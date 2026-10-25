@@ -5,6 +5,9 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowCounterClockwiseIcon,
+  EyeIcon,
+  LightningIcon,
+  XIcon,
   BookOpenIcon,
   BuildingsIcon,
   CaretDownIcon,
@@ -28,6 +31,9 @@ import { useSim, SPEEDS, type Speed } from "@/lib/sim";
 import { leadRows } from "@/lib/model";
 import { formatCount } from "@/lib/format";
 import { pinHref, pinKey } from "@/lib/pins";
+import { useShadow } from "@/lib/shadow";
+import { SCENARIOS, SCENARIO_IDS, type ScenarioId } from "@/lib/world";
+import { OpenSnapshot } from "./pages/shadow";
 
 export const REPO_URL = "https://github.com/distribute-you/gtm-factory";
 
@@ -112,6 +118,7 @@ function Sidebar() {
         <div className="space-y-px">
           <NavItem href="/" label="Today" icon={<HouseIcon size={15} />} active={at("/")} />
         </div>
+        <ShadowNav at={at} />
         <Group title="Campaigns">
           <NavItem href="/campaigns/" label="Overview" icon={<SquaresFourIcon size={15} />} active={at("/campaigns")} />
           {model &&
@@ -180,9 +187,22 @@ function Sidebar() {
   );
 }
 
+/** Shadow mode's pages, when a snapshot is open. */
+function ShadowNav({ at }: { at: (p: string) => boolean }) {
+  const { shadow, busy } = useShadow();
+  const pathname = usePathname() ?? "/";
+  if (!shadow && !busy) return null;
+  return (
+    <Group title="Shadow">
+      <NavItem href="/shadow/" label="Clients" icon={<EyeIcon size={15} />} active={at("/shadow") || pathname.startsWith("/shadow/client")} trailing={<Count n={shadow?.snapshot.clients.length} />} />
+      <NavItem href="/shadow/actions/" label="Actions" icon={<LightningIcon size={15} />} active={at("/shadow/actions")} trailing={<Count n={shadow?.report.actions.length} />} />
+    </Group>
+  );
+}
+
 /** Which client the pages show: one brand, or every client. */
 function ScopeSwitcher() {
-  const { model, scope, setScope } = useSim();
+  const { model, scope, setScope, scenario } = useSim();
   const [open, setOpen] = useState(false);
   const current = model?.clients.find((c) => c.brand.id === scope);
   const brands = model ? model.clients.map((c) => c.brand) : [];
@@ -192,7 +212,7 @@ function ScopeSwitcher() {
         <Mark kind="audience" id={current?.brand.id ?? "all"} size={22} quiet={!current} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{current?.brand.name ?? "All clients"}</span>
-          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory · fictional data</span>
+          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory · {scenario === "fictional" ? "fictional data" : `${SCENARIOS[scenario].label}, fictional clients`}</span>
         </span>
         <CaretDownIcon size={12} className="k-fg3" />
       </button>
@@ -220,7 +240,36 @@ function ScopeSwitcher() {
 
 /** The simulator, always in reach above every page: the day, play / pause / one day / speed, the scenario, reset on a seed. */
 function SimBar() {
-  const { model, playing, play, pause, stepDay, speed, setSpeed, reset, seed } = useSim();
+  const { shadow } = useShadow();
+  return shadow ? <ShadowBar /> : <SimulatorBar />;
+}
+
+/** With a snapshot open: what it is, and the way back to the simulator. */
+function ShadowBar() {
+  const { shadow, close } = useShadow();
+  if (!shadow) return null;
+  return (
+    <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-2 lg:pl-0" role="toolbar" aria-label="Shadow mode">
+      <span className="k-label hidden shrink-0 pl-1 sm:inline">Shadow</span>
+      <span className="flex min-w-0 shrink items-center gap-1.5 pl-1 pr-1">
+        <EyeIcon size={14} className="k-fg3 shrink-0" />
+        <span className="truncate text-[14px] font-medium" data-testid="shadow-name">
+          {shadow.snapshot.name}
+        </span>
+        <span className="k-fg3 hidden shrink-0 text-[12px] md:inline">read {shadow.snapshot.takenAt.slice(0, 10)} · nothing executes</span>
+      </span>
+      <span className="ml-auto" />
+      <OpenSnapshot compact />
+      <button type="button" className="k-btn shrink-0" onClick={close} title="Close the snapshot and go back to the simulator">
+        <XIcon size={13} />
+        Close
+      </button>
+    </div>
+  );
+}
+
+function SimulatorBar() {
+  const { model, playing, play, pause, stepDay, speed, setSpeed, reset, seed, scenario, setScenario } = useSim();
   const [seedText, setSeedText] = useState(String(seed));
   useEffect(() => setSeedText(String(seed)), [seed]);
   const nextSpeed = (): Speed => SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!;
@@ -245,6 +294,13 @@ function SimBar() {
         {speed} days/s
       </button>
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
+      <select aria-label="Scenario" className="k-input shrink-0 px-1.5" style={{ font: "inherit" }} value={scenario} onChange={(e) => setScenario(e.target.value as ScenarioId)}>
+        {SCENARIO_IDS.map((id) => (
+          <option key={id} value={id}>
+            {SCENARIOS[id].label}
+          </option>
+        ))}
+      </select>
       <span className="k-input flex w-[104px] shrink-0 items-center gap-1 px-2">
         <span className="k-fg3 text-[12px]">Seed</span>
         <input
@@ -262,6 +318,8 @@ function SimBar() {
         <ArrowCounterClockwiseIcon size={13} />
         Reset
       </button>
+      <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
+      <OpenSnapshot compact />
     </div>
   );
 }

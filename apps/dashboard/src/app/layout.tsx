@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Shell } from "@/components/shell";
 import { SimProvider } from "@/lib/sim";
+import { ShadowProvider } from "@/lib/shadow";
 import "./globals.css";
 import "./keel.css";
 
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>
         <SimProvider>
-          <Shell>{children}</Shell>
+          <ShadowProvider>
+            <Shell>{children}</Shell>
+          </ShadowProvider>
         </SimProvider>
       </body>
     </html>

@@ -4179,7 +4179,10 @@
           "paid_client",
           "lead_visited"
         ],
-        "lifetimeRevenue": 400
+        "lifetimeRevenue": 400,
+        "outcomeValues": {
+          "lead_interested": 30
+        }
       },
       "campaigns": [
         {
@@ -4416,7 +4419,10 @@
           "paid_client",
           "lead_visited"
         ],
-        "lifetimeRevenue": 1200
+        "lifetimeRevenue": 1200,
+        "outcomeValues": {
+          "meeting_booked": 150
+        }
       },
       "campaigns": [
         {

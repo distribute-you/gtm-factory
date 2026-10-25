@@ -54,6 +54,11 @@ export interface EvidenceContext {
   parentOf(option: string): string | null;
   /** Half-life of evidence, days (0 or unset = never fade). */
   memoryHalfLifeDays?: number;
+  /**
+   * The evidence no longer moves (an observed snapshot): every derived figure is
+   * computed once and kept. A simulation leaves it off: its cells move during the day.
+   */
+  frozen?: boolean;
 }
 
 export interface LegEstimateRead {
@@ -145,6 +150,20 @@ export class EvidenceBook {
    * factory was still learning is not blamed for it.
    */
   counts(point: string, option: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
+    if (!this.ctx.frozen) return this.computeCounts(point, option, brands, day, delay);
+    const key = `${point}${SEP}${option}${SEP}${day}${SEP}${brands.join(",")}`;
+    const hit = this.countsCache.get(key);
+    if (hit) return hit;
+    const v = this.computeCounts(point, option, brands, day, delay);
+    this.countsCache.set(key, v);
+    return v;
+  }
+
+  private readonly countsCache = new Map<string, Counts & { cost: number; n: number }>();
+  private readonly liftCache = new Map<string, { lift: number; weight: number }>();
+  private readonly groupLiftCache = new Map<string, number>();
+
+  private computeCounts(point: string, option: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
     const base = this.baselineOf(point, day, delay);
     let successes = 0;
     let trials = 0;
@@ -224,6 +243,16 @@ export class EvidenceBook {
 
   /** How much better than its points' average an option does everywhere it is offered (its overall level). */
   private liftOf(option: string, day: number): { lift: number; weight: number } {
+    if (!this.ctx.frozen) return this.computeLift(option, day);
+    const key = `${option}${SEP}${day}`;
+    const hit = this.liftCache.get(key);
+    if (hit) return hit;
+    const v = this.computeLift(option, day);
+    this.liftCache.set(key, v);
+    return v;
+  }
+
+  private computeLift(option: string, day: number): { lift: number; weight: number } {
     let s = 0;
     let e = 0;
     const brands = this.ctx.brandIds();
@@ -239,6 +268,20 @@ export class EvidenceBook {
       e += (mine.trials * S) / T;
     }
     return { lift: (s + 2) / (e + 2), weight: e };
+  }
+
+  /** The level of every option sharing a signature (their tactic group). */
+  private groupLift(sig: string, day: number): number {
+    const key = `${sig}${SEP}${day}`;
+    if (this.ctx.frozen && this.groupLiftCache.has(key)) return this.groupLiftCache.get(key)!;
+    const groupOpts = [...this.optionPoints.keys()].filter((o) => this.signatureOf(o) === sig);
+    const g = groupOpts.reduce((acc, o) => {
+      const l = this.liftOf(o, day);
+      return { s: acc.s + l.lift * l.weight, w: acc.w + l.weight };
+    }, { s: 0, w: 0 });
+    const v = (g.s + 2) / (g.w + 2);
+    if (this.ctx.frozen) this.groupLiftCache.set(key, v);
+    return v;
   }
 
   /**
@@ -259,12 +302,7 @@ export class EvidenceBook {
     const baseline = (S + 0.1) / (T + 2);
     // The option's overall level, pulled toward its tactic group's.
     const sig = this.signatureOf(option);
-    const groupOpts = [...this.optionPoints.keys()].filter((o) => this.signatureOf(o) === sig);
-    const g = groupOpts.reduce((acc, o) => {
-      const l = this.liftOf(o, day);
-      return { s: acc.s + l.lift * l.weight, w: acc.w + l.weight };
-    }, { s: 0, w: 0 });
-    const groupLift = (g.s + 2) / (g.w + 2);
+    const groupLift = this.groupLift(sig, day);
     const own = this.liftOf(option, day);
     const lift = (own.lift * own.weight + groupLift * 5) / (own.weight + 5);
     let prior = { rate: Math.min(0.95, baseline * lift), strength: Math.min(Math.max(fitPoolingStrength(fleet), 2), 400) };

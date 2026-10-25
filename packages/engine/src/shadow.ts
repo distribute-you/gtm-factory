@@ -16,7 +16,7 @@
 
 import { Catalogue, START, defaultStrategyId, isOnDemand, type CatalogueData, type SalesFunnel, type SalesPath, type OutcomeId, type Pipe, type Script, type Strategy } from "./catalogue";
 import { EvidenceBook, SEP, bumpCell, legEstimateOf, type CellStore, type LegEstimateRead } from "./evidence";
-import { allocateBudget, chainCostPerTarget, rankFunnels, valueBackwardLine, type LegEdge, type LegEstimate, type RankedFunnel } from "./funnels";
+import { allocateBudget, chainCostPerTarget, enumerateFunnels, valueBackwardLine, type LegEdge, type LegEstimate, type RankedFunnel } from "./funnels";
 import { buildLedger, type LedgerOccurrence, type LedgerReport, type LedgerRun } from "./ledger";
 import { prioritize } from "./prioritizer";
 import { createRng } from "./rng";
@@ -36,6 +36,8 @@ export const SHADOW_FORMAT = "gtm-factory/shadow@1";
 export interface ProductionFigure {
   value: number;
   source: string;
+  /** "org": production only knows the figure for the client's whole org (every brand of it). Default "brand". */
+  scope?: "brand" | "org";
 }
 
 export interface ProductionFigures {
@@ -255,6 +257,8 @@ export interface LegView {
   from: OutcomeId;
   to: OutcomeId;
   todayPipe: string | null;
+  /** Every pipe the leg runs through today, in the order they run (the inputs' providers, then the play). */
+  pipes: string[];
   enginePipe: string | null;
   estimate: LegEstimateRead;
 }
@@ -366,6 +370,7 @@ export class ShadowSession {
       groupOf: (b) => this.groupOf(b),
       parentOf: (o) => this.parentOf(o),
       memoryHalfLifeDays: this.settings.memoryHalfLifeDays,
+      frozen: true,
     });
     this.load();
     // Name the sales funnel each campaign runs today, in campaign order: one snapshot, one set of names.
@@ -488,6 +493,14 @@ export class ShadowSession {
     return providers.flatMap((p) => this.catalogue.dynastiesOf(p.id)).filter((s) => meetsAll(s.tactics, rules));
   }
 
+  private readonly legPipeRuns = new Map<string, string[]>();
+
+  /** Every pipe each leg of a campaign runs through today, in the order they run. */
+  legPipesOf(campaign: ShadowCampaign): string[][] {
+    this.pointsOfCampaign(campaign);
+    return campaign.line.map((_, k) => this.legPipeRuns.get(`${campaign.id}${SEP}${k}`) ?? (campaign.today.legPipes[k] ? [campaign.today.legPipes[k]!] : []));
+  }
+
   /** Object dynasties a client holds for an outcome (each serves its head version). */
   objectDynasties(brandId: string, outcome: OutcomeId): string[] {
     const client = this.snapshot.clients.find((c) => c.brand.id === brandId);
@@ -527,12 +540,15 @@ export class ShadowSession {
       add({ point: playPoint(from, to), kind: "play", consumer: null, input: to, legIndex: k, options: plays.map((p) => p.id), delay, horizon });
       if (!pipe) return;
       add({ point: pointKey(legConsumer(from, to), to), kind: "script", consumer: null, input: to, legIndex: k, options: this.allowed(campaign, null, null, [pipe]).map((s) => s.dynasty), delay, horizon });
-      this.walkInputs(campaign, pipe, from, k, delay, horizon, add, new Set([pipe.id]));
+      const ran: string[] = [];
+      this.walkInputs(campaign, pipe, from, k, delay, horizon, add, new Set([pipe.id]), ran);
+      ran.push(pipe.id);
+      this.legPipeRuns.set(`${campaign.id}${SEP}${k}`, ran);
     });
     return out;
   }
 
-  private walkInputs(campaign: ShadowCampaign, pipe: Pipe, from: OutcomeId, k: number, delay: number, horizon: number, add: (p: ReturnType<ShadowSession["pointsOfCampaign"]>[number]) => void, visiting: Set<string>): void {
+  private walkInputs(campaign: ShadowCampaign, pipe: Pipe, from: OutcomeId, k: number, delay: number, horizon: number, add: (p: ReturnType<ShadowSession["pointsOfCampaign"]>[number]) => void, visiting: Set<string>, ran: string[] = []): void {
     for (const i of pipe.inputs) {
       const out = this.catalogue.outcome(i);
       if (!out || out.subject === "event") continue;
@@ -559,7 +575,8 @@ export class ShadowSession {
       const script = pick ? this.catalogue.headOf(pick) : undefined;
       const provider = script ? this.catalogue.pipe(script.pipeId) : undefined;
       if (!provider || visiting.has(provider.id)) continue;
-      this.walkInputs(campaign, provider, from, k, delay, horizon, add, new Set([...visiting, provider.id]));
+      this.walkInputs(campaign, provider, from, k, delay, horizon, add, new Set([...visiting, provider.id]), ran);
+      if (!ran.includes(provider.id)) ran.push(provider.id);
     }
   }
 
@@ -602,6 +619,16 @@ export class ShadowSession {
 
   /** What a leg costs and yields through one pipe across the fleet (every campaign playing it there). */
   fleetLegEstimate(from: OutcomeId, to: OutcomeId, pipeId: string): LegEstimate | null {
+    const key = `${from}${SEP}${to}${SEP}${pipeId}`;
+    if (this.fleetLegCache.has(key)) return this.fleetLegCache.get(key)!;
+    const v = this.computeFleetLegEstimate(from, to, pipeId);
+    this.fleetLegCache.set(key, v);
+    return v;
+  }
+
+  private readonly fleetLegCache = new Map<string, LegEstimate | null>();
+
+  private computeFleetLegEstimate(from: OutcomeId, to: OutcomeId, pipeId: string): LegEstimate | null {
     const merged = new Map<number, { t: number; s: number; f: number; c: number }>();
     let delay = this.catalogue.pipe(pipeId)?.maturity.delayMeanDays ?? 0;
     for (const c of this.campaigns()) {
@@ -622,6 +649,20 @@ export class ShadowSession {
     const e = legEstimateOf(merged, this.day, delay);
     if (e.yieldRate === null || e.costPerAttempt === null || e.reached === 0) return null;
     return { costPerAttempt: e.costPerAttempt, yieldRate: e.yieldRate, label: e.label };
+  }
+
+  /** The 3 cheapest distinct lines to a target (a bounded search: a real catalogue has many legs). */
+  private bestLines(outcomes: OutcomeId[], target: OutcomeId, estimator: (e: LegEdge) => LegEstimate | null, value: number, entry: OutcomeId): RankedFunnel[] {
+    const out: RankedFunnel[] = [];
+    const seen = new Set<string>();
+    for (const f of enumerateFunnels(this.catalogue, outcomes, target, (e) => estimator(e), value, entry, 3000)) {
+      const k = f.line.join(">");
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(f);
+      if (out.length >= 3) break;
+    }
+    return out;
   }
 
   /** Value of one occurrence at the end of a campaign's leg (backward from its target). */
@@ -648,11 +689,14 @@ export class ShadowSession {
       const rel = fig.value !== 0 ? gap / fig.value : null;
       lines.push({ key, snapshot, production: fig.value, source: fig.source, gap, relativeGap: rel, matches: fig.value === 0 ? Math.abs(gap) < 1e-9 : Math.abs(gap) <= tol * Math.abs(fig.value) });
     };
-    const spend = this.snapshot.observations.runs.filter((r) => r.brandId === b).reduce((s, r) => s + r.spendCents, 0);
+    const orgBrands = new Set(this.snapshot.clients.filter((c) => c.org.id === client.org.id).map((c) => c.brand.id));
+    const spendBrands = client.production.spendCents?.scope === "org" ? orgBrands : new Set([b]);
+    const spend = this.snapshot.observations.runs.filter((r) => spendBrands.has(r.brandId)).reduce((s, r) => s + r.spendCents, 0);
     line("spend", spend, client.production.spendCents);
     const outcomes = new Set([...Object.keys(client.production.outcomes ?? {})]);
     for (const o of [...outcomes].sort()) {
-      const n = this.snapshot.observations.states.filter((s) => s.brandId === b && s.outcome === o).reduce((x, s) => x + s.leads, 0);
+      const brands = client.production.outcomes?.[o]?.scope === "org" ? orgBrands : new Set([b]);
+      const n = this.snapshot.observations.states.filter((s) => brands.has(s.brandId) && s.outcome === o).reduce((x, s) => x + s.leads, 0);
       line(o, n, client.production.outcomes?.[o]);
     }
     return { brandId: b, lines, reconciles: lines.length > 0 && lines.every((l) => l.matches), missing, notes: client.notes ?? [] };
@@ -723,10 +767,12 @@ export class ShadowSession {
       const engine = [...views].sort((x, y) => y.valuePerDollar - x.valuePerDollar || (x.option < y.option ? -1 : 1))[0]!.option;
       points.push({ point: p.point, kind: p.kind, consumer: p.consumer, input: p.input, legIndex: p.legIndex, today: campaign.today.picks[p.point] ?? (p.kind === "play" ? campaign.today.legPipes[p.legIndex] ?? null : null), engine, options: views });
     }
+    const runs = this.legPipesOf(campaign);
     const legs: LegView[] = estimates.map((e, k) => ({
       from: e.from,
       to: e.to,
       todayPipe: campaign.today.legPipes[k] ?? null,
+      pipes: runs[k] ?? [],
       enginePipe: points.find((p) => p.kind === "play" && p.legIndex === k)?.engine ?? campaign.today.legPipes[k] ?? null,
       estimate: { attempts: e.attempts, reached: e.reached, yieldRate: e.yieldRate, costPerAttempt: e.costPerAttempt, label: e.label },
     }));
@@ -744,7 +790,7 @@ export class ShadowSession {
     const engine =
       tv.amount > 0
         ? this.entryRoots(entry)
-            .flatMap((root) => rankFunnels(this.catalogue, outcomes, target, estimator, tv.amount, 3, root).map((f) => ({ ...f, line: [entry, ...f.line.slice(1)] })))
+            .flatMap((root) => this.bestLines(outcomes, target, estimator, tv.amount, root).map((f) => ({ ...f, line: [entry, ...f.line.slice(1)] })))
             .sort((a, b) => a.costPerTarget - b.costPerTarget || a.line.join(">").localeCompare(b.line.join(">")))
             .slice(0, 3)
         : [];

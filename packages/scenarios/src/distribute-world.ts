@@ -156,12 +156,12 @@ export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWo
   });
   const clients: WorldClient[] = [
     client(1, "Northwind Analytics", "Mid-market", { lifetimeRevenue: 900 }, [camp(1, "", "Paid clients from cold outreach", ["lead_interested", "meeting_booked", "meeting_attended", "paid_client"], 3000)]),
-    client(2, "Bluepeak Logistics", "Mid-market", { lifetimeRevenue: 400 }, [
+    client(2, "Bluepeak Logistics", "Mid-market", { lifetimeRevenue: 400, outcomeValues: { lead_interested: 30 } }, [
       camp(2, "", "Signups from the website", ["lead_visited", "lead_interested", "paid_client"], 2500),
       camp(2, "f", "Visits that did not sign up", ["lead_interested"], 800, { entry: { kind: "trigger", triggerId: "website_visit_no_signup_30_min" } }),
     ]),
     client(3, "Lumen Dental Labs", "SMB", { lifetimeRevenue: 1500 }, [camp(3, "", "Replies closed by the team", ["lead_interested", "paid_client"], 2000)]),
-    client(4, "Copperleaf Studio", "SMB", { lifetimeRevenue: 1200 }, [camp(4, "", "Meetings from cold email", ["lead_interested", "meeting_booked"], 2000, { strategies: { [coldEmailPipe]: `${coldEmailPipe}#cold-email-only` } })]),
+    client(4, "Copperleaf Studio", "SMB", { lifetimeRevenue: 1200, outcomeValues: { meeting_booked: 150 } }, [camp(4, "", "Meetings from cold email", ["lead_interested", "meeting_booked"], 2000, { strategies: { [coldEmailPipe]: `${coldEmailPipe}#cold-email-only` } })]),
   ];
 
   return {
