@@ -22,7 +22,7 @@ describe("cost per target outcome", () => {
     expect(ranked[1]!.costPerTarget).toBeCloseTo(700, 9);
     expect(ranked[1]!.valuePerDollar).toBeCloseTo(3, 9);
     const legs = ranked[1]!.legs;
-    expect(legs.map((l) => l.inputsPerTarget)).toEqual([expect.closeTo(625, 9), expect.closeTo(12.5, 9), expect.closeTo(5, 9)]);
+    expect(legs.map((l) => l.leadsNeeded)).toEqual([expect.closeTo(625, 9), expect.closeTo(12.5, 9), expect.closeTo(5, 9)]);
     expect(legs.map((l) => l.costPerTarget)).toEqual([expect.closeTo(625, 9), expect.closeTo(25, 9), expect.closeTo(50, 9)]);
   });
 

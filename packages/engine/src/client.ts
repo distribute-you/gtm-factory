@@ -65,6 +65,8 @@ export interface Campaign {
   /** Cap on leads served. */
   maxVolume?: number;
   status: "running" | "paused";
+  /** The sales funnel the client launched (play ids from Start). Unset: the engine picks the funnel itself. */
+  salesFunnel?: string[];
 }
 
 export interface Lead {

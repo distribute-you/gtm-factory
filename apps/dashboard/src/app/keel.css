@@ -1,0 +1,178 @@
+/*
+ * Design tokens and primitives copied from distribute.you dashboard v2 (itself ported
+ * from Keel's light theme): layout, density, type scale, elevations, our brand accent.
+ * Everything is scoped under `.v2-root`.
+ */
+.v2-root {
+  --bg-canvas: #f3f3f4;
+  --bg-surface: #fafafa;
+  --bg-raised: #ffffff;
+  --bg-inset: #f5f5f6;
+  --bg-hover: #1010120a;
+  --bg-active: #10101212;
+  --bg-selected: #1010120f;
+  --bg-strong: #18181b;
+  --bg-strong-hover: #27272b;
+  --fg-1: #101012;
+  --fg-2: #5e5e66;
+  --fg-3: #74747c;
+  --fg-4: #a9a9b0;
+  --line-subtle: #10101211;
+  --line: #10101217;
+  --line-strong: #10101224;
+  --accent: var(--color-brand-600);
+  --accent-soft: var(--color-brand-50);
+  --accent-text: var(--color-brand-700);
+  --data-teal: #0e9f86;
+  /* Every RUNNING indicator in v2 is green, whatever the brand's accent. */
+  --run: #16a34a;
+  --data-amber: #c7870a;
+  --data-violet: #6e5cf0;
+  --data-rose: #e03a6a;
+  --data-sky: #1d8be0;
+  --data-lime: #5c9a1b;
+  --data-track: #10101214;
+  --elev-panel: 0 0 0 1px var(--line-subtle), 0 1px 2px #0000000a;
+  --elev-control: 0 1px 1px #0000000d;
+  --elev-popover: 0 0 0 1px #10101214, 0 2px 6px -1px #00000014, 0 12px 28px -6px #00000024;
+  font-family: var(--font-geist-sans), "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--fg-1);
+  background: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+.v2-root ::selection { background: color-mix(in oklab, var(--accent) 22%, transparent); }
+
+.v2-root .k-mono { font-family: var(--font-geist-mono), "DM Mono", ui-monospace, monospace; }
+.v2-root .k-label {
+  font-family: var(--font-geist-mono), "DM Mono", ui-monospace, monospace;
+  font-size: 10.5px; font-weight: 500; line-height: 14px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3);
+}
+.v2-root .k-fg { color: var(--fg-1); }
+.v2-root .k-fg2 { color: var(--fg-2); }
+.v2-root .k-fg3 { color: var(--fg-3); }
+.v2-root .k-fg4 { color: var(--fg-4); }
+.v2-root .k-accent { color: var(--accent); }
+.v2-root .k-accent-text { color: var(--accent-text); }
+.v2-root .k-canvas { background: var(--bg-canvas); }
+.v2-root .k-surface { background: var(--bg-surface); }
+.v2-root .k-raised { background: var(--bg-raised); }
+.v2-root .k-inset { background: var(--bg-inset); }
+.v2-root .k-selected { background: var(--bg-selected); }
+.v2-root .k-hover:hover { background: var(--bg-hover); }
+.v2-root .k-line { border-color: var(--line); }
+.v2-root .k-line-subtle { border-color: var(--line-subtle); }
+.v2-root .k-panel { background: var(--bg-surface); border-radius: 12px; box-shadow: var(--elev-panel); }
+.v2-root .k-card { background: var(--bg-raised); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line-subtle); }
+.v2-root a.k-card, .v2-root button.k-card { transition: box-shadow 150ms; }
+.v2-root a.k-card:hover, .v2-root button.k-card:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* A ticked selectable card: light accent fill + accent ring. Tailwind bg-/ring- utilities lose to .k-card (unlayered), so the state lives here. */
+.v2-root .k-card.k-card-on, .v2-root button.k-card.k-card-on:hover { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.v2-root .k-card-accent { background: var(--bg-raised); border-radius: 12px; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
+.v2-root .k-popover { background: var(--bg-raised); border-radius: 12px; box-shadow: var(--elev-popover); }
+.v2-root .k-control { border-radius: 8px; }
+.v2-root .k-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 8px; background: var(--bg-raised); color: var(--fg-1); font-size: 13px; font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--line), var(--elev-control); transition: background 120ms;
+}
+.v2-root .k-btn:hover { background: var(--bg-inset); }
+.v2-root .k-btn-strong {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 8px; background: var(--bg-strong); color: #fafafa; font-size: 13px; font-weight: 500;
+  transition: background 120ms;
+}
+.v2-root .k-btn-strong:hover { background: var(--bg-strong-hover); }
+.v2-root .k-btn-accent {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 500;
+}
+/* A disabled accent button must LOOK disabled: unstyled, "Continue" with nothing ticked read as clickable. */
+.v2-root .k-btn-accent:disabled { opacity: 0.45; cursor: not-allowed; }
+.v2-root .k-btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px;
+  border-radius: 8px; color: var(--fg-2); font-size: 13px;
+}
+.v2-root .k-btn-ghost:hover { background: var(--bg-hover); color: var(--fg-1); }
+.v2-root .k-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 6px;
+  border-radius: 6px; background: var(--bg-inset); color: var(--fg-2); font-size: 12px;
+  box-shadow: inset 0 0 0 1px var(--line-subtle); white-space: nowrap;
+}
+.v2-root .k-kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 4px; background: var(--bg-raised); color: var(--fg-3); font-size: 10px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace; box-shadow: inset 0 0 0 1px var(--line);
+}
+/* A key hint is for a keyboard. On a touch screen it names keys nobody has, and in
+   the palette it took the room its own placeholder needed at 320px. `.k-keys` wraps a
+   hint that is more than a key ("↑ ↓ to move"), so the words go with the keys. */
+@media (hover: none) and (pointer: coarse) {
+  .v2-root .k-kbd, .v2-root .k-keys { display: none; }
+}
+.v2-root .k-input {
+  height: 28px; border-radius: 8px; background: var(--bg-raised); color: var(--fg-1); font-size: 13px;
+  box-shadow: inset 0 0 0 1px var(--line); outline: none;
+}
+.v2-root .k-input:focus-within { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 60%, transparent); }
+/* The call to action a selling screen exists for (the sign-up wall): 48px tall, never
+   missed. Sign-up choices are k-cta-dark, all the same: Google's own dark theme (#131314,
+   #8E918F stroke, standard G; its guidelines forbid a brand-colour fill), and email
+   dressed alike, never one blue and one not.
+   Tailwind height utilities lose to the 28px controls above (this file is unlayered),
+   so size a big control with these, never with h-12. */
+.v2-root .k-cta { height: 48px; padding: 0 18px; border-radius: 10px; font-size: 15px; font-weight: 600; }
+.v2-root .k-btn-accent.k-cta:hover:not(:disabled) { background: color-mix(in oklab, var(--accent) 88%, black); }
+.v2-root .k-cta-dark { display: inline-flex; align-items: center; background: #131314; color: #fff; box-shadow: inset 0 0 0 1px #8e918f; font-weight: 500; }
+.v2-root .k-cta-dark:hover:not(:disabled) { background: #2a2a2d; }
+.v2-root .k-cta-dark:disabled { opacity: 0.45; }
+.v2-root .k-input.k-cta-input { height: 48px; padding: 0 12px; border-radius: 10px; font-size: 15px; }
+.v2-root .k-tab { position: relative; height: 40px; display: inline-flex; align-items: center; gap: 6px; color: var(--fg-2); }
+.v2-root .k-tab[aria-current="page"] { color: var(--fg-1); }
+.v2-root .k-tab[aria-current="page"]::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1.5px; background: var(--fg-1);
+}
+.v2-root .k-row { border-bottom: 1px solid var(--line-subtle); }
+.v2-root .k-row:hover { background: var(--bg-hover); }
+/* A one-line path (Start → [channel] → step …) wider than its cell: a right fade says there is more,
+   and hovering the row, card or line slides it right to left to its end (HoverScroll, ui.tsx). */
+.v2-root .k-hscroll { display: block; min-width: 0; overflow: hidden; }
+.v2-root .k-hscroll-track { display: block; width: max-content; transition: transform 0.35s cubic-bezier(.23, 1, .32, 1); }
+.v2-root .k-hscroll[data-overflow] { mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.v2-root .k-row:hover .k-hscroll[data-overflow],
+.v2-root .k-hover:hover .k-hscroll[data-overflow],
+.v2-root .k-hscroll[data-overflow]:hover { mask-image: none; }
+.v2-root .k-row:hover .k-hscroll[data-overflow] > .k-hscroll-track,
+.v2-root .k-hover:hover .k-hscroll[data-overflow] > .k-hscroll-track,
+.v2-root .k-hscroll[data-overflow]:hover > .k-hscroll-track {
+  transform: translateX(var(--k-hscroll-shift)); transition: transform var(--k-hscroll-dur) linear 0.3s;
+}
+@media (prefers-reduced-motion: reduce) { .v2-root .k-hscroll-track { transform: none !important; } }
+.v2-root .k-dot-pulse { position: relative; }
+.v2-root .k-dot-pulse::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 9999px; background: currentColor; opacity: 0.25;
+  animation: k-pulse 2.4s cubic-bezier(.23, 1, .32, 1) infinite;
+}
+@keyframes k-pulse { 0% { transform: scale(0.6); opacity: 0.35 } 100% { transform: scale(1.6); opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .v2-root .k-dot-pulse::after { animation: none; } }
+.v2-root .k-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.v2-root .k-scroll::-webkit-scrollbar-thumb { background: #1010122e; border-radius: 9999px; border: 3px solid transparent; background-clip: content-box; }
+.v2-root .k-indeterminate { animation: k-indet 1.6s cubic-bezier(.65, 0, .35, 1) infinite; }
+@keyframes k-indet { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
+@media (prefers-reduced-motion: reduce) { .v2-root .k-indeterminate { animation: none; } }
+/* A right drawer slides in from the edge, ease-out, short; reduced motion opens it in place. */
+.v2-root .k-drawer-in { animation: k-drawer-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes k-drawer-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .v2-root .k-drawer-in { animation: none; } }
+
+
+/* Rows and cards that arrive while the simulation plays rise in, short and soft. */
+.v2-root .k-rise { animation: k-rise 320ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes k-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.v2-root .k-fill { transition: width 500ms cubic-bezier(.23, 1, .32, 1); }
+@media (prefers-reduced-motion: reduce) { .v2-root .k-rise { animation: none; } .v2-root .k-fill { transition: none; } }
+/* A chip that toggles a view: on = accent tint and ring (keel is unlayered, so the state lives here). */
+.v2-root .k-chip.k-chip-on { background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
+.v2-root button.k-chip:hover:not(.k-chip-on) { background: var(--bg-hover); color: var(--fg-1); }

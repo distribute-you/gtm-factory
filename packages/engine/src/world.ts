@@ -5,7 +5,7 @@
  * gets workflows, slot options and a hidden yield the same way.
  */
 
-import type { Catalogue, Pipe, SlotOption, StepKey, Workflow } from "./catalogue";
+import type { Catalogue, Pipe, SlotOption, StepKey, Strategy, Tactic, Workflow } from "./catalogue";
 import { START } from "./catalogue";
 import type { AudienceProposal, SegmentRule } from "./client";
 import { createRng, type Rng } from "./rng";
@@ -78,47 +78,7 @@ export function fictionalWorld(source: Catalogue, options: FictionalWorldOptions
 
   for (const pipe of catalogue.pipes) {
     if (!catalogue.isPipeLive(pipe)) continue;
-    const channel = catalogue.channel(pipe.channel);
-    const toState = catalogue.step(pipe.to)?.leadState ?? null;
-    const fromState = pipe.from === START ? null : catalogue.step(pipe.from)?.leadState ?? null;
-    const fromStart = pipe.from === START;
-    // Generic truth: the further a pipe moves a lead up its lead track, the lower its yield.
-    let baseYield: number;
-    if (!toState) baseYield = between(rng, 0.5, 0.9);
-    else if (fromState && fromState.leadTrack === toState.leadTrack) baseYield = between(rng, 0.2, 0.6) ** Math.max(1, toState.rank - fromState.rank);
-    else if (fromState) baseYield = between(rng, 0.05, 0.3) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
-    else baseYield = between(rng, 0.02, 0.08) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
-    truthPipes.push({
-      pipeId: pipe.id,
-      baseYield: round(baseYield),
-      delayMeanDays: pipe.maturity.delayMeanDays,
-      maxDelayDays: Math.max(1, Math.ceil(pipe.maturity.durationDays || pipe.maturity.delayMeanDays * 4)),
-    });
-    const cheap = fromStart || pipe.mode === "proactive";
-    const baseCost = cheap ? Math.round(between(rng, 30, 150)) : Math.round(between(rng, 100, 1500));
-    const expectedYield = round(baseYield * between(rng, 0.6, 1.4));
-    const person = channel?.performedBy === "person";
-    const flows: Workflow[] = person
-      ? [
-          { id: `${pipe.id}:wf:human`, dynasty: `${pipe.id}:human`, pipeId: pipe.id, kind: "human", slots: [], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
-          { id: `${pipe.id}:wf:scripted`, dynasty: `${pipe.id}:scripted`, pipeId: pipe.id, kind: "human", slots: ["template"], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
-        ]
-      : [
-          { id: `${pipe.id}:wf:rules`, dynasty: `${pipe.id}:rules`, pipeId: pipe.id, kind: "rules", slots: ["template"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
-          { id: `${pipe.id}:wf:ai`, dynasty: `${pipe.id}:ai`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
-          { id: `${pipe.id}:wf:ai-research`, dynasty: `${pipe.id}:ai-research`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: [], costPerTrialCents: Math.round(baseCost * 1.6), expectedYield, status: "active" },
-        ];
-    for (const w of flows) {
-      if (catalogue.workflow(w.id)) continue;
-      catalogue.add("workflows", w);
-      workflowTruth[w.id] = round(between(rng, 0.6, 1.6));
-    }
-    for (const name of ["short", "story"]) {
-      const o: SlotOption = { id: `${pipe.id}:template:${name}`, slot: "template", name: `${name} template`, pipeId: pipe.id, tactics: [], costPerTrialCents: 0, status: "active" };
-      if (catalogue.slotOption(o.id)) continue;
-      catalogue.add("slotOptions", o);
-      slotTruth[o.id] = round(between(rng, 0.75, 1.3));
-    }
+    furnishPipe(rng, catalogue, pipe, truthPipes, workflowTruth, slotTruth);
   }
 
   const optional = catalogue.steps.filter((s) => !s.retired && s.key !== target).map((s) => s.key);
@@ -171,6 +131,102 @@ export function fictionalWorld(source: Catalogue, options: FictionalWorldOptions
     evidencePolicy: { referenceReporter: Object.fromEntries(states.map((s) => [s, "crm"])), minReliability: 0.8 },
     settings: { funnelCandidates: 4, funnelEveryDays: 7, discoverEveryDays: 15, setupCentsPerClient: 5000 },
   };
+}
+
+/**
+ * Give one pipe what the world needs to run it: workflows (rules and AI, or
+ * people), two templates, and its hidden truths (base yield, delay, each
+ * option's multiplier). Generic: reads only the pipe's ends and its channel.
+ */
+function furnishPipe(
+  rng: Rng,
+  catalogue: Catalogue,
+  pipe: Pipe,
+  truthPipes: PipeTruth[],
+  workflowTruth: Record<string, number>,
+  slotTruth: Record<string, number>,
+): void {
+  ensureWorldTactics(catalogue);
+  const channel = catalogue.channel(pipe.channel);
+  const toState = catalogue.step(pipe.to)?.leadState ?? null;
+  const fromState = pipe.from === START ? null : catalogue.step(pipe.from)?.leadState ?? null;
+  const fromStart = pipe.from === START;
+  // Generic truth: the further a pipe moves a lead up its lead track, the lower its yield.
+  let baseYield: number;
+  if (!toState) baseYield = between(rng, 0.5, 0.9);
+  else if (fromState && fromState.leadTrack === toState.leadTrack) baseYield = between(rng, 0.2, 0.6) ** Math.max(1, toState.rank - fromState.rank);
+  else if (fromState) baseYield = between(rng, 0.05, 0.3) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
+  else baseYield = between(rng, 0.02, 0.08) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
+  truthPipes.push({
+    pipeId: pipe.id,
+    baseYield: round(baseYield),
+    delayMeanDays: pipe.maturity.delayMeanDays,
+    maxDelayDays: Math.max(1, Math.ceil(pipe.maturity.durationDays || pipe.maturity.delayMeanDays * 4)),
+  });
+  const cheap = fromStart || pipe.mode === "proactive";
+  const baseCost = cheap ? Math.round(between(rng, 30, 150)) : Math.round(between(rng, 100, 1500));
+  const expectedYield = round(baseYield * between(rng, 0.6, 1.4));
+  const person = channel?.performedBy === "person";
+  const flows: Workflow[] = person
+    ? [
+        { id: `${pipe.id}:wf:human`, dynasty: `${pipe.id}:human`, pipeId: pipe.id, kind: "human", slots: [], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
+        { id: `${pipe.id}:wf:scripted`, dynasty: `${pipe.id}:scripted`, pipeId: pipe.id, kind: "human", slots: ["template"], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
+      ]
+    : [
+        { id: `${pipe.id}:wf:rules`, dynasty: `${pipe.id}:rules`, pipeId: pipe.id, kind: "rules", slots: ["template"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
+        { id: `${pipe.id}:wf:ai`, dynasty: `${pipe.id}:ai`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
+        { id: `${pipe.id}:wf:ai-research`, dynasty: `${pipe.id}:ai-research`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: ["research-first"], costPerTrialCents: Math.round(baseCost * 1.6), expectedYield, status: "active" },
+      ];
+  for (const w of flows) {
+    if (catalogue.workflow(w.id)) continue;
+    catalogue.add("workflows", w);
+    workflowTruth[w.id] = round(between(rng, 0.6, 1.6));
+  }
+  for (const name of ["short", "story"]) {
+    const o: SlotOption = { id: `${pipe.id}:template:${name}`, slot: "template", name: `${name} template`, pipeId: pipe.id, tactics: [`${name}-copy`], costPerTrialCents: 0, status: "active" };
+    if (catalogue.slotOption(o.id)) continue;
+    catalogue.add("slotOptions", o);
+    slotTruth[o.id] = round(between(rng, 0.75, 1.3));
+  }
+}
+
+/** The tactics and strategies the fictional workflows and templates are tagged with. */
+export const FICTIONAL_TACTICS: Tactic[] = [
+  { id: "research-first", name: "Researches the company first", appliesTo: "workflow", description: "Reads the company before it writes or calls." },
+  { id: "short-copy", name: "Short copy", appliesTo: "slot_option", description: "Three sentences or fewer." },
+  { id: "story-copy", name: "Story copy", appliesTo: "slot_option", description: "Opens on a short client story." },
+];
+
+export const FICTIONAL_STRATEGIES: Strategy[] = [
+  { id: "researched", name: "Researched outreach", required: ["research-first"], excluded: [] },
+  { id: "short-and-direct", name: "Short and direct", required: ["short-copy"], excluded: ["research-first"] },
+];
+
+function ensureWorldTactics(catalogue: Catalogue): void {
+  for (const t of FICTIONAL_TACTICS) if (!catalogue.tactics.some((x) => x.id === t.id)) catalogue.add("tactics", t);
+  for (const st of FICTIONAL_STRATEGIES) if (!catalogue.strategy(st.id)) catalogue.add("strategies", st);
+}
+
+/**
+ * Add a pipe to a running world: the pipe must already be in the world's
+ * catalogue. It gets workflows, templates and hidden truths the same generic way
+ * as at creation, from a seed of its own (the rest of the world is unchanged).
+ */
+export function extendWorldWithPipe(world: WorldSpec, pipeId: string): void {
+  const pipe = world.catalogue.pipe(pipeId);
+  if (!pipe) throw new Error(`pipe "${pipeId}" not found`);
+  if (world.truth.pipes.some((t) => t.pipeId === pipeId)) return;
+  const rng = createRng(`world:${world.seed}:pipe:${pipeId}`);
+  furnishPipe(rng, world.catalogue, pipe, world.truth.pipes, world.truth.workflows, world.truth.slotOptions);
+}
+
+/** Draw the hidden yield multiplier of a workflow or slot option added while the world runs. */
+export function extendWorldWithOption(world: WorldSpec, kind: "workflows" | "slotOptions", id: string): number {
+  const table = kind === "workflows" ? world.truth.workflows : world.truth.slotOptions;
+  if (table[id] !== undefined) return table[id]!;
+  const rng = createRng(`world:${world.seed}:${kind}:${id}`);
+  table[id] = round(between(rng, 0.6, 1.6));
+  return table[id]!;
 }
 
 function expertAudiences(rng: Rng): AudienceProposal[] {

@@ -84,7 +84,7 @@ Funnel A, through a meeting:
 
 Cost forward: one interested lead costs $1 / 0.02 = **$50**. One meeting costs ($50 + $2) / 0.4 = **$130**. One paid client costs ($130 + $10) / 0.2 = **$700**.
 
-Read per paid client, the same $700 splits by leg: the closing leg needs 5 meetings at $10 (**$50**), the booking leg needs 12.5 interested leads at $2 (**$25**), the email leg needs 625 emails at $1 (**$625**). Value per dollar: $2,100 / $700 = **3.0**.
+Read per paid client, the same $700 splits by leg. Each leg's count of inputs per paid client is its **leads needed**: the closing leg needs 5 meetings at $10 (**$50**), the booking leg needs 12.5 interested leads at $2 (**$25**), the email leg needs 625 emails at $1 (**$625**). Value per dollar: $2,100 / $700 = **3.0**.
 
 Value backward: a meeting is worth 0.2 x $2,100 - $10 = **$410**. An interested lead is worth 0.4 x $410 - $2 = **$162**. One email is worth 0.02 x $162 - $1 = **$2.24** net, so each dollar spent on email returns 0.02 x $162 / $1 = **$3.24** in downstream value.
 
@@ -198,7 +198,7 @@ The email pipe's own price for decisions: $9 over 4 inputs is **$2.25** per inpu
 
 How do we know an outcome happened? A reply, a click, a booking is **evidence** of a lead state, and evidence comes from a reporter: the client's CRM, a website tracker, an AI judge reading a reply, a person's statement, an API push.
 
-Reporters are not equally trustworthy, and the framework never hardcodes which to trust. Each reporter's reliability is **measured** per outcome: its agreement with the outcome's reference reporter on the clients where both are connected. That number decides how much its evidence counts. A client counts in an outcome's figures only when a reliable reporter covers that outcome for them. The others are left out, never counted as zero.
+Reporters are not equally trustworthy, and the framework never hardcodes which to trust. Each reporter's reliability is **measured** per outcome: its agreement with the outcome's reference reporter on the clients where both are connected. That number decides how much its evidence counts. Merged over every reporter that saw it, an outcome carries a **confidence**: one minus the chance that every one of them is wrong. A client counts in an outcome's figures only when a reliable reporter covers that outcome for them. The others are left out, never counted as zero.
 
 ## 10. Adding a pipe
 
@@ -213,4 +213,4 @@ From the next decision on, every funnel that can use the pipe considers it. Its 
 
 ## 11. The simulator
 
-The engine ships with a synthetic world: fictional clients, offers, audiences and leads, with hidden true yields, delays and costs for every workflow, template, LLM and segment. Day by day, under each campaign's budget, the engine makes every choice, runs are produced, outcomes land after their delay, the ledger fills and the engine learns. One seed gives one history, byte for byte. This is what the dashboard plays.
+The engine ships with a synthetic world: fictional clients, offers, audiences and leads, with hidden true yields, delays and costs for every workflow, template, LLM and segment. Day by day, under each campaign's budget, the engine makes every choice, runs are produced, outcomes land after their delay, the ledger fills and the engine learns. One seed gives one history, byte for byte. This is what the dashboard plays: [`apps/dashboard`](../apps/dashboard), live at https://distribute-you.github.io/gtm-factory/.

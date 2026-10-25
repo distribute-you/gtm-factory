@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: oklch(97% 0.02 258);
+  --color-brand-100: oklch(94% 0.05 258);
+  --color-brand-200: oklch(88% 0.09 258);
+  --color-brand-300: oklch(80% 0.14 258);
+  --color-brand-400: oklch(72% 0.17 258);
+  --color-brand-500: oklch(64% 0.17 258);
+  --color-brand-600: oklch(54% 0.16 258);
+  --color-brand-700: oklch(47% 0.14 258);
+  --color-brand-800: oklch(41% 0.115 258);
+  --color-brand-900: oklch(35% 0.09 258);
+}
+
+html, body { margin: 0; height: 100%; background: #f3f3f4; }
+* { box-sizing: border-box; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }

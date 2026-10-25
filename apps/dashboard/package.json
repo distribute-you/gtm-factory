@@ -1,0 +1,33 @@
+{
+  "name": "dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The GTM Factory live dashboard: the whole product on a simulated world, in the browser.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "@gtm-factory/engine": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "next": "^16.4.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "playwright": "^1.64.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -5,3 +5,4 @@ dist
 .context
 *.log
 .DS_Store
+*.tsbuildinfo
