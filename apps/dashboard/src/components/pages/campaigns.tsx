@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon, LightningIcon } from "@phosphor-icons/react";
 import { defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
-import { FunnelLine, OutcomeChip } from "@/components/funnel-line";
+import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
@@ -190,6 +190,9 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
 
       <div className="k-card mb-6 px-4 py-3">
         <p className="k-label mb-1.5">Sales funnel</p>
+        <p className="mb-1.5">
+          <FunnelName model={model} campaign={campaign} />
+        </p>
         <FunnelLine model={model} campaign={campaign} size="md" />
       </div>
 
@@ -416,7 +419,7 @@ function Plays({ model, campaign }: { model: Model; campaign: Campaign }) {
   const pipes = playedPipes(model, campaign);
   return (
     <section className="mb-8">
-      <SectionTitle count={pipes.length} right={<span>A play is a pipe with a strategy. A strategy states conditions per input.</span>}>
+      <SectionTitle count={pipes.length} right={<span>Every pipe of the funnel line, each with its strategy.</span>}>
         Plays
       </SectionTitle>
       <div className="grid gap-3 md:grid-cols-2">

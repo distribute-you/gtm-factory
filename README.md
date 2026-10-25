@@ -53,12 +53,12 @@ Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Pla
 |---|---|
 | Today | Return measured beside expected on one formula, value won by our runs beside other factories, outcomes per lead track, why the engine chose. |
 | New campaign | Pick a client, a target and an entry (Start or a trigger), get the best sales funnels by value per dollar, choose strategies per pipe, launch. |
-| Campaigns | Each sales funnel leg by leg, its plays and strategies, every input choice with its options, beliefs and the hidden best. |
+| Campaigns | Each campaign's named sales funnel, every pipe each leg runs through, its plays and strategies, every input choice with its options, beliefs and the hidden best. |
 | ICPs | Competing ICP sentences per client, the finer ones the splits proposed, and the verdict of every split. |
 | Leads, Companies | A board per lead state and track; each lead's timeline with the traceability of every occurrence. |
 | Pinned pages | Pin any outcome or pipe: Templates and LLMs ship pinned. Read, edit (a new version) and compare versions; scripts as cards; where a pipe is plugged and the best script at each input; its pipe storage. |
 | Research | Convergence of every choice point toward the hidden best option, beliefs beside the hidden truth, strategies proposed by splits. |
-| Catalogue | Outcomes, pipes, scripts, triggers, tactics, strategies and factories. Upgrade, fork, retire, pin. |
+| Catalogue | Outcomes, pipes, scripts, triggers, sales paths and funnels, tactics, strategies and factories. Upgrade, fork, retire, pin. |
 | Ledger | Every-path unit costs beside each pipe's own cost, our spend beside other factories', reconciled to the cent. |
 | How it works | The framework's core ideas, linked to the spec. |
 

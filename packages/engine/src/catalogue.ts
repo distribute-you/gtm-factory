@@ -190,6 +190,36 @@ export interface Strategy {
   retired?: boolean;
 }
 
+/**
+ * A sales path: a straight line of lead states from Start (or a trigger's
+ * event) to a target. Named on first sight, never renamed.
+ */
+export interface SalesPath {
+  id: string;
+  name: string;
+  /** START, or the event outcome of the trigger that opens it. */
+  entry: OutcomeId;
+  /** The lead states after the entry; the last one is the target. */
+  line: OutcomeId[];
+}
+
+/** A sales funnel: a sales path and one play (a pipe) per leg. Named on first sight, never renamed. */
+export interface SalesFunnel {
+  id: string;
+  name: string;
+  pathId: string;
+  /** The pipe playing each leg of the path. */
+  plays: string[];
+}
+
+export function salesPathId(entry: OutcomeId, line: readonly OutcomeId[]): string {
+  return `path:${[entry, ...line].join(">")}`;
+}
+
+export function salesFunnelId(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): string {
+  return `funnel:${[entry, ...line].join(">")}|${plays.join("+")}`;
+}
+
 export interface CatalogueData {
   leadTracks: LeadTrack[];
   outcomes: Outcome[];
@@ -199,9 +229,12 @@ export interface CatalogueData {
   triggers: Trigger[];
   tactics: Tactic[];
   strategies: Strategy[];
+  /** Sales paths and sales funnels named so far (names are given on first sight and kept). */
+  salesPaths?: SalesPath[];
+  salesFunnels?: SalesFunnel[];
 }
 
-type Kind = keyof CatalogueData;
+type Kind = Exclude<keyof CatalogueData, "salesPaths" | "salesFunnels">;
 
 export interface CatalogueIssue {
   kind: string;
@@ -232,6 +265,8 @@ export class Catalogue {
       triggers: [...(data?.triggers ?? [])],
       tactics: [...(data?.tactics ?? [])],
       strategies: [...(data?.strategies ?? [])],
+      salesPaths: [...(data?.salesPaths ?? [])],
+      salesFunnels: [...(data?.salesFunnels ?? [])],
     };
     for (const p of this.data.pipes) this.ensureDefaultStrategy(p.id);
   }
@@ -267,6 +302,84 @@ export class Catalogue {
   }
   get strategies(): readonly Strategy[] {
     return this.data.strategies;
+  }
+
+  get salesPaths(): readonly SalesPath[] {
+    return this.data.salesPaths ?? [];
+  }
+  get salesFunnels(): readonly SalesFunnel[] {
+    return this.data.salesFunnels ?? [];
+  }
+
+  salesPath(id: string): SalesPath | undefined {
+    return this.salesPaths.find((p) => p.id === id);
+  }
+  salesFunnel(id: string): SalesFunnel | undefined {
+    return this.salesFunnels.find((f) => f.id === id);
+  }
+  /** The funnels of a sales path, in the order they were named. */
+  funnelsOf(pathId: string): SalesFunnel[] {
+    return this.salesFunnels.filter((f) => f.pathId === pathId);
+  }
+
+  /** The sales path of a line: its stored name, or the name it would get now (nothing is stored). */
+  peekSalesPath(entry: OutcomeId, line: readonly OutcomeId[]): SalesPath {
+    const id = salesPathId(entry, line);
+    return this.salesPath(id) ?? { id, name: this.freshName(this.pathNames(entry, line), new Set(this.salesPaths.map((p) => p.name))), entry, line: [...line] };
+  }
+
+  /** The sales path of a line, named on first sight and kept. */
+  nameSalesPath(entry: OutcomeId, line: readonly OutcomeId[]): SalesPath {
+    const p = this.peekSalesPath(entry, line);
+    if (!this.salesPath(p.id)) this.data.salesPaths!.push(p);
+    return p;
+  }
+
+  /** The sales funnel of a line and its plays: its stored name, or the name it would get now (nothing is stored). */
+  peekSalesFunnel(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
+    const id = salesFunnelId(entry, line, plays);
+    const found = this.salesFunnel(id);
+    if (found) return found;
+    const path = this.peekSalesPath(entry, line);
+    return { id, name: this.freshName(this.funnelNames(path, plays), new Set(this.salesFunnels.map((f) => f.name))), pathId: path.id, plays: [...plays] };
+  }
+
+  /** The sales funnel of a line and its plays, named on first sight (its path too) and kept. */
+  nameSalesFunnel(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
+    this.nameSalesPath(entry, line);
+    const f = this.peekSalesFunnel(entry, line, plays);
+    if (!this.salesFunnel(f.id)) this.data.salesFunnels!.push(f);
+    return f;
+  }
+
+  private plural(o: OutcomeId): string {
+    const out = this.outcome(o);
+    return out?.plural ?? `${out?.label ?? o}s`;
+  }
+
+  /** Plain words, most general first: "Paid clients from the market", then the states it passes through. */
+  private pathNames(entry: OutcomeId, line: readonly OutcomeId[]): string[] {
+    const target = line[line.length - 1] ?? entry;
+    const from = entry === START ? "the market" : (this.triggers.find((t) => t.event === entry)?.label ?? this.outcome(entry)?.label ?? entry).toLowerCase();
+    const base = `${this.plural(target)} from ${from}`;
+    const via = line.slice(0, -1).map((o) => this.plural(o).toLowerCase());
+    return via.length > 0 ? [base, `${base}, through ${via.length > 1 ? `${via.slice(0, -1).join(", ")} and ${via[via.length - 1]}` : via[0]}`] : [base];
+  }
+
+  /** Plain words: the plays it runs, then what it brings; then where it starts. */
+  private funnelNames(path: SalesPath, plays: readonly string[]): string[] {
+    const names = plays.map((id) => this.pipe(id)?.name ?? id);
+    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? path.name;
+    const target = this.plural(path.line[path.line.length - 1] ?? path.entry).toLowerCase();
+    const from = path.entry === START ? "the market" : (this.triggers.find((t) => t.event === path.entry)?.label ?? path.entry).toLowerCase();
+    return [`${list} for ${target}`, `${list} for ${target}, from ${from}`];
+  }
+
+  /** The first candidate no other object holds, else the last one numbered (2, 3...). */
+  private freshName(candidates: readonly string[], taken: ReadonlySet<string>): string {
+    for (const c of candidates) if (!taken.has(c)) return c;
+    const last = candidates[candidates.length - 1]!;
+    for (let n = 2; ; n++) if (!taken.has(`${last} ${n}`)) return `${last} ${n}`;
   }
 
   outcome(id: OutcomeId): Outcome | undefined {

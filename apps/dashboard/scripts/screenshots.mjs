@@ -50,6 +50,8 @@ export const PAGES = [
   ["catalogue-scripts", "/catalogue/?tab=scripts"],
   ["catalogue-tactics", "/catalogue/?tab=tactics"],
   ["catalogue-strategies", "/catalogue/?tab=strategies"],
+  ["catalogue-paths", "/catalogue/?tab=paths"],
+  ["sales-funnel", "FUNNEL"],
   ["ledger", "/ledger/"],
   ["how-it-works", "/how-it-works/"],
 ];
@@ -65,8 +67,9 @@ page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
 await page.goto(`${origin}/?day=30`);
 await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
 let leadHref = "/leads/";
+let funnelHref = "/catalogue/?tab=paths";
 for (const [name, route] of PAGES) {
-  await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route}`);
+  await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route === "FUNNEL" ? funnelHref.replace(BASE, "") : route}`);
   await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
   await page.waitForTimeout(1200);
   // The panel scrolls inside a fixed frame: grow the window to the panel's height to capture it whole.
@@ -77,6 +80,7 @@ for (const [name, route] of PAGES) {
   await page.screenshot({ path: file });
   await page.setViewportSize({ width: 1440, height: 900 });
   console.log("saved", file);
+  if (name === "catalogue-paths") funnelHref = (await page.$eval('a[href*="pin=funnel"]', (a) => a.getAttribute("href")).catch(() => null)) ?? funnelHref;
   if (name === "leads") {
     // The lead page shows the furthest lead of the board: its whole timeline, from first touch to paid.
     const cols = await page.$$eval("[data-col]", (els) => els.map((e) => ({ col: e.getAttribute("data-col"), href: e.querySelector("a")?.getAttribute("href") ?? null })));

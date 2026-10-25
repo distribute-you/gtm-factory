@@ -10,7 +10,7 @@ import worldJson from "../../../../seed/fictional-world.json";
 
 export const WORLD: WorldData = worldJson as unknown as WorldData;
 
-export type CatalogueKind = keyof CatalogueData;
+export type CatalogueKind = Exclude<keyof CatalogueData, "salesPaths" | "salesFunnels">;
 
 export type SimAction =
   | { type: "launch"; client: WorldClient }

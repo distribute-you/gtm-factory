@@ -8,9 +8,11 @@ import { ProviderLogo, ScriptCard, VersionEditor } from "@/components/catalogue-
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { headScript, type Model } from "@/lib/model";
+import { headScript, outcomeLabel, pipeLine, type Model } from "@/lib/model";
+import { FunnelLine } from "@/components/funnel-line";
+import { linePipes, namedLine } from "@/lib/funnels";
 import { pinnedPage, type PinnedPage as PageData } from "@/lib/pinned";
-import { parsePin, pinKey, togglePin, type Pin } from "@/lib/pins";
+import { parsePin, pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
 import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -41,6 +43,8 @@ function PinButton({ pin }: { pin: Pin }) {
 function Pinned({ model, pin, scope }: { model: Model; pin: Pin; scope: string | null }) {
   const data = useMemo(() => pinnedPage(model, pin, scope), [model, pin, scope]);
   if (data.kind === "missing") return <EmptyNote>The catalogue has no {pin.kind} with this id any more.</EmptyNote>;
+  if (data.kind === "path") return <PathPage model={model} data={data} />;
+  if (data.kind === "funnel") return <FunnelPage model={model} data={data} />;
   return data.kind === "outcome" ? <OutcomePage model={model} data={data} /> : <PipePage model={model} data={data} />;
 }
 
@@ -117,6 +121,78 @@ function OutcomePage({ model, data }: { model: Model; data: Extract<PageData, { 
 // ---------------------------------------------------------------------------
 // A pipe: its scripts, where it is plugged, its pipe storage
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// A sales path: its named funnels, and who runs each today
+// ---------------------------------------------------------------------------
+
+function PathPage({ model, data }: { model: Model; data: Extract<PageData, { kind: "path" }> }) {
+  const running = data.funnels.reduce((n, f) => n + f.campaigns.length, 0);
+  return (
+    <>
+      <PageHeader title={data.title} sub={`A sales path: a straight line of lead states. ${plural(data.funnels.length, "sales funnel plays it", "sales funnels play it")}, ${plural(running, "campaign runs", "campaigns run")} one today.`} />
+      <div className="k-card mb-6 px-4 py-3">
+        <p className="k-label mb-1.5">Lead states</p>
+        <p className="text-[13px]">{[data.path.entry, ...data.path.line].map((o) => outcomeLabel(model.catalogue, o)).join(" → ")}</p>
+      </div>
+      <SectionTitle count={data.funnels.length}>Sales funnels</SectionTitle>
+      <div className="k-card divide-y divide-[var(--line-subtle)]">
+        {data.funnels.map(({ funnel, campaigns }) => (
+          <div key={funnel.id} className="px-4 py-3">
+            <Link href={pinHref({ kind: "funnel", id: funnel.id })} className="inline-flex items-center gap-2 text-[13px] font-medium hover:underline">
+              <Mark kind="funnel" id={funnel.id} size={20} />
+              {funnel.name}
+            </Link>
+            <div className="mt-1.5">
+              <FunnelLine model={model} line={namedLine(model, funnel)} />
+            </div>
+            <p className="k-fg3 mt-1 text-[12px]">{campaigns.length > 0 ? `Run today by ${campaigns.map((c) => c.name).join(", ")}` : "No campaign runs it today."}</p>
+          </div>
+        ))}
+        {data.funnels.length === 0 && <EmptyNote>No sales funnel has played this path yet.</EmptyNote>}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A sales funnel: its line, every pipe it runs through, who runs it
+// ---------------------------------------------------------------------------
+
+function FunnelPage({ model, data }: { model: Model; data: Extract<PageData, { kind: "funnel" }> }) {
+  const line = namedLine(model, data.funnel);
+  const pipes = line ? linePipes(line) : [];
+  return (
+    <>
+      <PageHeader title={data.title} sub={data.path ? `A sales funnel: the path ${data.path.name.toLowerCase()}, one play per leg.` : "A sales funnel."} />
+      <div className="k-card mb-6 px-4 py-3">
+        <p className="k-label mb-1.5">Sales funnel</p>
+        <FunnelLine model={model} line={line} size="md" />
+      </div>
+      <SectionTitle count={pipes.length}>Pipes it runs through</SectionTitle>
+      <div className="k-card mb-6 divide-y divide-[var(--line-subtle)]">
+        {pipes.map((p) => (
+          <div key={p.id} className="flex items-center gap-2.5 px-4 py-2.5">
+            <Mark kind="pipe" id={p.id} icon={p.icon} size={22} />
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-medium">{p.name}</span>
+              <span className="k-fg3 block truncate text-[12px]">{pipeLine(model.catalogue, p)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <SectionTitle count={data.campaigns.length}>Campaigns running it today</SectionTitle>
+      <div className="k-card divide-y divide-[var(--line-subtle)]">
+        {data.campaigns.map((c) => (
+          <Link key={c.id} href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="block px-4 py-2.5 text-[13px] hover:underline">
+            {c.name}
+          </Link>
+        ))}
+        {data.campaigns.length === 0 && <EmptyNote>No campaign runs it today.</EmptyNote>}
+      </div>
+    </>
+  );
+}
 
 function PipePage({ model, data }: { model: Model; data: Extract<PageData, { kind: "pipe" }> }) {
   const pipe = model.catalogue.pipe(data.id)!;

@@ -4,13 +4,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type RankedFunnel, type WorldClient } from "@gtm-factory/engine";
-import { OutcomeChip } from "@/components/funnel-line";
+import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
+import { linePipes, rankedLine } from "@/lib/funnels";
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { campaignHref } from "./campaigns";
 import { freshCampaignId, newClient } from "@/lib/campaigns";
-import { outcomeLabel, pipeName, proposeFunnels, type Model } from "@/lib/model";
+import { outcomeLabel, proposeFunnels, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, formatRoi, formatUsd, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -99,13 +100,8 @@ function Flow({ model }: { model: Model }) {
   const value = Number(d.value) || 0;
   const funnels = useMemo(() => (step === "funnels" && d.target ? proposeFunnels(model, offerOutcomes, d.target, value, entry.event) : []), [model, step, offerOutcomes, d.target, value, entry.event]);
   const chosen: RankedFunnel | undefined = funnels[Math.min(d.funnel, funnels.length - 1)];
-  // Pipes whose play the campaign may choose: each leg's pipe, and every pipe with a strategy beyond its default.
-  const playable = useMemo(() => {
-    const ids: string[] = [];
-    for (const l of chosen?.legs ?? []) if (!ids.includes(l.pipeId)) ids.push(l.pipeId);
-    for (const s of model.catalogue.strategies) if (!s.retired && s.id !== defaultStrategyId(s.pipeId) && !ids.includes(s.pipeId)) ids.push(s.pipeId);
-    return ids.map((id) => model.catalogue.pipe(id)).filter((p): p is NonNullable<typeof p> => !!p && model.catalogue.strategiesOf(p.id).length > 1);
-  }, [model, chosen]);
+  // The plays of the chosen funnel: every pipe its line draws, each with the strategy the campaign picks.
+  const playable = useMemo(() => (chosen ? linePipes(rankedLine(model, chosen)) : []), [model, chosen]);
 
   const launch = () => {
     if (!chosen) return;
@@ -120,7 +116,7 @@ function Flow({ model }: { model: Model }) {
       id,
       brandId: base.brand.id,
       offerId: base.offer.id,
-      name: d.campaignName.trim() || `${outcomeLabel(model.catalogue, d.target)} from ${entry.id === START ? pipeName(model.catalogue, chosen.legs[0]!.pipeId).toLowerCase() : entry.label.replace(/ \(a trigger\)$/, "").toLowerCase()}`,
+      name: d.campaignName.trim() || rankedLine(model, chosen).funnel?.name || outcomeLabel(model.catalogue, d.target),
       entry: entry.id === START ? { kind: "start" } : { kind: "trigger", triggerId: entry.id },
       line: chosen.line.slice(1),
       dailyBudgetCents: Math.round((Number(d.perDay) || 0) * 100),
@@ -339,19 +335,11 @@ function FunnelCard({ model, funnel, selected, onSelect }: { model: Model; funne
   return (
     <button type="button" onClick={onSelect} className={`k-card ${selected ? "k-card-on" : ""} block w-full p-4 text-left`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <span className="inline-flex flex-wrap items-center gap-1.5 text-[12px]">
-          <OutcomeChip model={model} outcome={funnel.line[0]!} />
-          {funnel.legs.map((l) => (
-            <span key={`${l.from}>${l.to}:${l.pipeId}`} className="inline-flex items-center gap-1.5">
-              <span className="k-fg4">→</span>
-              <span className="inline-flex items-center gap-1">
-                <Mark kind="pipe" id={l.pipeId} icon={model.catalogue.pipe(l.pipeId)?.icon} size={14} />
-                <span>{pipeName(model.catalogue, l.pipeId)}</span>
-              </span>
-              <span className="k-fg4">→</span>
-              <OutcomeChip model={model} outcome={l.to} />
-            </span>
-          ))}
+        <span className="min-w-0 flex-1 space-y-1.5">
+          <FunnelName model={model} funnel={funnel} />
+          <span className="block">
+            <FunnelLine model={model} funnel={funnel} />
+          </span>
         </span>
         <span className="text-right">
           <span className={`block text-[18px] font-medium tabular-nums ${roiIsGood(funnel.valuePerDollar) ? "text-[var(--run)]" : ""}`}>{formatRoi(funnel.valuePerDollar)}</span>

@@ -392,7 +392,10 @@ export class SimulationSession {
       Object.assign(occ, { dynasty: s.dynasty, version: s.version, name: s.name, text: s.text, ...(s.parentDynasty ? { parentDynasty: s.parentDynasty } : {}), ...(s.conditions ? { conditions: s.conditions } : {}) });
       this.addOcc(occ);
     }
-    for (const camp of c.campaigns) this.spent.set(camp.id, this.spent.get(camp.id) ?? 0);
+    for (const camp of c.campaigns) {
+      this.spent.set(camp.id, this.spent.get(camp.id) ?? 0);
+      this.salesFunnelOf(camp, true);
+    }
   }
 
   private ourFactory(): string {
@@ -515,6 +518,7 @@ export class SimulationSession {
 
     if (day > 0 && day % this.world.settings.splitEveryDays === 0) this.studyAndPropose(day);
     this.logChoices(day);
+    for (const c of this.campaigns()) if (c.status === "running") this.salesFunnelOf(c, true);
     this.days.push(snap);
     this.today = null;
     this.dayIndex++;
@@ -1488,6 +1492,104 @@ export class SimulationSession {
 
   // ---- reports ---------------------------------------------------------------------------
 
+  /** Where a campaign's line starts: Start, or its trigger's event. */
+  entryOf(campaign: Campaign): OutcomeId {
+    return campaign.entry.kind === "start" ? START : this.catalogue.trigger(campaign.entry.triggerId)?.event ?? START;
+  }
+
+  /** The sales path a campaign runs (named on first sight). */
+  salesPathOf(campaign: Campaign) {
+    return this.catalogue.peekSalesPath(this.entryOf(campaign), campaign.line);
+  }
+
+  /** The pipe playing each leg of a campaign today: its pinned play, else the play picked most over the last 7 days. */
+  playsToday(campaign: Campaign): (string | null)[] {
+    return campaign.line.map((to, k) => {
+      const from = k === 0 ? this.entryOf(campaign) : campaign.line[k - 1]!;
+      const plays = this.playsFor(campaign, from, to);
+      const pinned = campaign.pinned?.[k];
+      if (pinned && plays.some((p) => p.id === pinned)) return pinned;
+      let best: string | null = plays[0]?.id ?? null;
+      let bestN = 0;
+      for (const [o, arr] of this.pickSeries(playPoint(from, to), campaign.id)) {
+        const n = arr.slice(-7).reduce((x, y) => x + y, 0);
+        if (n > bestN || (n === bestN && n > 0 && best !== null && o < best)) {
+          best = o;
+          bestN = n;
+        }
+      }
+      return best;
+    });
+  }
+
+  /**
+   * The sales funnel a campaign runs today: its sales path and the play of each
+   * leg. `name` stores the names (the session does it once a day, in campaign
+   * order, so a seed always gives the same names); otherwise nothing is stored.
+   */
+  salesFunnelOf(campaign: Campaign, name = false) {
+    const plays = this.playsToday(campaign);
+    if (plays.some((p) => p === null)) return null;
+    const entry = this.entryOf(campaign);
+    return name ? this.catalogue.nameSalesFunnel(entry, campaign.line, plays as string[]) : this.catalogue.peekSalesFunnel(entry, campaign.line, plays as string[]);
+  }
+
+  /**
+   * Every pipe a leg runs through, in the order they run: the pipe providing
+   * each input of the leg's play (the script picked most at that input over
+   * the last 7 days, else the first allowed), down to the leg's start, then the
+   * play itself. `main` marks the chain that carries the subject; the others
+   * feed an input of a pipe on it (a research, a model call).
+   * `campaign` null reads the picks of every campaign (a funnel not launched yet).
+   */
+  legPipes(play: string, from: OutcomeId, campaign: Campaign | null): LegPipe[] {
+    const out: LegPipe[] = [];
+    const seen = new Set<string>();
+    const strategic = campaign ?? ({ strategies: {} } as Campaign);
+    const visit = (pipeId: string, feeds: { pipe: string; input: OutcomeId } | null, main: boolean) => {
+      if (seen.has(pipeId)) return;
+      seen.add(pipeId);
+      const pipe = this.catalogue.pipe(pipeId);
+      if (!pipe) return;
+      const subject = this.catalogue.subjectInput(pipe);
+      const order = subject ? [subject, ...pipe.inputs.filter((i) => i !== subject)] : [...pipe.inputs];
+      for (const i of order) {
+        const o = this.catalogue.outcome(i);
+        if (!o || o.subject === "event" || o.track) continue;
+        const providers = this.catalogue.providersOf(i).filter((p) => !this.reports(p));
+        const onDemand = providers.filter((p) => isOnDemand(p));
+        let candidates: Pipe[];
+        if (o.subject === "object") candidates = onDemand;
+        else candidates = providers.filter((p) => isOnDemand(p) || this.catalogue.rootsOf(p).has(from) || this.rootedAnywhere(p, from));
+        if (candidates.length === 0) continue;
+        const scripts = this.allowedScripts(strategic, pipe, i, candidates);
+        let best = scripts[0]?.dynasty ?? null;
+        let bestN = 0;
+        for (const [opt, arr] of this.pickSeries(pointKey(pipe.id, i), campaign?.id)) {
+          const n = arr.slice(-7).reduce((x, y) => x + y, 0);
+          if (n > bestN || (n === bestN && n > 0 && best !== null && opt < best)) {
+            best = opt;
+            bestN = n;
+          }
+        }
+        const provider = best ? this.catalogue.headOf(best)?.pipeId : candidates[0]?.id;
+        if (provider) visit(provider, { pipe: pipe.id, input: i }, main && i === subject);
+      }
+      out.push({ pipeId, output: pipe.output, feeds, main });
+    };
+    visit(play, null, true);
+    return out;
+  }
+
+  /** Every pipe each leg of a campaign runs through today (see `legPipes`), leg by leg. */
+  campaignPipes(campaign: Campaign): LegPipe[][] {
+    const plays = this.playsToday(campaign);
+    return campaign.line.map((_, k) => {
+      const play = plays[k];
+      return play ? this.legPipes(play, k === 0 ? this.entryOf(campaign) : campaign.line[k - 1]!, campaign) : [];
+    });
+  }
+
   /** The value of one target outcome of a campaign: stated, else the fleet median of stated ones. */
   targetValue(campaign: Campaign): { amount: number; label: "stated" | "expected" } {
     const offer = this.world.clients.find((c) => c.offer.id === campaign.offerId)?.offer;
@@ -1824,6 +1926,15 @@ export class SimulationSession {
   people(): Person[] {
     return [...this.persons.values()];
   }
+}
+
+/** One pipe a leg runs through: what it makes, and the input of the pipe it feeds (null for the leg's play). */
+export interface LegPipe {
+  pipeId: string;
+  output: OutcomeId;
+  feeds: { pipe: string; input: OutcomeId } | null;
+  /** On the chain that carries the leg's subject from its start to its end. */
+  main: boolean;
 }
 
 /** Merge two lists of conditions: the second refines the first. */

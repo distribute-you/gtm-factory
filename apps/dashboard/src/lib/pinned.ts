@@ -4,7 +4,8 @@
  * its scripts, the inputs it is plugged at with the best script at each, and its pipe storage.
  */
 
-import type { ContentType, StorageReport } from "@gtm-factory/engine";
+import type { Campaign, ContentType, SalesFunnel, SalesPath, StorageReport } from "@gtm-factory/engine";
+import { campaignsRunning } from "./funnels";
 import { objectDynasties, outcomeLabel, pipeLine, pluggedAt, type Model, type ObjectDynasty, type PluggedInput } from "./model";
 import type { Pin } from "./pins";
 
@@ -28,9 +29,35 @@ export type PinnedPage =
       plugged: PluggedInput[];
       storage: StorageReport;
     }
+  | {
+      kind: "path";
+      id: string;
+      title: string;
+      path: SalesPath;
+      /** Its named funnels, each with the campaigns running it today. */
+      funnels: { funnel: SalesFunnel; campaigns: Campaign[] }[];
+    }
+  | {
+      kind: "funnel";
+      id: string;
+      title: string;
+      funnel: SalesFunnel;
+      path: SalesPath | undefined;
+      campaigns: Campaign[];
+    }
   | { kind: "missing"; id: string; title: string };
 
 export function pinnedPage(model: Model, pin: Pin, scope: string | null): PinnedPage {
+  if (pin.kind === "path") {
+    const path = model.catalogue.salesPath(pin.id);
+    if (!path) return { kind: "missing", id: pin.id, title: pin.label };
+    return { kind: "path", id: path.id, title: path.name, path, funnels: model.catalogue.funnelsOf(path.id).map((funnel) => ({ funnel, campaigns: campaignsRunning(model, funnel.id) })) };
+  }
+  if (pin.kind === "funnel") {
+    const funnel = model.catalogue.salesFunnel(pin.id);
+    if (!funnel) return { kind: "missing", id: pin.id, title: pin.label };
+    return { kind: "funnel", id: funnel.id, title: funnel.name, funnel, path: model.catalogue.salesPath(funnel.pathId), campaigns: campaignsRunning(model, funnel.id) };
+  }
   if (pin.kind === "outcome") {
     const o = model.catalogue.outcome(pin.id);
     if (!o) return { kind: "missing", id: pin.id, title: pin.label };
