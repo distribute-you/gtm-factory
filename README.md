@@ -23,6 +23,8 @@ Read the spec: [docs/framework.md](docs/framework.md).
 |---|---|
 | `packages/engine` | The engine. TypeScript, zero runtime dependencies, pure and deterministic. |
 | `seed/fictional-world.json` | The fictional world: catalogue, clients, market and hidden truth. Every scenario number lives here. |
+| `seed/distribute-catalogue.json`, `seed/distribute-world.json` | distribute.you's public catalogue (no production figure, no price) and the "distribute.you catalogue" scenario built on it, fictional clients and numbers. |
+| `packages/scenarios` | The translation of distribute.you's public catalogue into the model (a pipe is a leg, a channel is a tactic) and the scenario builder. |
 | `docs/framework.md` | The framework, in plain English, with worked examples checked by tests. |
 | `apps/dashboard` | The live dashboard: the whole product on the simulated world, in the browser. Next.js static export, deployed to GitHub Pages on every push to `main`. |
 | `docs/screenshots/` | One screenshot per dashboard page after 30 simulated days. |
@@ -59,6 +61,7 @@ Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Pla
 | Pinned pages | Pin any outcome or pipe: Templates and LLMs ship pinned. Read, edit (a new version) and compare versions; scripts as cards; where a pipe is plugged and the best script at each input; its pipe storage. |
 | Research | Convergence of every choice point toward the hidden best option, beliefs beside the hidden truth, strategies proposed by splits. |
 | Catalogue | Outcomes, pipes, scripts, triggers, sales paths and funnels, tactics, strategies and factories. Upgrade, fork, retire, pin. |
+| Shadow | Open a snapshot of an observed factory (a file kept in the tab, or a snapshot of the simulation): every client reconciled with production, today beside what the engine would do, and the actions it would launch. Read only. |
 | Ledger | Every-path unit costs beside each pipe's own cost, our spend beside other factories', reconciled to the cent. |
 | How it works | The framework's core ideas, linked to the spec. |
 

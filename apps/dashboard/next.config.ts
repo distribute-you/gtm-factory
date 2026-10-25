@@ -9,6 +9,7 @@ const config: NextConfig = {
   basePath,
   trailingSlash: true,
   images: { unoptimized: true },
+  devIndicators: false,
   transpilePackages: ["@gtm-factory/engine"],
   turbopack: { root: path.join(import.meta.dirname, "../..") },
   outputFileTracingRoot: path.join(import.meta.dirname, "../.."),

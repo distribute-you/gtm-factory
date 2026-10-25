@@ -80,11 +80,12 @@ describe("credit through traceability", () => {
     fresh.catalogue.fork("glm", { id: "glm-terse", dynasty: "glm-terse", name: "GLM, terse prompt", kind: "ai", tactics: { tier: "fast" }, costCents: 1 });
     fresh.catalogue.upgrade("gemini_flash", { id: "gemini-flash-2", name: "Gemini Flash 2" });
     const flashBefore = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "gemini_flash")!;
-    fresh.run(1);
-    const at = (fresh as unknown as { belief: SimulationSession["belief"] }).belief.bind(fresh);
+    // Before the fork has any decision of its own, its belief is its parent's.
+    const at = fresh.belief.bind(fresh);
     const parent = at(point, "glm", ["glm", "gemini_flash", "gemini_pro", "glm-terse"], "brand-1", fresh.day);
     const child = at(point, "glm-terse", ["glm", "gemini_flash", "gemini_pro", "glm-terse"], "brand-1", fresh.day);
     expect(child.posterior.alpha / (child.posterior.alpha + child.posterior.beta)).toBeCloseTo(parent.posterior.alpha / (parent.posterior.alpha + parent.posterior.beta), 2);
+    fresh.run(1);
     expect(before.rate).toBeGreaterThan(0);
     // The upgrade is the same option: its stats carry on, its new version runs.
     const flashAfter = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "gemini_flash")!;

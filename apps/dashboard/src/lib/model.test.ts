@@ -182,3 +182,24 @@ describe("a funnel line and its plays describe the same pipes", () => {
     expect(linePipes(line).length).toBeGreaterThanOrEqual(f.legs.length);
   });
 });
+
+describe("shadow mode on a snapshot of the simulation (fictional data)", () => {
+  it("every client reconciles with its own books and shows today beside the engine", async () => {
+    const { ShadowSession, selfProduction, snapshotFromSimulation } = await import("@gtm-factory/engine");
+    const { clientRows, pointOptions } = await import("./shadow-model");
+    const { world, session } = replay(WORLD.seed, [], 20);
+    const snapshot = selfProduction(snapshotFromSimulation(session));
+    const shadow = new ShadowSession(snapshot);
+    const s = { snapshot, session: shadow, report: shadow.compute(), origin: "test" };
+    const rows = clientRows(s);
+    expect(rows.length).toBe(world.clients.length);
+    expect(rows.every((r) => r.view.reconciliation.reconciles)).toBe(true);
+    const v = rows[0]!.view.campaigns[0]!;
+    expect(v.salesPath.name).toBeTruthy();
+    for (const p of v.points) {
+      const { shown } = pointOptions(p);
+      if (p.today) expect(shown.map((o) => o.option)).toContain(p.today);
+      expect(shown.map((o) => o.option)).toContain(p.engine);
+    }
+  });
+});

@@ -189,4 +189,14 @@ The email pipe's own cost for decisions: $9 over 4 inputs is **$2.25** per input
 
 The engine ships with a fictional world as data ([`seed/fictional-world.json`](../seed/fictional-world.json)): four fictional clients, their market of fictional people and companies, the catalogue, and the hidden truth (yields, costs, delays, the effect of every script at every input, of every template and of every lead tactic). Day by day, under each campaign's budget, the engine makes every input choice, runs produce occurrences after their delay, the ledger fills and the engine learns. One seed gives one history, byte for byte. On the default world with its seed, every choice point with 200 picks or more ends day 60 with 80% or more of its picks on the hidden best option.
 
+A second scenario, **distribute.you catalogue** ([`seed/distribute-world.json`](../seed/distribute-world.json)), plays distribute.you's whole public GTM catalogue: every channel, leg, step and trigger it serves ([`seed/distribute-catalogue.json`](../seed/distribute-catalogue.json), its identity-free reads stripped of every production figure and price), translated by [`packages/scenarios`](../packages/scenarios) into this model. A pipe is a leg; each of the 53 channels is a value of the "Channel" tactic its generated scripts carry. Its clients and numbers are fictional.
+
 The dashboard plays it: [`apps/dashboard`](../apps/dashboard), live at https://distribute-you.github.io/gtm-factory/.
+
+## 11. Shadow mode
+
+The same engine reads an **observed** world instead of a simulated one. A **snapshot** ([`shadow.ts`](../packages/engine/src/shadow.ts)) holds what a real factory did: its catalogue, its clients, what each campaign runs today (the pipe of each leg, the option picked at each input) and aggregated observations (leg cohorts, choices, runs, lead states, lead tactics). A shadow session loads them into the same evidence book the simulator fills, and computes every recommendation the engine would make: per input the beliefs and the share of picks it would give each option, the best named sales funnels, the daily budgets spread again by value per dollar, finer ICPs and strategies from the split mechanism, and the list of actions it would launch. Nothing runs: no hidden truth, no ticks, every draw seeded. One snapshot, one answer.
+
+Before showing anything about a client, the session **reconciles** the snapshot with production figures the snapshot carries (spend, lead states, each with where it was read). A client whose figures differ by more than 1% shows its gap, never a recommendation.
+
+The dashboard opens a snapshot from a file picked in the browser (it stays in the tab, nothing is uploaded), or takes one of the running simulation to show the same pages on fictional data. A real factory writes its snapshot with its own exporter, outside this repository.

@@ -7,8 +7,21 @@
 
 import { SimulationSession, worldFromData, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/engine";
 import worldJson from "../../../../seed/fictional-world.json";
+import distributeJson from "../../../../seed/distribute-world.json";
 
 export const WORLD: WorldData = worldJson as unknown as WorldData;
+
+/** The scenarios the simulator plays: each a world as data. */
+export const SCENARIOS = {
+  fictional: { label: "Fictional world", data: WORLD },
+  distribute: { label: "distribute.you catalogue", data: distributeJson as unknown as WorldData },
+} as const;
+export type ScenarioId = keyof typeof SCENARIOS;
+export const SCENARIO_IDS = Object.keys(SCENARIOS) as ScenarioId[];
+
+export function scenarioData(id: ScenarioId): WorldData {
+  return (SCENARIOS[id] ?? SCENARIOS.fictional).data;
+}
 
 export type CatalogueKind = Exclude<keyof CatalogueData, "salesPaths" | "salesFunnels">;
 
@@ -29,8 +42,8 @@ export interface LoggedAction {
   action: SimAction;
 }
 
-export function buildWorld(seed: number): WorldSpec {
-  return worldFromData(WORLD, seed);
+export function buildWorld(seed: number, scenario: ScenarioId = "fictional"): WorldSpec {
+  return worldFromData(scenarioData(scenario), seed);
 }
 
 /** Apply one action to a running world. Throws on an action the engine refuses. */
@@ -71,8 +84,8 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
 }
 
 /** Build the world and play it to `day`, applying each logged action on its day. */
-export function replay(seed: number, actions: readonly LoggedAction[], day: number): { world: WorldSpec; session: SimulationSession; applied: LoggedAction[] } {
-  const world = buildWorld(seed);
+export function replay(seed: number, actions: readonly LoggedAction[], day: number, scenario: ScenarioId = "fictional"): { world: WorldSpec; session: SimulationSession; applied: LoggedAction[] } {
+  const world = buildWorld(seed, scenario);
   const session = new SimulationSession(world);
   const applied: LoggedAction[] = [];
   const applyDue = (d: number) => {
