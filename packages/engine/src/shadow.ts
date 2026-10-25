@@ -14,7 +14,7 @@
  * not reconcile gets its gaps, never recommendations.
  */
 
-import { Catalogue, START, defaultStrategyId, isOnDemand, type CatalogueData, type OutcomeId, type Pipe, type Script, type Strategy } from "./catalogue";
+import { Catalogue, START, defaultStrategyId, isOnDemand, type CatalogueData, type SalesFunnel, type SalesPath, type OutcomeId, type Pipe, type Script, type Strategy } from "./catalogue";
 import { EvidenceBook, SEP, bumpCell, legEstimateOf, type CellStore, type LegEstimateRead } from "./evidence";
 import { allocateBudget, chainCostPerTarget, rankFunnels, valueBackwardLine, type LegEdge, type LegEstimate, type RankedFunnel } from "./funnels";
 import { buildLedger, type LedgerOccurrence, type LedgerReport, type LedgerRun } from "./ledger";
@@ -276,8 +276,11 @@ export interface CampaignView {
   targetValue: { amount: number; label: "stated" | "expected" };
   legs: LegView[];
   points: PointView[];
-  /** Today's line priced on the fleet's leg estimates, and the best lines the engine finds. */
-  funnels: { today: RankedFunnel | null; engine: RankedFunnel[]; unmeasuredLegs: number };
+  /** The sales path it runs and the named sales funnel it runs today (null while a leg has no pipe). */
+  salesPath: SalesPath;
+  salesFunnel: SalesFunnel | null;
+  /** Today's line priced on the fleet's leg estimates, and the best lines the engine finds, each with its funnel's name. */
+  funnels: { today: RankedFunnel | null; engine: (RankedFunnel & { name: string; id: string })[]; unmeasuredLegs: number };
   budget: BudgetView;
   spendCents: number;
 }
@@ -365,6 +368,12 @@ export class ShadowSession {
       memoryHalfLifeDays: this.settings.memoryHalfLifeDays,
     });
     this.load();
+    // Name the sales funnel each campaign runs today, in campaign order: one snapshot, one set of names.
+    for (const c of this.campaigns()) {
+      const entry = this.entryOf(c);
+      this.catalogue.nameSalesPath(entry, c.line);
+      if (c.today.legPipes.every((p) => p)) this.catalogue.nameSalesFunnel(entry, c.line, c.today.legPipes as string[]);
+    }
   }
 
   get clients(): readonly ShadowClient[] {
@@ -444,10 +453,23 @@ export class ShadowSession {
 
   /** Live pipes producing a leg's end whose subject comes from the leg's start (and that have a script). */
   playsFor(from: OutcomeId, to: OutcomeId): Pipe[] {
+    const roots = this.entryRoots(from);
     return this.catalogue
       .providersOf(to)
-      .filter((p) => !isOnDemand(p) && !p.reports && this.catalogue.rootsOf(p).has(from))
+      .filter((p) => !isOnDemand(p) && !p.reports && roots.some((r) => this.catalogue.rootsOf(p).has(r)))
       .filter((p) => this.catalogue.dynastiesOf(p.id).length > 0);
+  }
+
+  /**
+   * Where a leg's subject may come from: its start, and for the event of a
+   * trigger fired the moment a state is reached (no delay, no "unless"), that
+   * state too: a funnel opened by "a reply came" plays pipes that start from
+   * the interested lead.
+   */
+  entryRoots(from: OutcomeId): OutcomeId[] {
+    const t = this.catalogue.triggers.find((x) => x.event === from && !x.retired);
+    if (t && t.when.length > 0 && !t.delayDays && t.unless.length === 0) return [from, ...t.when];
+    return [from];
   }
 
   strategyOf(campaign: Campaign, pipeId: string): Strategy | null {
@@ -526,7 +548,8 @@ export class ShadowSession {
       } else if (out.subject === "object") {
         options = this.allowed(campaign, pipe, i, onDemand).map((s) => s.dynasty);
       } else {
-        const rooted = providers.filter((p) => isOnDemand(p) || this.catalogue.rootsOf(p).has(from));
+        const roots = this.entryRoots(from);
+        const rooted = providers.filter((p) => isOnDemand(p) || roots.some((r) => this.catalogue.rootsOf(p).has(r)));
         options = this.allowed(campaign, pipe, i, rooted).map((s) => s.dynasty);
       }
       add({ point, kind, consumer: pipe.id, input: i, legIndex: k, options, delay, horizon });
@@ -717,7 +740,14 @@ export class ShadowSession {
       if (!est) unmeasured++;
       return est;
     };
-    const engine = tv.amount > 0 ? rankFunnels(this.catalogue, [...new Set([...offerOutcomes, ...campaign.line])], target, estimator, tv.amount, 3, entry) : [];
+    const outcomes = [...new Set([...offerOutcomes, ...campaign.line])];
+    const engine =
+      tv.amount > 0
+        ? this.entryRoots(entry)
+            .flatMap((root) => rankFunnels(this.catalogue, outcomes, target, estimator, tv.amount, 3, root).map((f) => ({ ...f, line: [entry, ...f.line.slice(1)] })))
+            .sort((a, b) => a.costPerTarget - b.costPerTarget || a.line.join(">").localeCompare(b.line.join(">")))
+            .slice(0, 3)
+        : [];
     const todayLegs = campaign.line.map((to, k) => {
       const pipe = campaign.today.legPipes[k];
       return pipe ? this.fleetLegEstimate(this.legFrom(campaign, k), to, pipe) : null;
@@ -749,6 +779,10 @@ export class ShadowSession {
       const t = chainCostPerTarget(estimates.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! })));
       if (Number.isFinite(t) && t > 0) vpd = tv.amount / t;
     }
+    const named = engine.map((f) => {
+      const n = this.catalogue.peekSalesFunnel(f.line[0] ?? entry, f.line.slice(1), f.legs.map((l) => l.pipeId));
+      return { ...f, name: n.name, id: n.id };
+    });
     return {
       campaignId: campaign.id,
       brandId: campaign.brandId,
@@ -759,7 +793,9 @@ export class ShadowSession {
       targetValue: tv,
       legs,
       points,
-      funnels: { today, engine, unmeasuredLegs: unmeasured },
+      salesPath: this.catalogue.peekSalesPath(entry, campaign.line),
+      salesFunnel: campaign.today.legPipes.every((p) => p) ? this.catalogue.peekSalesFunnel(entry, campaign.line, campaign.today.legPipes as string[]) : null,
+      funnels: { today, engine: named, unmeasuredLegs: unmeasured },
       budget: { todayCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, engineCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, valuePerDollar: vpd },
       spendCents,
     };
@@ -825,7 +861,7 @@ export class ShadowSession {
         point: null,
         from: v.funnels.today.line.join(">"),
         to: best.line.join(">"),
-        label: `Run the line ${best.line.join(" → ")}`,
+        label: `Run the sales funnel "${best.name}"`,
         reason: `${money(best.costPerTarget * 100)} per target outcome against ${money(v.funnels.today.costPerTarget * 100)} today, on the fleet's measured legs.`,
       });
     }
