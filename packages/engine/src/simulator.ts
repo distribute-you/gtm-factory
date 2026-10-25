@@ -1635,7 +1635,8 @@ export class SimulationSession {
     const out = this.catalogue.outcome(input);
     if (out?.subject === "object" && !this.catalogue.providersOf(input).some((p) => isOnDemand(p))) return this.objectDynasties(campaign.brandId, input);
     const seen = new Set(this.dayPicksAll.get(`${point}${SEP}${campaign.id}`) ?? []);
-    return this.optionsAt(point).filter((o) => seen.has(o) || this.catalogue.headOf(o) !== undefined || this.catalogue.pipe(o) !== undefined);
+    const offered = this.optionsAt(point).filter((o) => seen.has(o));
+    return offered.length > 0 ? offered : this.optionsAt(point);
   }
 
   /** The options ever offered at a point. */

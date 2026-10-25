@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildModel, costPerOutcomeSeries, diffWords, leadTracks, objectDynasties, pluggedAt, pointsOf, scopeFigures, variablesOf } from "./model";
 import { WORLD, replay, type LoggedAction } from "./world";
+import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
+import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
 
 describe("the world the dashboard plays", () => {
@@ -64,6 +66,27 @@ describe("read models", () => {
 
   it("cost per outcome over time is null before the first outcome, never zero", () => {
     expect(costPerOutcomeSeries([100, 100, 100], [0, 0, 2])).toEqual([null, null, 1.5]);
+  });
+});
+
+describe("pins are configuration", () => {
+  const { world, session } = replay(WORLD.seed, [], 6);
+  const model = buildModel(world, session);
+
+  it("the world ships two pins, and pinning any other outcome or pipe gives it a page with no new code", () => {
+    expect(DEFAULT_PINS).toHaveLength(2);
+    for (const p of DEFAULT_PINS) expect(pinnedPage(model, p, null).kind).toBe(p.kind);
+    // Pin an object outcome nobody pinned: it gets a menu entry and a page listing its dynasties.
+    const other = model.catalogue.outcomes.find((o) => o.subject === "object" && !DEFAULT_PINS.some((p) => p.id === o.id) && session.objectVersions(model.clients[0]!.brand.id, o.id).length > 0)!;
+    const pins = togglePin(DEFAULT_PINS, { kind: "outcome", id: other.id, label: other.plural ?? other.label });
+    expect(pins).toHaveLength(3);
+    expect(pinHref(pins[2]!)).toContain(encodeURIComponent(`outcome:${other.id}`));
+    const page = pinnedPage(model, pins[2]!, null);
+    expect(page.kind === "outcome" && page.dynasties.length).toBeGreaterThan(0);
+    // And a pipe: its scripts, where it is plugged, its pipe storage.
+    const pipe = model.catalogue.pipes.find((p) => p.inputs.length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
+    const pipePage = pinnedPage(model, { kind: "pipe", id: pipe.id, label: pipe.name }, null);
+    expect(pipePage.kind === "pipe" && pipePage.dynasties.length).toBeGreaterThan(0);
   });
 });
 

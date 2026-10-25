@@ -1,37 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { MagnifyingGlassIcon } from "@phosphor-icons/react";
-import type { SimLead } from "@gtm-factory/engine";
-import { FunnelLine } from "@/components/funnel-line";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import { confidenceOf, type Occurrence, type TacticValue } from "@gtm-factory/engine";
+import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
-import { CardTable, Drawer, EmptyNote, Initials, KeyHint, Page, PageHeader, SectionTitle, TD, TDN, TH, Tabs, ToneDot, TopBar } from "@/components/ui";
+import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { campaignHref } from "./campaigns";
-import { funnelName, leadStateOn, nodeLabel, outcomeLabel, pipeTitle, slotOptionLabel, workflowLabel, type Model, type TrackDef } from "@/lib/model";
-import { companyKey, companyName, personName, personTitle } from "@/lib/people";
-import { formatCentsExact, formatCount, formatRatePct, humanize, sentenceCase } from "@/lib/format";
+import { companyName, factoryName, leadRows, optionLabel, outcomeLabel, personName, pipeName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
+import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
 export function leadHref(id: string): string {
   return `/leads/view/?id=${encodeURIComponent(id)}`;
 }
 
-const COLUMN_CAP = 20;
+const PER_COLUMN = 12;
 
-/** The day a lead reached its state on a track (its last outcome on that track). */
-function reachedDay(model: Model, lead: SimLead, track: TrackDef): number {
-  for (let i = lead.timeline.length - 1; i >= 0; i--) {
-    const e = lead.timeline[i]!;
-    if (e.kind === "outcome" && e.step && model.catalogue.step(e.step)?.leadState?.leadTrack === track.id) return e.day;
-  }
-  return lead.createdDay;
+/** Who brought a lead in: our factory, or another one. */
+function RootDot({ model, root }: { model: Model; root: string }) {
+  const ours = model.catalogue.factory(root)?.ours ?? false;
+  return <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : factoryName(model.catalogue, root)}</ToneDot>;
 }
 
 // ---------------------------------------------------------------------------
-// Board
+// Leads board
 // ---------------------------------------------------------------------------
 
 export function LeadsPage() {
@@ -39,65 +33,79 @@ export function LeadsPage() {
   return (
     <>
       <TopBar crumbs={[{ label: "Leads" }]} />
-      <Page>{model ? <Board model={model} scope={scope} /> : <PageSkeleton />}</Page>
+      <Page>{model ? <Leads model={model} scope={scope} /> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-function Board({ model, scope }: { model: Model; scope: string | null }) {
-  const asked = useSearchParams().get("state");
-  const initial = model.tracks.find((t) => t.states.some((s) => s.state === asked))?.id ?? model.tracks[0]?.id ?? "";
-  const [trackId, setTrackId] = useState(initial);
-  const track = model.tracks.find((t) => t.id === trackId) ?? model.tracks[0];
-  const leads = useMemo(() => model.leads.filter((l) => !scope || l.brandId === scope), [model, scope]);
-  if (!track) return <EmptyNote>The catalogue has no lead track.</EmptyNote>;
-  const columns = [
-    { key: "none", label: "Found, no state yet", leads: [] as SimLead[] },
-    ...track.states.map((s) => ({ key: s.state, label: s.label, leads: [] as SimLead[] })),
-  ];
-  for (const l of leads) {
-    const st = leadStateOn(model, l, track);
-    columns.find((c) => c.key === (st?.state ?? "none"))!.leads.push(l);
-  }
-  for (const c of columns) c.leads.sort((a, b) => reachedDay(model, b, track) - reachedDay(model, a, track) || (a.id < b.id ? 1 : -1));
-  const reached = leads.length - columns[0]!.leads.length;
+function Leads({ model, scope }: { model: Model; scope: string | null }) {
+  const search = useSearchParams();
+  const only = search.get("state");
+  const rows = leadRows(model, scope);
+  const columns = model.tracks.map((t) => ({
+    track: t,
+    cols: [
+      { key: `${t.id}:none`, label: "No state yet", rows: rows.filter((r) => !r.states[t.id]) },
+      ...t.states.map((s) => ({ key: s.outcome, label: s.label, rows: rows.filter((r) => r.states[t.id]?.outcome === s.outcome) })),
+    ].filter((c) => !only || c.key === only),
+  }));
+  const ours = rows.filter((r) => model.catalogue.factory(r.root)?.ours).length;
   return (
     <>
       <PageHeader
-        title={`${formatCount(reached)} of ${formatCount(leads.length)} leads moved on the ${track.label}`}
-        sub="One column per lead state. A lead sits in the furthest state it reached on this track."
+        title={<>{plural(rows.length, "lead", "leads")}</>}
+        sub={`${formatCount(ours)} brought by our runs, ${formatCount(rows.length - ours)} by another factory. A lead moves on each track on its own.`}
+        right={only ? <Link href="/leads/" className="k-btn">Every state</Link> : undefined}
       />
-      <Tabs tabs={model.tracks.map((t) => ({ id: t.id, label: t.label, count: leads.filter((l) => (l.states[t.id] ?? 0) > 0).length }))} value={track.id} onChange={setTrackId} />
-      <div className="k-scroll flex gap-3 overflow-x-auto pb-2">
-        {columns.map((col) => (
-          <div key={col.key} data-col={col.key} className={`flex min-w-[208px] flex-1 flex-col rounded-[12px] p-2 ${col.key === asked ? "k-selected" : "k-inset"}`}>
-            <div className="flex items-center justify-between px-1.5 pb-2 pt-1">
-              <span className="flex items-center gap-1.5">
-                {col.key !== "none" ? <Mark kind="step" id={col.key} size={16} /> : <Mark kind="start" id="none" size={16} quiet />}
-                <span className="text-[13px] font-medium">{col.label}</span>
-              </span>
-              <span className="k-fg3 text-[12px] tabular-nums">{formatCount(col.leads.length)}</span>
-            </div>
-            <div className="space-y-1.5">
-              {col.leads.slice(0, COLUMN_CAP).map((l) => (
-                <Link key={l.id} href={leadHref(l.id)} className="k-card k-rise block px-3 py-2">
-                  <span className="flex items-center gap-2">
-                    <Initials name={personName(l)} size={22} round />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{personName(l)}</span>
-                      <span className="k-fg3 block truncate text-[12px]">{companyName(companyKey(l))}</span>
-                    </span>
-                    <span className="k-mono k-fg3 shrink-0 text-[11px]">Day {reachedDay(model, l, track)}</span>
-                  </span>
-                </Link>
+      {columns.map(({ track, cols }) =>
+        cols.length === 0 ? null : (
+          <section key={track.id} className="mb-8">
+            <SectionTitle right={<span>{track.description}</span>}>{track.label}</SectionTitle>
+            <div className="k-scroll flex gap-3 overflow-x-auto pb-2">
+              {cols.map((c) => (
+                <div key={c.key} data-col={c.key} className="k-inset flex w-[260px] shrink-0 flex-col rounded-[12px] p-2">
+                  <div className="flex items-baseline justify-between px-1.5 pb-2 pt-1">
+                    <span className="k-label truncate">{c.label}</span>
+                    <span className="k-fg3 text-[12px] tabular-nums">{formatCount(c.rows.length)}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[...c.rows]
+                      .sort((a, b) => b.firstDay - a.firstDay || (a.person.id < b.person.id ? -1 : 1))
+                      .slice(0, PER_COLUMN)
+                      .map((r) => (
+                        <LeadCard key={r.person.id} model={model} row={r} />
+                      ))}
+                    {c.rows.length === 0 && <p className="k-fg3 px-1.5 py-2 text-[12px]">Nobody here yet.</p>}
+                    {c.rows.length > PER_COLUMN && <p className="k-fg3 px-1.5 py-1 text-[12px]">and {formatCount(c.rows.length - PER_COLUMN)} more</p>}
+                  </div>
+                </div>
               ))}
-              {col.leads.length > COLUMN_CAP && <p className="k-fg3 px-1.5 py-1 text-[12px]">and {formatCount(col.leads.length - COLUMN_CAP)} more</p>}
-              {col.leads.length === 0 && <p className="k-fg3 px-1.5 py-3 text-[12px]">Nobody here yet.</p>}
             </div>
-          </div>
-        ))}
-      </div>
+          </section>
+        ),
+      )}
     </>
+  );
+}
+
+function LeadCard({ model, row }: { model: Model; row: LeadRow }) {
+  const name = personName(row.person.id);
+  const campaigns = row.campaignIds.map((id) => model.campaigns.find((c) => c.id === id)?.name).filter(Boolean);
+  return (
+    <Link href={leadHref(row.person.id)} className="k-card k-hover block px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <Initials name={name} size={22} round />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium">{name}</span>
+          <span className="k-fg3 block truncate text-[12px]">{companyName(row.person.companyId)}</span>
+        </span>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <RootDot model={model} root={row.root} />
+        <span className="k-fg3 k-mono text-[11px]">Day {row.firstDay}</span>
+      </div>
+      {campaigns.length > 0 && <p className="k-fg3 mt-1 truncate text-[11px]">{campaigns.join(", ")}</p>}
+    </Link>
   );
 }
 
@@ -108,172 +116,217 @@ function Board({ model, scope }: { model: Model; scope: string | null }) {
 export function LeadPage() {
   const { model } = useSim();
   const id = useSearchParams().get("id") ?? "";
-  const lead = model?.leadById.get(id);
+  const person = model?.session.person(id);
   return (
     <>
-      <TopBar crumbs={[{ label: "Leads", href: "/leads/" }, { label: lead ? personName(lead) : "Lead" }]} />
-      <Page>
-        {!model ? (
-          <PageSkeleton />
-        ) : !lead ? (
-          <div className="k-card">
-            <EmptyNote>
-              This lead does not exist in this world yet. <Link href="/leads/" className="k-accent">See every lead</Link>.
-            </EmptyNote>
-          </div>
-        ) : (
-          <Lead model={model} lead={lead} />
-        )}
-      </Page>
+      <TopBar crumbs={[{ label: "Leads", href: "/leads/" }, { label: person ? personName(person.id) : "Lead" }]} />
+      <Page>{model ? person ? <Lead model={model} id={id} /> : <EmptyNote>This lead is not in the world on this day.</EmptyNote> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-type Entry = { day: number; order: number; node: React.ReactNode };
+function TacticList({ model, values, level }: { model: Model; values: Record<string, TacticValue>; level: "lead" | "company" }) {
+  const tactics = model.catalogue.tactics.filter((t) => t.describes.includes(level) && values[t.id] !== undefined);
+  return (
+    <dl className="space-y-2">
+      {tactics.map((t) => (
+        <div key={t.id} className="flex items-baseline justify-between gap-3">
+          <dt className="k-label">{t.name}</dt>
+          <dd className="text-right text-[13px] tabular-nums">{valueText(values[t.id]!, t.type.kind === "number" ? t.type.unit : undefined)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
-function Lead({ model, lead }: { model: Model; lead: SimLead }) {
-  const client = model.clients.find((c) => c.campaign.id === lead.campaignId);
-  const audience = model.result.audiences.find((a) => a.id === lead.audienceId);
-  const evidence = model.result.evidence.filter((e) => e.subject === lead.id);
-  const attested = model.result.attested.filter((a) => a.subject === lead.id);
-  const reporters = new Map((model.world.reporters ?? []).map((r) => [r.reporter.id, r.reporter.name]));
-  const entries: Entry[] = [];
-  lead.timeline.forEach((e, i) => {
-    const pipe = model.catalogue.pipe(e.pipeId);
-    const ch = pipe ? model.catalogue.channel(pipe.channel) : undefined;
-    if (e.kind === "trial") {
-      const slots = Object.entries(e.slotChoice ?? {}).map(([slot, id]) => `${nodeLabel(`slot:${slot}`)}: ${slotOptionLabel(model.catalogue, id)}`);
-      entries.push({
-        day: e.day,
-        order: i * 3,
-        node: (
-          <TimelineRow mark={<Mark kind="channel" id={pipe?.channel ?? ""} icon={ch?.icon} size={28} />} title={<>{ch?.name} worked on this lead</>}>
-            {pipeTitle(model.catalogue, e.pipeId).name} · {e.workflowId ? workflowLabel(model.catalogue, e.workflowId) : "—"}
-            {slots.length ? ` · ${slots.join(" · ")}` : ""} · run {e.runId.replace("run:", "#")}
-          </TimelineRow>
-        ),
-      });
-    } else {
-      const state = model.catalogue.step(e.step ?? "")?.leadState?.state ?? e.step ?? "";
-      const std = e.occurrenceId ? model.result.ledger.standardCents[e.occurrenceId] : undefined;
-      entries.push({
-        day: e.day,
-        order: i * 3 + 1,
-        node: (
-          <TimelineRow mark={<Mark kind="step" id={e.step ?? ""} icon={model.catalogue.step(e.step ?? "")?.icon} size={28} />} title={<>Reached {outcomeLabel(model, state)}</>} tone="run">
-            {e.occurrenceId
-              ? `New occurrence, standard cost ${std != null ? formatCentsExact(std) : "—"} (its share of the run that made it)`
-              : "Already there on its track: no new occurrence, no new cost"}
-          </TimelineRow>
-        ),
-      });
-    }
-  });
-  for (const ev of evidence) {
-    const a = attested.find((x) => x.outcome === ev.outcome);
-    entries.push({
-      day: ev.day,
-      order: 1e9,
-      node: (
-        <TimelineRow mark={<Mark kind="trigger" id={ev.reporterId} size={28} />} title={<>{reporters.get(ev.reporterId) ?? ev.reporterId} reported {outcomeLabel(model, ev.outcome)}</>}>
-          Evidence. Confidence it happened: {a ? formatRatePct(a.confidence) : "—"} across {a?.reporters.length ?? 1} reporter{(a?.reporters.length ?? 1) === 1 ? "" : "s"}.
-        </TimelineRow>
-      ),
-    });
-  }
-  entries.sort((a, b) => b.day - a.day || b.order - a.order);
-  const name = personName(lead);
+function valueText(v: TacticValue, unit?: string): string {
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") return `${v}${unit ? ` ${unit}` : ""}`;
+  return v;
+}
+
+function Lead({ model, id }: { model: Model; id: string }) {
+  const s = model.session;
+  const person = s.person(id)!;
+  const name = personName(id);
+  const reached = s.reachedBy(id);
+  const timeline = useMemo(() => timelineOf(model, id), [model, id]);
+  const reliability = useMemo(() => s.reliability(), [s, model.day]);
+  const triggers = s.triggerEvents.filter((e) => e.subject === id);
+  const root = s.rootOf(id) ?? "";
+  const attempts = s.attemptsOf(id);
   return (
     <>
       <div className="mb-6 flex items-start gap-3">
         <Initials name={name} size={40} round />
-        <div>
-          <h1 className="text-[24px] font-medium leading-[30px] tracking-[-0.02em]">{name}</h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="k-chip">{personTitle(lead)}</span>
-            <span className="k-chip">{companyName(companyKey(lead))}</span>
-            {model.tracks.map((t) => {
-              const st = leadStateOn(model, lead, t);
-              return st ? (
-                <ToneDot key={t.id} tone="run">
-                  {st.label}
-                </ToneDot>
-              ) : null;
-            })}
+        <div className="min-w-0">
+          <h1 className="text-[24px] font-medium leading-8 tracking-[-0.02em]">{name}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <RootDot model={model} root={root} />
+            <Link href={`/companies/?id=${encodeURIComponent(person.companyId)}`} className="k-chip">
+              {companyName(person.companyId)}
+            </Link>
+            {s.campaignsOfSubject(id).map((c) => (
+              <Link key={c} href={`/campaigns/view/?id=${encodeURIComponent(c)}`} className="k-chip">
+                {model.campaigns.find((x) => x.id === c)?.name ?? c}
+              </Link>
+            ))}
           </div>
         </div>
       </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section>
-          <SectionTitle count={entries.length}>Timeline</SectionTitle>
-          <div className="k-card divide-y divide-[var(--line-subtle)]">
-            {entries.map((e, i) => (
-              <div key={i} className="flex gap-3 px-4 py-3">
-                <span className="k-mono k-fg3 w-14 shrink-0 pt-1 text-[12px]">Day {e.day}</span>
-                <div className="min-w-0 flex-1">{e.node}</div>
-              </div>
-            ))}
+        <div className="min-w-0 space-y-8">
+          <section>
+            <SectionTitle>Lead states</SectionTitle>
+            <div className="grid gap-3 md:grid-cols-2">
+              {model.tracks.map((t) => (
+                <div key={t.id} className="k-card p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Mark kind="leadTrack" id={t.id} size={20} />
+                    <span className="text-[13px] font-medium">{t.label}</span>
+                  </div>
+                  <ol className="space-y-1.5">
+                    {t.states.map((st) => {
+                      const day = reached.get(st.outcome);
+                      const producers = [...new Set(timeline.filter((o) => o.outcome === st.outcome && o.pipeId).map((o) => o.pipeId!))];
+                      const conf = day !== undefined && producers.length > 0 ? confidenceOf(producers, st.outcome, reliability) : null;
+                      return (
+                        <li key={st.outcome} className="flex items-center gap-2 text-[13px]">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${day !== undefined ? "bg-[var(--data-teal)]" : "border-[1.5px] border-[var(--fg-4)]"}`} />
+                          <span className={day !== undefined ? "" : "k-fg3"}>{st.label}</span>
+                          <span className="k-fg3 k-mono ml-auto text-[12px]">
+                            {day !== undefined ? `Day ${day}` : "—"}
+                            {conf !== null && ` · ${formatRatePct(conf)} sure`}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <SectionTitle count={timeline.length} right={<span>Oldest first. Each line names the script that made it and what led to it.</span>}>
+              Timeline
+            </SectionTitle>
+            <div className="k-card divide-y divide-[var(--line-subtle)]">
+              {timeline.map((o) => (
+                <TimelineRow key={o.id} model={model} occ={o} />
+              ))}
+              {timeline.length === 0 && <EmptyNote>Nothing happened to this lead yet.</EmptyNote>}
+            </div>
+          </section>
+        </div>
+
+        <aside className="space-y-4">
+          <div className="k-card h-fit p-4">
+            <p className="k-label mb-3">Person</p>
+            <TacticList model={model} values={person.values} level="lead" />
           </div>
-        </section>
-        <aside className="k-card h-fit p-4">
-          <dl className="space-y-3 text-[13px]">
-            <div>
-              <dt className="k-label">Client</dt>
-              <dd>{client?.brand.name ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="k-label">Campaign</dt>
-              <dd>
-                {client ? (
-                  <Link href={campaignHref(client.campaign.id)} className="k-accent">
-                    {funnelName(model.catalogue, lead.funnel)}
-                  </Link>
-                ) : (
-                  "—"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="k-label">Funnel it walks</dt>
-              <dd className="mt-1">
-                <FunnelLine catalogue={model.catalogue} plays={lead.funnel} />
-              </dd>
-            </div>
-            <div>
-              <dt className="k-label">Audience</dt>
-              <dd>{audience ? sentenceCase(audience.name) : "—"}</dd>
-            </div>
-            {model.tracks.map((t) => (
-              <div key={t.id}>
-                <dt className="k-label">{t.label}</dt>
-                <dd>{leadStateOn(model, lead, t)?.label ?? <span className="k-fg4">—</span>}</dd>
-              </div>
-            ))}
-            {Object.entries(lead.attributes).map(([k, v]) => (
-              <div key={k}>
-                <dt className="k-label">{humanize(k)}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-            <div>
-              <dt className="k-label">First found</dt>
-              <dd className="k-mono k-fg2 text-[12px]">Day {lead.createdDay}</dd>
-            </div>
-          </dl>
+          <div className="k-card h-fit p-4">
+            <p className="k-label mb-3">Company</p>
+            <TacticList model={model} values={person.values} level="company" />
+          </div>
+          <div className="k-card h-fit p-4">
+            <p className="k-label mb-3">Trigger events</p>
+            {triggers.length === 0 ? (
+              <p className="k-fg3 text-[12px]">No trigger fired for this lead.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {triggers.map((e) => (
+                  <li key={e.occurrenceId} className="flex items-center gap-2 text-[13px]">
+                    <Mark kind="trigger" id={e.triggerId} size={18} />
+                    <span className="min-w-0 flex-1 truncate">{model.catalogue.trigger(e.triggerId)?.label ?? e.triggerId}</span>
+                    <span className="k-fg3 k-mono text-[12px]">Day {e.day}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="k-card h-fit p-4">
+            <p className="k-label mb-3">Legs tried</p>
+            <ul className="space-y-1.5">
+              {attempts.map((a, i) => (
+                <li key={i} className="flex items-center gap-2 text-[12px]">
+                  <span className="min-w-0 flex-1 truncate">
+                    {outcomeLabel(model.catalogue, a.from)} → {outcomeLabel(model.catalogue, a.to)}
+                  </span>
+                  <ToneDot tone={a.status === "done" ? "teal" : a.status === "failed" ? "rose" : "accent"}>{a.status === "done" ? "Reached" : a.status === "failed" ? "Stopped" : "Open"}</ToneDot>
+                </li>
+              ))}
+              {attempts.length === 0 && <li className="k-fg3 text-[12px]">No leg tried yet.</li>}
+            </ul>
+          </div>
         </aside>
       </div>
     </>
   );
 }
 
-function TimelineRow({ mark, title, children, tone }: { mark: React.ReactNode; title: React.ReactNode; children: React.ReactNode; tone?: "run" }) {
+function TimelineRow({ model, occ }: { model: Model; occ: Occurrence }) {
+  const [open, setOpen] = useState(false);
+  const script = occ.scriptId ? model.catalogue.script(occ.scriptId) : undefined;
+  const ours = model.catalogue.factory(occ.factory)?.ours ?? false;
+  const campaign = occ.campaignId ? model.campaigns.find((c) => c.id === occ.campaignId) : undefined;
+  const choices = occ.trace.map((d) => model.session.decisions[d]).filter((d): d is NonNullable<typeof d> => !!d);
+  const inputs = Object.entries(occ.inputs).filter(([, v]) => v);
   return (
-    <div className="flex items-start gap-2.5">
-      {mark}
-      <div className="min-w-0">
-        <p className={`text-[13px] font-medium ${tone === "run" ? "text-[var(--run)]" : ""}`}>{title}</p>
-        <p className="k-fg3 text-[12px]">{children}</p>
-      </div>
+    <div className="px-4 py-3">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 text-left" aria-expanded={open}>
+        {script ? <ProviderLogo script={script} size={28} /> : <Mark kind="outcome" id={occ.outcome} icon={model.catalogue.outcome(occ.outcome)?.icon} size={28} />}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium">{outcomeLabel(model.catalogue, occ.outcome)}</span>
+          <span className="k-fg3 block truncate text-[12px]">
+            {occ.pipeId ? pipeName(model.catalogue, occ.pipeId) : "Trigger"}
+            {script ? ` · ${script.name}` : ""}
+            {campaign ? ` · ${campaign.name}` : ""}
+          </span>
+        </span>
+        <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our run" : factoryName(model.catalogue, occ.factory)}</ToneDot>
+        <span className="k-fg3 k-mono w-14 shrink-0 text-right text-[12px]">Day {occ.day}</span>
+      </button>
+      {open && (
+        <div className="k-inset mt-2 space-y-2 rounded-[8px] p-3">
+          <div>
+            <p className="k-label mb-1">Inputs consumed</p>
+            {inputs.length === 0 ? (
+              <p className="k-fg3 text-[12px]">None: it came from the market or from outside.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {inputs.map(([o, id]) => {
+                  const src = model.session.occurrence(id);
+                  return (
+                    <span key={o} className="k-chip">
+                      {outcomeLabel(model.catalogue, o)}
+                      {src?.name ? `: ${src.name}${src.version ? ` v${src.version}` : ""}` : src ? ` (day ${src.day})` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="k-label mb-1">Traceability: the input choices that led here</p>
+            {choices.length === 0 ? (
+              <p className="k-fg3 text-[12px]">No input choice: a single option or another factory.</p>
+            ) : (
+              <ul className="space-y-1">
+                {choices.map((d) => (
+                  <li key={d.id} className="flex items-baseline gap-2 text-[12px]">
+                    <span className="k-fg3 min-w-0 flex-1 truncate">{pointInfo(model.catalogue, d.point).title}</span>
+                    <span className="truncate font-medium">{optionLabel(model, d.point, d.option, d.brandId)}</span>
+                    <span className="k-fg3 k-mono">Day {d.day}</span>
+                    {d.credited && <span className="k-chip">Credited</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -293,78 +346,63 @@ export function CompaniesPage() {
 }
 
 interface CompanyRow {
-  key: string;
-  name: string;
-  brand: string;
-  country: string;
-  size: string;
-  people: SimLead[];
-  best: { label: string; rank: number } | null;
-  last: number;
+  id: string;
+  leads: LeadRow[];
+  furthest: { label: string; rank: number; track: string } | null;
+  researchedDay: number | null;
+  researchUses: number;
 }
 
 function Companies({ model, scope }: { model: Model; scope: string | null }) {
-  const router = useRouter();
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState<CompanyRow | null>(null);
-  const [cursor, setCursor] = useState(0);
-  const [limit, setLimit] = useState(50);
-  const track = model.tracks[0];
+  const focus = useSearchParams().get("id");
+  const [shown, setShown] = useState(50);
   const rows = useMemo(() => {
-    const map = new Map<string, CompanyRow>();
-    for (const l of model.leads) {
-      if (scope && l.brandId !== scope) continue;
-      const key = companyKey(l);
-      const row =
-        map.get(key) ??
-        ({ key, name: companyName(key), brand: model.clients.find((c) => c.brand.id === l.brandId)?.brand.name ?? "", country: l.attributes.country ?? "", size: l.attributes.company_size ?? "", people: [], best: null, last: 0 } as CompanyRow);
-      row.people.push(l);
-      row.last = Math.max(row.last, l.timeline[l.timeline.length - 1]?.day ?? l.createdDay);
-      const st = track ? leadStateOn(model, l, track) : null;
-      if (st && (!row.best || st.rank > row.best.rank)) row.best = { label: st.label, rank: st.rank };
-      map.set(key, row);
+    const leads = leadRows(model, scope);
+    const by = new Map<string, LeadRow[]>();
+    for (const l of leads) by.set(l.person.companyId, [...(by.get(l.person.companyId) ?? []), l]);
+    // One research of a company serves every lead of it: count the leads whose message consumed it.
+    const research = new Map<string, number>();
+    const uses = new Map<string, number>();
+    const occCompany = new Map<string, string>();
+    for (const o of model.session.occurrences) {
+      if (!by.has(o.subject)) continue;
+      occCompany.set(o.id, o.subject);
+      if (model.catalogue.outcome(o.outcome)?.subject === "company") research.set(o.subject, Math.min(research.get(o.subject) ?? o.day, o.day));
     }
-    return [...map.values()].sort((a, b) => (b.best?.rank ?? 0) - (a.best?.rank ?? 0) || b.people.length - a.people.length || b.last - a.last);
-  }, [model, scope, track]);
-  const shown = rows.filter((r) => !q || r.name.toLowerCase().includes(q.toLowerCase()) || r.brand.toLowerCase().includes(q.toLowerCase()));
-  const visible = shown.slice(0, limit);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
-      if (e.key === "/") {
-        e.preventDefault();
-        document.getElementById("company-search")?.focus();
-      } else if (e.key === "j") setCursor((c) => Math.min(visible.length - 1, c + 1));
-      else if (e.key === "k") setCursor((c) => Math.max(0, c - 1));
-      else if (e.key === "Enter" && visible[cursor]) setOpen(visible[cursor]!);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [visible, cursor]);
-
+    for (const o of model.session.occurrences) {
+      for (const id of Object.values(o.inputs)) {
+        const cid = occCompany.get(id);
+        if (cid) uses.set(cid, (uses.get(cid) ?? 0) + 1);
+      }
+    }
+    const out: CompanyRow[] = [...by].map(([id, ls]) => {
+      let furthest: CompanyRow["furthest"] = null;
+      for (const l of ls)
+        for (const t of model.tracks) {
+          const st = l.states[t.id];
+          if (st && (!furthest || st.rank > furthest.rank)) furthest = { label: st.label, rank: st.rank, track: t.label };
+        }
+      return { id, leads: ls, furthest, researchedDay: research.get(id) ?? null, researchUses: uses.get(id) ?? 0 };
+    });
+    return out.sort((a, b) => (b.furthest?.rank ?? 0) - (a.furthest?.rank ?? 0) || b.leads.length - a.leads.length || (a.id < b.id ? -1 : 1));
+  }, [model, scope]);
+  const focused = focus ? rows.find((r) => r.id === focus) : undefined;
+  const companyTactics = model.catalogue.tactics.filter((t) => t.describes.includes("company"));
+  const list = focused ? [focused, ...rows.filter((r) => r !== focused)] : rows;
   return (
     <>
-      <PageHeader title={`${formatCount(rows.length)} companies`} sub={`Every company the campaigns reached. Ranked by the furthest state one of its people reached on the ${track?.label ?? "first track"}.`} />
-      <div className="mb-3 flex items-center gap-2">
-        <span className="k-input flex w-72 items-center gap-1.5 px-2">
-          <MagnifyingGlassIcon size={13} className="k-fg3" />
-          <input id="company-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search companies" className="w-full bg-transparent outline-none" style={{ font: "inherit" }} />
-          <span className="k-kbd">/</span>
-        </span>
-        <span className="ml-auto flex gap-3">
-          <KeyHint keys={["J", "K"]} label="to move" />
-          <KeyHint keys={["↵"]} label="to open" />
-        </span>
-      </div>
+      <PageHeader
+        title={<>{plural(rows.length, "company", "companies")}</>}
+        sub="Every lead resolves to one person in one company: identity is a pipe, and every pipe shares its ids. One company research serves every lead of that company."
+      />
       <CardTable
         footer={
           <span className="flex items-center justify-between">
             <span>
-              {formatCount(visible.length)} of {formatCount(shown.length)}
+              {formatCount(Math.min(shown, list.length))} of {formatCount(list.length)}
             </span>
-            {shown.length > limit && (
-              <button type="button" className="k-btn-ghost" onClick={() => setLimit((n) => n + 50)}>
+            {shown < list.length && (
+              <button type="button" className="k-btn-ghost" onClick={() => setShown((n) => n + 50)}>
                 Show 50 more
               </button>
             )}
@@ -374,52 +412,61 @@ function Companies({ model, scope }: { model: Model; scope: string | null }) {
         <thead>
           <tr className="k-line-subtle border-b">
             <th className={TH}>Company</th>
-            <th className={TH}>Client</th>
-            <th className={TH}>Country</th>
-            <th className={TH}>Size</th>
-            <th className={`${TH} text-right`}># people</th>
+            {companyTactics.map((t) => (
+              <th key={t.id} className={TH}>
+                {t.name}
+              </th>
+            ))}
             <th className={TH}>Furthest state</th>
-            <th className={`${TH} text-right`}>Last activity</th>
+            <th className={TH}>Researched</th>
+            <th className={`${TH} text-right`}>Leads</th>
           </tr>
         </thead>
         <tbody>
-          {visible.map((r, i) => (
-            <tr key={r.key} className={`k-row h-10 cursor-pointer ${i === cursor ? "k-selected" : ""}`} onClick={() => setOpen(r)}>
-              <td className={TD}>
-                <span className="flex items-center gap-2">
-                  <Initials name={r.name} size={20} />
-                  <span className="font-medium">{r.name}</span>
-                </span>
+          {list.slice(0, shown).map((r) => {
+            const values = r.leads[0]!.person.values;
+            return (
+              <tr key={r.id} className={`k-row k-line-subtle border-b ${r === focused ? "k-selected" : ""}`}>
+                <td className={TD}>
+                  <span className="flex items-center gap-2">
+                    <Initials name={companyName(r.id)} size={22} />
+                    <span className="truncate font-medium">{companyName(r.id)}</span>
+                  </span>
+                </td>
+                {companyTactics.map((t) => (
+                  <td key={t.id} className={`${TD} tabular-nums`}>
+                    {values[t.id] !== undefined ? valueText(values[t.id]!, t.type.kind === "number" ? t.type.unit : undefined) : <span className="k-fg4">—</span>}
+                  </td>
+                ))}
+                <td className={TD}>{r.furthest ? r.furthest.label : <span className="k-fg4">—</span>}</td>
+                <td className={TD}>
+                  {r.researchedDay !== null ? (
+                    <span className="k-fg2 text-[12px]">
+                      Day {r.researchedDay}
+                      {r.researchUses > 0 ? `, used ${r.researchUses}×` : ""}
+                    </span>
+                  ) : (
+                    <span className="k-fg4">—</span>
+                  )}
+                </td>
+                <td className={TDN}>
+                  <Link href={leadHref(r.leads[0]!.person.id)} className="hover:underline">
+                    {formatCount(r.leads.length)}
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+          {list.length === 0 && (
+            <tr>
+              <td colSpan={5 + companyTactics.length}>
+                <EmptyNote>No company yet. Press play.</EmptyNote>
               </td>
-              <td className={`${TD} k-fg2`}>{r.brand}</td>
-              <td className={`${TD} k-fg2`}>{r.country}</td>
-              <td className={`${TD} k-fg2 tabular-nums`}>{r.size}</td>
-              <td className={TDN}>{r.people.length}</td>
-              <td className={TD}>{r.best ? <ToneDot tone="run">{r.best.label}</ToneDot> : <span className="k-fg4">—</span>}</td>
-              <td className={`${TDN} k-mono k-fg2 text-[12px]`}>Day {r.last}</td>
             </tr>
-          ))}
+          )}
         </tbody>
       </CardTable>
-      {open && (
-        <Drawer title={open.name} onClose={() => setOpen(null)}>
-          <p className="k-fg2 text-[13px]">
-            {open.brand} reached {open.people.length} {open.people.length === 1 ? "person" : "people"} here. {open.country}, {open.size} people.
-          </p>
-          <div className="k-card mt-3 divide-y divide-[var(--line-subtle)]">
-            {open.people.map((l) => (
-              <button key={l.id} type="button" onClick={() => router.push(leadHref(l.id))} className="k-hover flex w-full items-center gap-2 px-3 py-2 text-left">
-                <Initials name={personName(l)} size={22} round />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px]">{personName(l)}</span>
-                  <span className="k-fg3 block truncate text-[12px]">{personTitle(l)}</span>
-                </span>
-                <span className="k-fg2 text-[12px]">{(track && leadStateOn(model, l, track)?.label) ?? "No state yet"}</span>
-              </button>
-            ))}
-          </div>
-        </Drawer>
-      )}
     </>
   );
 }
+

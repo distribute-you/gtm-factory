@@ -3,7 +3,14 @@
 import type { Icon } from "@phosphor-icons/react";
 import {
   AddressBookIcon,
+  AlarmIcon,
   AtIcon,
+  BookOpenIcon,
+  EnvelopeOpenIcon,
+  FactoryIcon,
+  FingerprintIcon,
+  HandHeartIcon,
+  ProhibitIcon,
   BellIcon,
   BirdIcon,
   BrainIcon,
@@ -69,6 +76,13 @@ import {
  */
 const ICONS: Record<string, Icon> = {
   "address-book": AddressBookIcon,
+  alarm: AlarmIcon,
+  "book-open": BookOpenIcon,
+  "envelope-open": EnvelopeOpenIcon,
+  fingerprint: FingerprintIcon,
+  "hand-heart": HandHeartIcon,
+  prohibit: ProhibitIcon,
+  tag: TagIcon,
   at: AtIcon,
   "at-sign": AtIcon,
   bell: BellIcon,
@@ -121,24 +135,24 @@ const ICONS: Record<string, Icon> = {
 
 /** The glyph of each kind of object that has no icon of its own. */
 export const KIND_ICON = {
-  step: FlowArrowIcon,
+  outcome: FlowArrowIcon,
   leadTrack: PathIcon,
   trigger: LightningIcon,
-  channel: ChatCircleIcon,
   pipe: BirdIcon,
-  salesPath: PathIcon,
   funnel: FunnelIcon,
   play: PlayIcon,
   tactic: TagIcon,
   strategy: StrategyIcon,
-  "workflow:rules": FlowArrowIcon,
-  "workflow:ai": RobotIcon,
-  "workflow:human": UserIcon,
-  template: FileTextIcon,
-  llm: CpuIcon,
-  slot: BrainIcon,
+  "script:rules": FlowArrowIcon,
+  "script:ai": RobotIcon,
+  "script:human": UserIcon,
+  object: FileTextIcon,
+  factory: FactoryIcon,
   audience: UsersThreeIcon,
   start: PlayIcon,
+  point: BrainIcon,
+  person: UserIcon,
+  company: UsersIcon,
 } as const satisfies Record<string, Icon>;
 
 export type MarkKind = keyof typeof KIND_ICON;

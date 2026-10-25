@@ -1,247 +1,279 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 import { CheckIcon } from "@phosphor-icons/react";
+import { describeCondition } from "@gtm-factory/engine";
 import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
-import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TopBar } from "@/components/ui";
+import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { markKindOf } from "./campaigns";
-import { flashMature, nodeLabel, optionLabel, optionOfRun, pickShares, pipeTitle, rate, runsOf, scopedClients, trueYield, type Model } from "@/lib/model";
+import { headScript, optionLabel, pipeName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
+import { multiPlugged, pointGroups, recentShare } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
-const NODES = ["workflow", "slot:template", "slot:llm"];
-
 export function ResearchPage() {
-  const { model, scope } = useSim();
+  const { model } = useSim();
   return (
     <>
       <TopBar crumbs={[{ label: "Research" }]} />
-      <Page>{model ? <Research model={model} scope={scope} /> : <PageSkeleton />}</Page>
+      <Page>{model ? <Research model={model} /> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-/** What an option costs per input, on the catalogue (a slot option adds to its pipe's average workflow). */
-function costCents(model: Model, pipeId: string, node: string, id: string): number {
-  if (node === "workflow") return model.catalogue.workflow(id)?.costPerTrialCents ?? 0;
-  const wfs = model.catalogue.workflows.filter((w) => w.pipeId === pipeId && w.status === "active");
-  const avg = wfs.reduce((s, w) => s + w.costPerTrialCents, 0) / Math.max(1, wfs.length);
-  return avg + (model.catalogue.slotOption(id)?.costPerTrialCents ?? 0);
-}
-
-/** The option the hidden truth says is best: most true outcomes per dollar. */
-function trueBest(model: Model, pipeId: string, node: string, ids: string[]): string | null {
-  let best: string | null = null;
-  let bestScore = -1;
-  for (const id of ids) {
-    const y = trueYield(model, pipeId, node, id);
-    const c = costCents(model, pipeId, node, id);
-    if (y == null || c <= 0) continue;
-    const s = y / c;
-    if (s > bestScore) {
-      bestScore = s;
-      best = id;
-    }
-  }
-  return best;
-}
-
-function Research({ model, scope }: { model: Model; scope: string | null }) {
-  const [view, setView] = useState<"flash" | "mature">("flash");
-  const [shown, setShown] = useState(6);
-  const campaignIds = useMemo(() => new Set(scopedClients(model, scope).map((c) => c.campaign.id)), [model, scope]);
-  const runs = useMemo(() => runsOf(model, { campaignIds }), [model, campaignIds]);
-  const pipes = useMemo(() => {
-    const spend = new Map<string, number>();
-    for (const r of runs) spend.set(r.pipeId!, (spend.get(r.pipeId!) ?? 0) + r.spendCents);
-    return [...spend.entries()].sort((a, b) => b[1] - a[1]).map(([id, cents]) => ({ id, cents }));
-  }, [runs]);
-
-  // Convergence: share of each day's picks that went to the option the hidden truth says is best.
-  const { series, nodes, converged } = useMemo(() => {
-    const perDay = new Array<{ best: number; all: number }>(model.day).fill({ best: 0, all: 0 }).map(() => ({ best: 0, all: 0 }));
-    const bestOf = new Map<string, string | null>();
-    let nodes = 0;
-    let converged = 0;
-    for (const p of pipes) {
-      for (const node of NODES) {
-        const last = [...model.result.choices].reverse().find((c) => c.node === node && c.pipeId === p.id && campaignIds.has(c.campaignId));
-        if (!last || last.options.length < 2) continue;
-        const best = trueBest(model, p.id, node, last.options.map((o) => o.id));
-        bestOf.set(`${p.id}|${node}`, best);
-        nodes++;
-        const shares = pickShares(model, node, p.id, campaignIds);
-        const top = [...shares.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-        if (top && top === best) converged++;
-      }
-    }
-    for (const c of model.result.choices) {
-      if (!campaignIds.has(c.campaignId) || c.day >= model.day) continue;
-      const best = bestOf.get(`${c.pipeId}|${c.node}`);
-      if (!best) continue;
-      for (const o of c.options) {
-        perDay[c.day]!.all += o.picks;
-        if (o.id === best) perDay[c.day]!.best += o.picks;
-      }
-    }
-    return { series: perDay.map((d) => (d.all > 0 ? d.best / d.all : null)), nodes, converged };
-  }, [model, pipes, campaignIds]);
-
-  const lastWeek = series.slice(-7).filter((x): x is number => x != null);
-  const firstWeek = series.slice(0, 7).filter((x): x is number => x != null);
-  const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
+function Research({ model }: { model: Model }) {
+  const search = useSearchParams();
+  const router = useRouter();
+  const groups = useMemo(() => pointGroups(model), [model]);
+  const all = groups.flatMap((g) => g.points);
+  const asked = search.get("point");
+  const selected = all.find((p) => p.conv.point === asked) ?? [...all].sort((a, b) => b.conv.picks - a.conv.picks)[0] ?? null;
+  const select = (point: string) => router.replace(`/research/?point=${encodeURIComponent(point)}`, { scroll: false });
+  const converged = all.filter((p) => p.conv.picks >= 200 && (recentShare(p.conv) ?? 0) >= 0.8).length;
+  const big = all.filter((p) => p.conv.picks >= 200).length;
 
   return (
     <>
       <PageHeader
-        title={`The engine backs the true best option at ${converged} of ${nodes} choices`}
-        sub="Every choice node, its options, what was measured and what the engine believes. The hidden truth of the simulated world sits beside it, so you can watch the engine converge."
-        right={
-          <span className="flex items-center gap-1">
-            {(["flash", "mature"] as const).map((x) => (
-              <button key={x} type="button" className={`k-chip ${view === x ? "k-chip-on" : ""}`} onClick={() => setView(x)} aria-pressed={view === x}>
-                {x === "flash" ? "Flash" : "Mature"}
-              </button>
-            ))}
-          </span>
+        title={
+          <>
+            {converged} of {big} choice points back their hidden best
+          </>
         }
+        sub="Every input choice, made by one prioritizer. The world hides the true best option at each input; here is how fast the engine finds it."
+        right={<span>Day {model.day}</span>}
       />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Picks on the true best" note="last 7 days">
-          <Figure value={formatRatePct(avg(lastWeek))} sub={`from ${formatRatePct(avg(firstWeek))} in week one`} />
-        </StatTile>
-        <StatTile label="Choice nodes" note="with 2+ options">
-          <Figure value={formatCount(nodes)} />
-        </StatTile>
-        <StatTile label="Pipes that ran">
-          <Figure value={formatCount(pipes.length)} />
-        </StatTile>
-        <StatTile label="Choices logged">
-          <Figure value={formatCount(model.result.choices.filter((c) => campaignIds.has(c.campaignId)).length)} />
-        </StatTile>
-      </div>
-      <section className="mt-6">
-        <SectionTitle right={<span>Each day&apos;s picks, every workflow, template and LLM node</span>}>Learning curve</SectionTitle>
-        <div className="k-card px-4 pb-3 pt-3">
-          <DayChart series={[{ key: "s", label: "Share of picks on the true best option", values: series, color: "var(--data-teal)" }]} format={(v) => formatRatePct(v)} />
-          <Legend series={[{ label: "Share of picks on the true best option", color: "var(--data-teal)" }]} />
-        </div>
-      </section>
-      {pipes.length === 0 && <EmptyNote>No pipe has run yet. Press play.</EmptyNote>}
-      {pipes.slice(0, shown).map((p) => (
-        <PipeResearch key={p.id} model={model} pipeId={p.id} cents={p.cents} runs={runs.filter((r) => r.pipeId === p.id)} campaignIds={campaignIds} view={view} />
-      ))}
-      {pipes.length > shown && (
-        <div className="mt-6 flex justify-center">
-          <button type="button" className="k-btn" onClick={() => setShown(pipes.length)}>
-            Show the other {pipes.length - shown} pipes
-          </button>
+
+      {all.length === 0 ? (
+        <EmptyNote>No input choice yet. Press play.</EmptyNote>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section>
+            <SectionTitle count={all.length}>Choice points</SectionTitle>
+            <div className="space-y-4">
+              {groups.map((g) => (
+                <div key={g.key}>
+                  <p className="k-label mb-1.5 px-1">{g.title}</p>
+                  <div className="k-card divide-y divide-[var(--line-subtle)]">
+                    {g.points.map(({ info, conv }) => {
+                      const share = recentShare(conv);
+                      const on = selected?.conv.point === conv.point;
+                      return (
+                        <button
+                          key={conv.point}
+                          type="button"
+                          onClick={() => select(conv.point)}
+                          className={`k-hover flex w-full items-center gap-3 px-3 py-2.5 text-left first:rounded-t-[12px] last:rounded-b-[12px] ${on ? "k-selected" : ""}`}
+                        >
+                          <Mark kind="point" id={conv.point} size={28} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-medium">{info.title}</span>
+                            <span className="k-fg3 block truncate text-[12px]">
+                              {info.sub} · {formatCount(conv.picks)} picks
+                            </span>
+                          </span>
+                          <span className="w-16 shrink-0">
+                            <SparkLine className="h-6" values={shareSeries(conv).map((x) => x ?? 0)} color={share != null && share >= 0.8 ? "var(--run)" : "var(--accent)"} />
+                          </span>
+                          <span className={`w-10 shrink-0 text-right text-[13px] tabular-nums ${share != null && share >= 0.8 ? "text-[var(--run)]" : "k-fg2"}`}>{formatRatePct(share)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="min-w-0">{selected && <PointDetail model={model} point={selected.conv.point} />}</section>
         </div>
       )}
+
+      <MultiPlugged model={model} />
+      <ProposedStrategies model={model} />
     </>
   );
 }
 
-function PipeResearch({ model, pipeId, cents, runs, campaignIds, view }: { model: Model; pipeId: string; cents: number; runs: ReturnType<typeof runsOf>; campaignIds: Set<string>; view: "flash" | "mature" }) {
-  const pipe = model.catalogue.pipe(pipeId);
-  const ch = pipe ? model.catalogue.channel(pipe.channel) : undefined;
-  const fm = flashMature(model, pipe, runs);
-  const t = pipeTitle(model.catalogue, pipeId);
-  const base = model.world.truth.pipes.find((x) => x.pipeId === pipeId)?.baseYield ?? null;
+function PointDetail({ model, point }: { model: Model; point: string }) {
+  const info = pointInfo(model.catalogue, point);
+  const conv = useMemo(() => pointGroups(model).flatMap((g) => g.points).find((p) => p.conv.point === point)?.conv ?? null, [model, point]);
+  const campaigns = model.campaigns.filter((c) => conv && conv.bestByCampaign[c.id] !== undefined);
+  const series = conv ? [{ key: "s", label: "Share of picks on the hidden best option", values: shareSeries(conv), color: "var(--run)" }] : [];
+  const share = conv ? recentShare(conv) : null;
+  const first = conv ? conv.daily.slice(0, 10).reduce((a, d) => ({ p: a.p + d.picks, b: a.b + d.onBest }), { p: 0, b: 0 }) : null;
   return (
-    <section className="mt-8">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Mark kind="channel" id={pipe?.channel ?? ""} icon={ch?.icon} size={32} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[14px] font-medium">
-            {ch?.name} <span className="k-fg3 font-normal">· {t.name}</span>
-          </h2>
-          <p className="k-fg3 text-[12px]">{t.line}</p>
-        </div>
-        <div className="k-fg2 flex flex-wrap gap-4 text-[12px] tabular-nums">
-          <span>{formatCents(cents)} spent</span>
-          <span>
-            Flash {formatRatePct(rate(fm.flash))} · Mature {fm.mature.inputs > 0 ? formatRatePct(rate(fm.mature)) : "—"}
-          </span>
-          <span>{fm.isMature ? "Mature" : `Learning: needs ${fm.outcomesRequired} mature outcomes, ${fm.windowDays}-day window`}</span>
-          <span className="k-fg3">Hidden base rate {formatRatePct(base)}</span>
-        </div>
+    <>
+      <SectionTitle right={<span>{info.sub}</span>}>{info.title}</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <StatTile label="On the hidden best" note="last 7 days">
+          <Figure value={formatRatePct(share)} tone={share != null && share >= 0.8 ? "run" : undefined} />
+        </StatTile>
+        <StatTile label="First 10 days" note="the engine knew nothing">
+          <Figure value={formatRatePct(first && first.p > 0 ? first.b / first.p : null)} tone="muted" />
+        </StatTile>
+        <StatTile label="Picks" note={`${campaigns.length} campaigns`}>
+          <Figure value={formatCount(conv?.picks ?? 0)} />
+        </StatTile>
       </div>
-      <div className="grid gap-3 lg:grid-cols-3">
-        {NODES.map((node) => {
-          const last = [...model.result.choices].reverse().find((c) => c.node === node && c.pipeId === pipeId && campaignIds.has(c.campaignId));
-          if (!last) return null;
-          return <NodeTable key={node} model={model} node={node} pipeId={pipeId} runs={runs} campaignIds={campaignIds} view={view} />;
-        })}
+      <div className="k-card mt-3 px-4 pb-3 pt-3">
+        {series.length ? <DayChart series={series} format={(v) => formatRatePct(v)} reference={{ y: 0.8, label: "80%" }} /> : <EmptyNote>No pick yet.</EmptyNote>}
+        <Legend series={series} />
+      </div>
+
+      {campaigns.map((c) => {
+        const row = pointRow(model, c, point, hiddenOf(model, c).get(point) ?? null);
+        const brand = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name;
+        return (
+          <div key={c.id} className="mt-6">
+            <SectionTitle count={row.options.length} right={<span>{brand}</span>}>
+              {c.name}
+            </SectionTitle>
+            <CardTable footer="Belief = what the engine reads today. Hidden truth = what the world really does, never read by the engine.">
+              <thead>
+                <tr className="k-line-subtle border-b">
+                  <th className={TH}>Option</th>
+                  <th className={`${TH} text-right`}>Picks, 7 days</th>
+                  <th className={`${TH} text-right`}>Belief: reaches the leg's end</th>
+                  <th className={`${TH} text-right`}>Belief: $ to the end</th>
+                  <th className={`${TH} text-right`}>Belief: ends per $</th>
+                  <th className={`${TH} text-right`}>Truth: reaches the end</th>
+                  <th className={`${TH} text-right`}>Truth: $ to the end</th>
+                  <th className={`${TH} text-right`}>Truth: ends per $</th>
+                </tr>
+              </thead>
+              <tbody>
+                {row.options.map((o) => {
+                  const script = headScript(model.catalogue, o.option);
+                  return (
+                    <tr key={o.option} className="k-row k-line-subtle border-b last:border-0">
+                      <td className={TD}>
+                        <span className="flex items-center gap-2">
+                          {script ? <Mark kind={`script:${script.kind}`} id={script.dynasty} size={20} /> : <Mark kind={model.catalogue.pipe(o.option) ? "pipe" : "object"} id={o.option} size={20} />}
+                          <span className="truncate font-medium">{o.label}</span>
+                          {o.isHiddenBest && (
+                            <span className="k-chip inline-flex items-center gap-1 text-[var(--run)]">
+                              <CheckIcon size={11} weight="bold" /> Hidden best
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className={TDN}>{formatRatePct(o.share)}</td>
+                      <td className={TDN}>
+                        {formatRatePct(o.rate)} <span className="k-fg3">± {formatRatePct(o.rateSd)}</span>
+                      </td>
+                      <td className={TDN}>{formatUsd(o.cost)}</td>
+                      <td className={TDN}>{(o.rate / Math.max(o.cost, 1e-9)).toFixed(3)}</td>
+                      <td className={TDN}>{o.truth ? formatRatePct(o.truth.rate) : <span className="k-fg4">—</span>}</td>
+                      <td className={TDN}>{o.truth ? formatCents(Math.round(o.truth.costCents)) : <span className="k-fg4">—</span>}</td>
+                      <td className={`${TDN} ${o.isHiddenBest ? "text-[var(--run)]" : ""}`}>{o.truth ? o.truth.perDollar.toFixed(3) : <span className="k-fg4">—</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </CardTable>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** The same provider pipe plugged at two inputs: each input has its own choice, so its own best script. */
+function MultiPlugged({ model }: { model: Model }) {
+  const rows = useMemo(() => multiPlugged(model), [model]);
+  if (rows.length === 0) return null;
+  return (
+    <section className="mt-10">
+      <SectionTitle right={<span>The choice lives on the input, never on the provider pipe</span>}>One pipe, several inputs</SectionTitle>
+      <div className="grid gap-3 md:grid-cols-2">
+        {rows.map((r) => (
+          <div key={r.pipeId} className="k-card p-4">
+            <div className="flex items-center gap-2">
+              <Mark kind="pipe" id={r.pipeId} icon={model.catalogue.pipe(r.pipeId)?.icon} size={28} />
+              <span className="text-[14px] font-medium">{pipeName(model.catalogue, r.pipeId)}</span>
+              <span className="k-fg3 ml-auto text-[12px]">plugged at {r.inputs.length} inputs</span>
+            </div>
+            <div className="k-inset mt-3 divide-y divide-[var(--line-subtle)] rounded-[8px]">
+              {r.inputs.map((i) => (
+                <Link key={i.point} href={`/research/?point=${encodeURIComponent(i.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
+                  <span className="min-w-0 flex-1 truncate">{i.info.title}</span>
+                  <span className="k-fg3 text-[12px]">best</span>
+                  <span className="font-medium">{i.bestScript ? optionLabel(model, i.point, i.bestScript) : "—"}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-function NodeTable({ model, node, pipeId, runs, campaignIds, view }: { model: Model; node: string; pipeId: string; runs: ReturnType<typeof runsOf>; campaignIds: Set<string>; view: "flash" | "mature" }) {
-  const pipe = model.catalogue.pipe(pipeId);
-  const last = [...model.result.choices].reverse().find((c) => c.node === node && c.pipeId === pipeId && campaignIds.has(c.campaignId))!;
-  const shares = pickShares(model, node, pipeId, campaignIds);
-  const ids = last.options.map((o) => o.id);
-  const best = trueBest(model, pipeId, node, ids);
-  const byOption = new Map<string, typeof runs>();
-  for (const r of runs) {
-    const o = optionOfRun(r, node);
-    if (o) byOption.set(o, [...(byOption.get(o) ?? []), r]);
-  }
-  const options = [...last.options].sort((a, b) => (shares.get(b.id) ?? 0) - (shares.get(a.id) ?? 0));
+/** Strategies the split mechanism proposed from the tactics of the scripts picked at an input. */
+function ProposedStrategies({ model }: { model: Model }) {
+  const proposals = model.session.proposals.filter((p) => p.kind === "strategy" && p.point);
   return (
-    <CardTable footer={"Seen: measured conversion. Belief: expected $ back per $1. Truth: hidden conversion. ✓ best in truth."}>
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={NTH}>{nodeLabel(node)}</th>
-          <th className={`${NTH} text-right`}>Picks</th>
-          <th className={`${NTH} text-right`}>Seen</th>
-          <th className={`${NTH} text-right`}>Belief</th>
-          <th className={`${NTH} text-right`}>Truth</th>
-        </tr>
-      </thead>
-      <tbody>
-        {options.map((o) => {
-          const fm = flashMature(model, pipe, byOption.get(o.id) ?? []);
-          const tally = fm[view];
-          const truth = trueYield(model, pipeId, node, o.id);
-          return (
-            <tr key={o.id} className="k-row">
-              <td className={NTD}>
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Mark kind={markKindOf(model, node, o.id)} id={o.id} size={18} />
-                  <span className="truncate text-[12px]">{optionLabel(model, node, o.id)}</span>
-                  {o.id === best && <CheckIcon size={12} weight="bold" className="shrink-0 text-[var(--data-teal)]" aria-label="Best in the hidden truth" />}
-                </span>
-              </td>
-              <td className={NTDN}>
-                <span className="text-[12px]">{formatRatePct(shares.get(o.id) ?? 0)}</span>
-              </td>
-              <td className={NTDN}>
-                <span className="text-[12px]" title={`${formatCount(tally.outputs)} of ${formatCount(tally.inputs)}`}>
-                  {tally.inputs > 0 ? formatRatePct(rate(tally)) : "—"}
-                </span>
-              </td>
-              <td className={NTDN}>
-                <span className="text-[12px]" title="Expected dollars back per $1, on the engine's posterior">
-                  {formatUsd(o.meanScore)}
-                </span>
-              </td>
-              <td className={NTDN}>
-                <span className="k-fg3 text-[12px]">{truth != null ? formatRatePct(truth) : "—"}</span>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </CardTable>
+    <section className="mt-10">
+      <SectionTitle count={proposals.length} right={<span>A split on scripts' tactics, kept only when the verdict is a conclusion</span>}>
+        Proposed strategies
+      </SectionTitle>
+      {proposals.length === 0 ? (
+        <EmptyNote>No split has reached a conclusion yet. Splits are studied every few days on mature decisions.</EmptyNote>
+      ) : (
+        <div className="space-y-3">
+          {proposals.map((p) => {
+            const info = pointInfo(model.catalogue, p.point!);
+            const strategy = model.catalogue.strategy(p.createdId);
+            return (
+              <div key={p.createdId} className="k-card p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Mark kind="strategy" id={p.createdId} size={28} />
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-medium">{strategy?.name ?? p.createdId}</span>
+                    <span className="k-fg3 block text-[12px]">
+                      On {info.title} · proposed day {p.day}
+                    </span>
+                  </span>
+                  <span className="ml-auto flex flex-wrap gap-1">
+                    {p.conditions.map((c, i) => (
+                      <span key={i} className="k-chip">
+                        {describeCondition(c, model.catalogue)}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+                <table className="mt-3 w-full text-[12px]">
+                  <thead>
+                    <tr className="k-line-subtle border-b">
+                      <th className={TH}>Split looked at</th>
+                      <th className={`${TH} text-right`}>Inside</th>
+                      <th className={`${TH} text-right`}>Outside</th>
+                      <th className={`${TH} text-right`}>Verdict</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {p.study.root.slice(0, 6).map((s, i) => (
+                      <tr key={i} className="k-line-subtle border-b last:border-0">
+                        <td className={TD}>{describeCondition(s.inside, model.catalogue)}</td>
+                        <td className={TDN}>
+                          {formatRatePct(s.insideCounts.trials ? s.insideCounts.successes / s.insideCounts.trials : null)} <span className="k-fg3">of {formatCount(s.insideCounts.trials)}</span>
+                        </td>
+                        <td className={TDN}>
+                          {formatRatePct(s.outsideCounts.trials ? s.outsideCounts.successes / s.outsideCounts.trials : null)} <span className="k-fg3">of {formatCount(s.outsideCounts.trials)}</span>
+                        </td>
+                        <td className={`${TDN} ${s.verdict === "conclusion" ? "text-[var(--run)]" : s.verdict === "signal" ? "text-[var(--data-amber)]" : "k-fg3"}`}>{s.verdict === "conclusion" ? "Conclusion" : s.verdict === "signal" ? "Signal" : "Noise"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
-
-
-const NTH = "k-label px-2 py-2 text-left font-medium first:pl-3 last:pr-3 whitespace-nowrap";
-const NTD = "px-2 py-1.5 first:pl-3 last:pr-3 align-middle max-w-[132px]";
-const NTDN = "px-2 py-1.5 first:pl-3 last:pr-3 align-middle text-right tabular-nums whitespace-nowrap";
