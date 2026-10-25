@@ -12,12 +12,13 @@ import { PageSkeleton } from "./today";
 import { factoryName, headScript, optionLabel, outcomeLabel, pipeLine, pipeName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
 import { factoryFigures } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
-import { pinKey, togglePin, type Pin } from "@/lib/pins";
+import { pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
+import { campaignsRunning } from "@/lib/funnels";
 import { useSim } from "@/lib/sim";
 
-const TABS = ["outcomes", "pipes", "scripts", "triggers", "tactics", "strategies", "factories"] as const;
+const TABS = ["outcomes", "pipes", "scripts", "triggers", "paths", "tactics", "strategies", "factories"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", triggers: "Triggers", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
+const TAB_LABEL: Record<Tab, string> = { paths: "Sales paths", outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", triggers: "Triggers", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
 
 export function CataloguePage() {
   const { model } = useSim();
@@ -41,6 +42,7 @@ function Catalogue({ model }: { model: Model }) {
     pipes: c.pipes.filter((p) => c.isPipeLive(p)).length,
     scripts: new Set(c.scripts.filter((s) => s.status === "active").map((s) => s.dynasty)).size,
     triggers: c.triggers.filter((t) => !t.retired).length,
+    paths: c.salesPaths.length,
     tactics: c.tactics.filter((t) => !t.retired).length,
     strategies: c.strategies.filter((s) => !s.retired).length,
     factories: c.factories.length,
@@ -60,10 +62,56 @@ function Catalogue({ model }: { model: Model }) {
       {tab === "pipes" && <Pipes model={model} />}
       {tab === "scripts" && <Scripts model={model} />}
       {tab === "triggers" && <Triggers model={model} />}
+      {tab === "paths" && <SalesPaths model={model} />}
       {tab === "tactics" && <Tactics model={model} />}
       {tab === "strategies" && <Strategies model={model} />}
       {tab === "factories" && <Factories model={model} />}
     </>
+  );
+}
+
+/** Sales paths (lines of lead states) and the sales funnels playing each: named on first sight, never renamed. */
+function SalesPaths({ model }: { model: Model }) {
+  const c = model.catalogue;
+  return (
+    <div className="space-y-6">
+      <p className="k-fg2 text-[13px]">A sales path is a straight line of lead states from Start or a trigger to a target. A sales funnel is a path with one play per leg. Each gets a name the first time it is seen, and keeps it.</p>
+      {c.salesPaths.length === 0 ? (
+        <div className="k-card">
+          <EmptyNote>No sales path has been run yet.</EmptyNote>
+        </div>
+      ) : (
+        c.salesPaths.map((p) => {
+          const funnels = c.funnelsOf(p.id);
+          return (
+            <section key={p.id}>
+              <SectionTitle count={funnels.length} right={<PinButton pin={{ kind: "path", id: p.id, label: p.name }} />}>
+                <Link href={pinHref({ kind: "path", id: p.id })} className="inline-flex items-center gap-2 hover:underline">
+                  <Mark kind="path" id={p.id} size={20} />
+                  {p.name}
+                </Link>
+              </SectionTitle>
+              <p className="k-fg3 mb-2 text-[12px]">{[p.entry, ...p.line].map((o) => outcomeLabel(c, o)).join(" → ")}</p>
+              <div className="k-card divide-y divide-[var(--line-subtle)]">
+                {funnels.map((f) => {
+                  const running = campaignsRunning(model, f.id);
+                  return (
+                    <div key={f.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                      <Link href={pinHref({ kind: "funnel", id: f.id })} className="inline-flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium hover:underline">
+                        <Mark kind="funnel" id={f.id} size={20} />
+                        <span className="truncate">{f.name}</span>
+                      </Link>
+                      <span className="k-fg3 text-[12px] tabular-nums">{running.length === 0 ? "No campaign today" : `${formatCount(running.length)} campaign${running.length > 1 ? "s" : ""} today`}</span>
+                      <PinButton pin={{ kind: "funnel", id: f.id, label: f.name }} />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })
+      )}
+    </div>
   );
 }
 

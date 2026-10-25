@@ -234,9 +234,9 @@ export function marketSample(world: WorldSpec, brandId: string, n = 3000): Perso
 // Loading a world from data
 // ---------------------------------------------------------------------------
 
-/** A pinned menu entry: an outcome or a pipe given its own page (configuration, no code). */
+/** A pinned menu entry: an outcome, a pipe, a sales path or a sales funnel given its own page (configuration, no code). */
 export interface Pin {
-  kind: "outcome" | "pipe";
+  kind: "outcome" | "pipe" | "path" | "funnel";
   id: string;
   label: string;
   icon?: string;

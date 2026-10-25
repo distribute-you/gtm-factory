@@ -35,9 +35,11 @@ Only four objects carry a status of their own: **outcomes**, **pipes**, **trigge
 |---|---|
 | **Outcome** | Something reached for a subject: a lead (lead identified, lead interested), a company (company researched), an object (an ICP, a template, an LLM completion) or a trigger event. Each reached outcome is an **occurrence**. |
 | **Lead track** | An ordered ladder of lead states. The CRM lifecycle track holds lead interested, meeting booked, meeting attended, paid client. The website visits track holds lead visited. Tracks are never added together. A track is data. |
-| **Pipe** | Turns its input outcomes into one output outcome. A pipe may need several inputs: the message writer needs a verified email, the company research, a template, a brand context and an LLM completion. A pipe with no lead input turns the market into leads. There are pipes only: no small or big pipe. |
+| **Pipe** | Turns its input outcomes into one output outcome: a leg, from what it consumes to what it makes. A pipe may need several inputs: the message writer needs a verified email, the company research, a template, a brand context and an LLM completion. A pipe with no lead input turns the market into leads. There are pipes only: no small or big pipe. |
 | **Script** | What performs a pipe. Several scripts compete on each pipe. Every script belongs to a **dynasty** of versions. |
 | **Trigger** | When outcome X (or one of a list) is reached for a subject, after a delay, unless outcome Y is reached meanwhile. Or reported from outside. Each event is an occurrence. |
+
+**A channel is a tactic, not an object.** Cold email, LinkedIn, WhatsApp, a cold call, an ad: each is a value of the list tactic "Channel" carried by scripts. Scripts of every channel compete on the same pipe; a client who wants only some channels says so in the strategy of its play ("Channel is cold email"). Two pipes differ only when what they consume or make differs.
 
 **Identity is a pipe.** "Who is this lead?" is the outcome *lead identified*, made by competing scripts (an email and domain match, a name, company and title merge). Only the id space is common to every pipe.
 
@@ -145,7 +147,9 @@ A **tactic** is a typed property: yes or no, one value from a list (country: Uni
 
 A **strategy** is a set of conditions on tactics: equals, in a list, within a range. A **play** is a pipe with a strategy. A strategy states its conditions **per input** of its pipe: a campaign's play on the writer can require "Model tier is pro" at its LLM input while the reply judge's LLM input stays open. A strategy may also state who the play serves (lead tactics, end states never reached: "never write to people who asked to stop"). A campaign chooses its strategy per pipe; a pipe it leaves out plays its default strategy, which has no condition. Eligibility rules such as recontact windows are script tactics filtered by the campaign's strategy: "Days before recontact is 60 or more" at the identity pipe's lead input.
 
-A **sales funnel** stays a straight line, one play per leg, from Start (or a trigger's event) to the target. A **campaign** runs one, with a daily budget.
+A **sales path** is a straight line of lead states from Start (or a trigger's event) to a target. A **sales funnel** is a sales path with one play per leg. Both are catalogue objects: each gets a stable id and a plain name the first time it is seen ("Paid clients from the market"; "Reply judge, AI booking, Reminders and Closing for paid clients"), keeps it, and never shares it, so it can be listed, pinned and read on its own page. A **campaign** runs a named sales funnel, with a daily budget: the funnel it runs today is its path with the play each leg picks (or the play it pinned).
+
+A funnel is drawn as every pipe each leg runs through, in the order they run: the follow-up leg reads Follow-up due, Follow-up email, Reply received, Reply judge, Lead interested. A pipe feeding a side input (a company research, a model call) rides beside the pipe it feeds. The plays of a campaign are exactly the pipes of its line.
 
 ## 6. One split mechanism
 

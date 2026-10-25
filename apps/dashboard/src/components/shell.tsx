@@ -148,7 +148,7 @@ function Sidebar() {
                 key={pinKey(p)}
                 href={pinHref(p)}
                 label={p.label}
-                icon={p.kind === "pipe" ? <Mark kind="pipe" id={p.id} icon={p.icon} size={16} /> : <Mark kind="object" id={p.id} icon={p.icon} size={16} />}
+                icon={<Mark kind={p.kind === "outcome" ? "object" : p.kind} id={p.id} icon={p.icon} size={16} />}
                 active={pathname.startsWith("/pinned") && pinned === pinKey(p)}
               />
             ))}

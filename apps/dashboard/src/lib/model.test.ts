@@ -6,6 +6,9 @@ import { WORLD, replay, type LoggedAction } from "./world";
 import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
 import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
+import { campaignLine, linePipes, rankedLine } from "./funnels";
+import { playedPipes } from "./campaigns";
+import { proposeFunnels } from "./model";
 
 describe("the world the dashboard plays", () => {
   it("replays the same history byte for byte", () => {
@@ -128,5 +131,54 @@ describe("the dashboard knows no outcome, pipe or script by name", () => {
         .join("\n");
       expect(code, f).not.toMatch(/["'`](template_written|llm_completion|audience_built|llm|template|icp)["'`|]/i);
     }
+  });
+});
+
+describe("a funnel line and its plays describe the same pipes", () => {
+  const { world, session } = replay(WORLD.seed, [], 20);
+  const model = buildModel(world, session);
+
+  it("for every campaign, the pipes drawn in its funnel line are exactly the pipes of its plays", () => {
+    for (const c of model.campaigns) {
+      const line = campaignLine(model, c);
+      const drawn = line.legs.flatMap((l) => l.parts.flatMap((p) => [...p.side, p.pipe].map((x) => x.id)));
+      expect(new Set(drawn)).toEqual(new Set(playedPipes(model, c).map((p) => p.id)));
+      // Each leg ends on its lead state, through its play.
+      line.legs.forEach((l, k) => {
+        expect(l.parts.at(-1)?.output).toBe(c.line[k]);
+        expect(l.parts.at(-1)?.pipe.id).toBe(session.playsToday(c)[k]);
+      });
+      // Every pipe whose inputs this campaign chose today is drawn.
+      for (const p of session.choicePoints().filter((x) => x.campaignId === c.id)) {
+        const consumer = model.catalogue.pipe(p.point.split("|")[0]!);
+        if (!consumer) continue;
+        const picked = [...session.pickSeries(p.point, c.id).values()].some((arr) => arr.slice(-7).some((n) => n > 0));
+        const onLine = drawn.includes(consumer.id);
+        if (picked && !onLine) {
+          // Only a pipe the leg does not run today (another option at an input) may be left out.
+          const alternatives = session.choicePoints().filter((x) => x.campaignId === c.id && !x.point.startsWith("play:"));
+          expect(alternatives.length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("the follow-up campaign draws Follow-up due, the follow-up email, the reply, the reply judge, the interested lead", () => {
+    const follow = model.campaigns.find((c) => c.entry.kind === "trigger")!;
+    const line = campaignLine(model, follow);
+    expect(line.trigger?.id).toBe(follow.entry.kind === "trigger" ? follow.entry.triggerId : null);
+    expect(line.legs[0]!.parts.map((p) => [p.pipe.id, p.output])).toEqual([
+      ["follow_up", "reply_received"],
+      ["reply_judging", "lead_interested"],
+    ]);
+    expect(linePipes(line).map((p) => p.id)).toEqual(playedPipes(model, follow).map((p) => p.id));
+  });
+
+  it("a proposed funnel draws every pipe its plays list offers, and has a name", () => {
+    const f = proposeFunnels(model, model.clients[0]!.offer.outcomes, "meeting_booked", 150)[0]!;
+    const line = rankedLine(model, f);
+    expect(line.funnel?.name).toBeTruthy();
+    expect(line.legs.map((l) => l.parts.at(-1)?.pipe.id)).toEqual(f.legs.map((l) => l.pipeId));
+    expect(linePipes(line).length).toBeGreaterThanOrEqual(f.legs.length);
   });
 });

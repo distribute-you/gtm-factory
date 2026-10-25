@@ -140,6 +140,7 @@ export const KIND_ICON = {
   trigger: LightningIcon,
   pipe: BirdIcon,
   funnel: FunnelIcon,
+  path: PathIcon,
   play: PlayIcon,
   tactic: TagIcon,
   strategy: StrategyIcon,

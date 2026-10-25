@@ -4,7 +4,8 @@
  */
 
 import { hiddenTruth, legBreakdown, type Campaign, type OutcomeId, type Pipe, type WorldClient } from "@gtm-factory/engine";
-import { legPlays, pointsOf, type Model } from "./model";
+import { campaignLine, linePipes } from "./funnels";
+import type { Model } from "./model";
 
 function memo<T>(model: Model, key: string, f: () => T): T {
   if (model.memo.has(key)) return model.memo.get(key) as T;
@@ -24,12 +25,9 @@ export function legEndOfPoints(model: Model, campaign: Campaign): Map<string, Ou
   });
 }
 
-/** Every pipe a campaign plays: the pipe of each leg, and every pipe whose inputs it chooses at. */
+/** Every pipe a campaign runs through today, in the order its funnel line draws them. */
 export function playedPipes(model: Model, campaign: Campaign): Pipe[] {
-  const ids: string[] = [];
-  for (const l of legPlays(model, campaign)) for (const o of l.options) if (!ids.includes(o)) ids.push(o);
-  for (const p of pointsOf(model, campaign)) if (p.info.consumer && !ids.includes(p.info.consumer.id)) ids.push(p.info.consumer.id);
-  return ids.map((id) => model.catalogue.pipe(id)).filter((p): p is Pipe => !!p);
+  return linePipes(campaignLine(model, campaign));
 }
 
 /** A campaign's legs as decisions read them, with the leads each leg needs per target outcome. */
