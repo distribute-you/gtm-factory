@@ -4415,8 +4415,8 @@
     ]
    },
    {
-    "slug": "agency-meeting-booking",
-    "name": "Agency Meeting Booking",
+    "slug": "managed-meeting-booking",
+    "name": "Managed Meeting Booking",
     "description": "Our team works the replies and site visits you already have by hand, and turns them into meetings on your calendar.",
     "shortDescription": "Our team turns replies into booked meetings.",
     "icon": "calendar-plus",
@@ -4451,7 +4451,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-meeting-booking|conversation_to_meeting_booked",
+       "id": "managed-meeting-booking|conversation_to_meeting_booked",
        "name": "Finch",
        "icon": "bird",
        "color": "#5E9E3A"
@@ -4478,7 +4478,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-meeting-booking|website_visit_to_meeting_booked",
+       "id": "managed-meeting-booking|website_visit_to_meeting_booked",
        "name": "Plover",
        "icon": "bird",
        "color": "#5E9E3A"
@@ -4652,8 +4652,8 @@
     ]
    },
    {
-    "slug": "agency-meeting-attendance",
-    "name": "Agency Meeting Attendance",
+    "slug": "managed-meeting-attendance",
+    "name": "Managed Meeting Attendance",
     "description": "Our team confirms, reminds and reschedules so the meetings on your calendar are actually held.",
     "shortDescription": "Our team makes sure buyers show up.",
     "icon": "bell",
@@ -4688,7 +4688,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-meeting-attendance|meeting_booked_to_meeting_attended",
+       "id": "managed-meeting-attendance|meeting_booked_to_meeting_attended",
        "name": "Robin",
        "icon": "bird",
        "color": "#C2563A"
@@ -4860,8 +4860,8 @@
     ]
    },
    {
-    "slug": "agency-closing-calls",
-    "name": "Agency Closing Calls",
+    "slug": "managed-closing-calls",
+    "name": "Managed Closing Calls",
     "description": "We put a closer on your account to run the meetings you get held and turn them into paying clients.",
     "shortDescription": "Our closer runs your meetings and closes deals.",
     "icon": "handshake",
@@ -4896,7 +4896,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-closing-calls|meeting_attended_to_paid_client",
+       "id": "managed-closing-calls|meeting_attended_to_paid_client",
        "name": "Sparrow",
        "icon": "bird",
        "color": "#8E6CD8"
@@ -5122,8 +5122,8 @@
     ]
    },
    {
-    "slug": "agency-signup-conversion",
-    "name": "Agency Signup Conversion",
+    "slug": "managed-signup-conversion",
+    "name": "Managed Signup Conversion",
     "description": "Our team follows up the people who signed up or filled your form until they become paying clients.",
     "shortDescription": "Our team turns signups into paying clients.",
     "icon": "user-check",
@@ -5158,7 +5158,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-signup-conversion|signup_to_paid_client",
+       "id": "managed-signup-conversion|signup_to_paid_client",
        "name": "Egret",
        "icon": "bird",
        "color": "#3FA27E"
@@ -5185,7 +5185,7 @@
       "crewName": null,
       "campaignName": null,
       "pipe": {
-       "id": "agency-signup-conversion|form_submitted_to_paid_client",
+       "id": "managed-signup-conversion|form_submitted_to_paid_client",
        "name": "Sandpiper",
        "icon": "bird",
        "color": "#C2563A"
@@ -7355,14 +7355,14 @@
    {
     "key": "message_sent",
     "label": "Message sent",
-    "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days).",
+    "description": "A message we sent one person, on any channel; each follow-up is one more.",
     "shortDescription": "Sends a message to a person",
     "pluralLabel": "Messages sent"
    },
    {
     "key": "message_written",
     "label": "Message written",
-    "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days).",
+    "description": "A message written for one person, on any channel.",
     "shortDescription": "Writes a message for a person",
     "pluralLabel": "Messages written"
    },
@@ -7376,14 +7376,14 @@
    {
     "key": "email_checked",
     "label": "Email checked",
-    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days).",
+    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones).",
     "shortDescription": "Checks a person's email",
     "pluralLabel": "Emails checked"
    },
    {
     "key": "email_found",
     "label": "Email found",
-    "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days).",
+    "description": "A work email found for a person.",
     "shortDescription": "Finds a person's email",
     "pluralLabel": "Emails found"
    },
@@ -7397,14 +7397,14 @@
    {
     "key": "lead_identified",
     "label": "Lead identified",
-    "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days).",
+    "description": "A person who fits the target, with no way to reach them yet.",
     "shortDescription": "Spots a person who fits",
     "pluralLabel": "Leads identified"
    },
    {
     "key": "audience_built",
     "label": "Audience built",
-    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead.",
+    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one.",
     "shortDescription": "Builds a list of people to reach",
     "pluralLabel": "Audiences built"
    },
@@ -7418,9 +7418,21 @@
    {
     "key": "post_published",
     "label": "Post published",
-    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote.",
+    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by the publishing system; the subject is its record of that publication.",
     "shortDescription": "A post or comment published on X or LinkedIn",
     "pluralLabel": "Posts published"
+   }
+  ],
+  "leadTracks": [
+   {
+    "id": "crm_lifecycle",
+    "name": "CRM lifecycle",
+    "description": "Lead interested, then meeting booked, then meeting attended, then paid client."
+   },
+   {
+    "id": "website_visits",
+    "name": "Website visits",
+    "description": "Lead visited the brand's website."
    }
   ],
   "outcomes": [
@@ -7511,14 +7523,14 @@
    {
     "key": "message_sent",
     "label": "Message sent",
-    "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days).",
+    "description": "A message we sent one person, on any channel; each follow-up is one more.",
     "shortDescription": "Sends a message to a person",
     "pluralLabel": "Messages sent"
    },
    {
     "key": "message_written",
     "label": "Message written",
-    "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days).",
+    "description": "A message written for one person, on any channel.",
     "shortDescription": "Writes a message for a person",
     "pluralLabel": "Messages written"
    },
@@ -7532,14 +7544,14 @@
    {
     "key": "email_checked",
     "label": "Email checked",
-    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days).",
+    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones).",
     "shortDescription": "Checks a person's email",
     "pluralLabel": "Emails checked"
    },
    {
     "key": "email_found",
     "label": "Email found",
-    "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days).",
+    "description": "A work email found for a person.",
     "shortDescription": "Finds a person's email",
     "pluralLabel": "Emails found"
    },
@@ -7553,14 +7565,14 @@
    {
     "key": "lead_identified",
     "label": "Lead identified",
-    "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days).",
+    "description": "A person who fits the target, with no way to reach them yet.",
     "shortDescription": "Spots a person who fits",
     "pluralLabel": "Leads identified"
    },
    {
     "key": "audience_built",
     "label": "Audience built",
-    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead.",
+    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one.",
     "shortDescription": "Builds a list of people to reach",
     "pluralLabel": "Audiences built"
    },
@@ -7574,7 +7586,7 @@
    {
     "key": "post_published",
     "label": "Post published",
-    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote.",
+    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by the publishing system; the subject is its record of that publication.",
     "shortDescription": "A post or comment published on X or LinkedIn",
     "pluralLabel": "Posts published"
    }
@@ -7586,7 +7598,7 @@
     "description": "A prospect replied with interest.",
     "icon": "thumbs-up",
     "fromStep": "conversation",
-    "firedBy": "instantly-service",
+    "firedBy": "email_inbox",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7601,7 +7613,7 @@
     "description": "A prospect clicked through to your site.",
     "icon": "cursor-click",
     "fromStep": "website_visit",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7616,7 +7628,7 @@
     "description": "A prospect was put on a call with your sales rep.",
     "icon": "phone-call",
     "fromStep": "booking_call",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7631,7 +7643,7 @@
     "description": "A prospect booked a meeting.",
     "icon": "calendar-check",
     "fromStep": "meeting_booked",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7646,7 +7658,7 @@
     "description": "A booked meeting was held.",
     "icon": "handshake",
     "fromStep": "meeting_attended",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7661,7 +7673,7 @@
     "description": "A prospect created an account.",
     "icon": "user-plus",
     "fromStep": "signup",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7676,7 +7688,7 @@
     "description": "A prospect filled in a form.",
     "icon": "clipboard-text",
     "fromStep": "form_submitted",
-    "firedBy": "crm-service",
+    "firedBy": "crm",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7691,7 +7703,7 @@
     "description": "A prospect bought on your site.",
     "icon": "shopping-cart",
     "fromStep": "purchase",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7706,7 +7718,7 @@
     "description": "A person matching your target was found.",
     "icon": "identification-card",
     "fromStep": "lead_found",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7721,7 +7733,7 @@
     "description": "A prospect became a paying client.",
     "icon": "currency-dollar",
     "fromStep": "paid_client",
-    "firedBy": "lead-service",
+    "firedBy": "lead_lifecycle",
     "coded": true,
     "origin": "code",
     "kind": "event",
@@ -7736,7 +7748,7 @@
     "description": "A follow-up planned for one person is due.",
     "icon": "bell-ringing",
     "fromStep": null,
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "code",
     "kind": "reported",
@@ -7751,12 +7763,12 @@
     "description": "You pushed an email you wrote, to send as written.",
     "icon": "code",
     "fromStep": null,
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "reported",
     "params": {
-     "reportedBy": "api-service"
+     "reportedBy": "api"
     },
     "type": "condition",
     "outcomeKey": null,
@@ -7768,7 +7780,7 @@
     "description": "A GitHub issue this campaign waits on reached production.",
     "icon": "github-logo",
     "fromStep": null,
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "code",
     "kind": "github_issue_in_prod",
@@ -7783,7 +7795,7 @@
     "description": "Anything happens with a person: a reply, a visit, a signup, a meeting, a payment.",
     "icon": "pulse",
     "fromStep": null,
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "code",
     "kind": "any_of",
@@ -7827,7 +7839,7 @@
     "description": "A person visited your site and did not sign up within 30 minutes.",
     "icon": "timer",
     "fromStep": "website_visit",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "delay",
@@ -7846,7 +7858,7 @@
     "description": "A person signed up and did not pay within 30 minutes.",
     "icon": "hourglass-medium",
     "fromStep": "signup",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "delay",
@@ -7865,7 +7877,7 @@
     "description": "A person signed up and did not pay within 24 hours.",
     "icon": "clock-countdown",
     "fromStep": "signup",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "delay",
@@ -7884,12 +7896,12 @@
     "description": "A person gave us their WhatsApp number.",
     "icon": "whatsapp-logo",
     "fromStep": "lead_found",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "reported",
     "params": {
-     "reportedBy": "crm-service"
+     "reportedBy": "crm"
     },
     "type": "condition",
     "outcomeKey": null,
@@ -7901,12 +7913,12 @@
     "description": "A lead wrote to the brand and wants to do business with it.",
     "icon": "fire",
     "fromStep": "conversation",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "reported",
     "params": {
-     "reportedBy": "lead-service"
+     "reportedBy": "lead_lifecycle"
     },
     "type": "condition",
     "outcomeKey": null,
@@ -7918,12 +7930,12 @@
     "description": "Something happened on a client account with us, like their credit running out or coming back.",
     "icon": "wallet",
     "fromStep": null,
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": true,
     "origin": "declared",
     "kind": "reported",
     "params": {
-     "reportedBy": "crm-service"
+     "reportedBy": "crm"
     },
     "type": "condition",
     "outcomeKey": null,
@@ -7935,7 +7947,7 @@
     "description": "A person engages with our daily industry update video (likes, comments or reposts it).",
     "icon": "video-camera",
     "fromStep": "industry_update_video",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -7950,7 +7962,7 @@
     "description": "An email you wrote is sent to the person, from our domains and inboxes.",
     "icon": "paper-plane-tilt",
     "fromStep": "email_sent",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -7962,10 +7974,10 @@
    {
     "id": "message_sent",
     "label": "Message sent",
-    "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days).",
+    "description": "A message we sent one person, on any channel; each follow-up is one more.",
     "icon": "paper-plane-tilt",
     "fromStep": "message_sent",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -7977,10 +7989,10 @@
    {
     "id": "message_written",
     "label": "Message written",
-    "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days).",
+    "description": "A message written for one person, on any channel.",
     "icon": "pencil-simple-line",
     "fromStep": "message_written",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -7995,7 +8007,7 @@
     "description": "A prospect's company website read, reused for every lead of that company. Every research run feeds a message.",
     "icon": "magnifying-glass",
     "fromStep": "company_researched",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8007,10 +8019,10 @@
    {
     "id": "email_checked",
     "label": "Email checked",
-    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days).",
+    "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones).",
     "icon": "seal-check",
     "fromStep": "email_checked",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8022,10 +8034,10 @@
    {
     "id": "email_found",
     "label": "Email found",
-    "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days).",
+    "description": "A work email found for a person.",
     "icon": "at",
     "fromStep": "email_found",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8040,7 +8052,7 @@
     "description": "A phone number found for a person. Every reveal runs inside a serve.",
     "icon": "phone",
     "fromStep": "phone_found",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8052,10 +8064,10 @@
    {
     "id": "lead_identified",
     "label": "Lead identified",
-    "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days).",
+    "description": "A person who fits the target, with no way to reach them yet.",
     "icon": "user-focus",
     "fromStep": "lead_identified",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8067,10 +8079,10 @@
    {
     "id": "audience_built",
     "label": "Audience built",
-    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead.",
+    "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one.",
     "icon": "users-three",
     "fromStep": "audience_built",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8085,7 +8097,7 @@
     "description": "One paid ad impression served to someone on an ads network (Google Ads, and any future Meta or LinkedIn ads channel). The money for it is already charged by the network; a share of impressions turn into a website visit.",
     "icon": "megaphone",
     "fromStep": "ad_shown",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8097,10 +8109,10 @@
    {
     "id": "post_published",
     "label": "Post published",
-    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote.",
+    "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by the publishing system; the subject is its record of that publication.",
     "icon": "megaphone",
     "fromStep": "post_published",
-    "firedBy": "campaign-service",
+    "firedBy": "platform",
     "coded": false,
     "origin": "declared",
     "kind": "event",
@@ -8167,7 +8179,7 @@
     "lifecycleRank": null,
     "subjectKind": "object",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8179,7 +8191,7 @@
     "lifecycleRank": null,
     "subjectKind": "object",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8191,7 +8203,7 @@
     "lifecycleRank": 3,
     "subjectKind": "person",
     "leadState": "lead_interested",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 1
    },
    {
@@ -8203,7 +8215,7 @@
     "lifecycleRank": null,
     "subjectKind": "object",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8215,7 +8227,7 @@
     "lifecycleRank": 3,
     "subjectKind": "person",
     "leadState": "lead_interested",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 1
    },
    {
@@ -8227,7 +8239,7 @@
     "lifecycleRank": null,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8239,7 +8251,7 @@
     "lifecycleRank": null,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8251,7 +8263,7 @@
     "lifecycleRank": 2,
     "subjectKind": null,
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8263,7 +8275,7 @@
     "lifecycleRank": 4,
     "subjectKind": "person",
     "leadState": "lead_interested",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 1
    },
    {
@@ -8275,7 +8287,7 @@
     "lifecycleRank": 3,
     "subjectKind": null,
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8287,7 +8299,7 @@
     "lifecycleRank": 1,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8299,7 +8311,7 @@
     "lifecycleRank": null,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8311,7 +8323,7 @@
     "lifecycleRank": 3,
     "subjectKind": "person",
     "leadState": "lead_interested",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 1
    },
    {
@@ -8323,7 +8335,7 @@
     "lifecycleRank": 3,
     "subjectKind": "person",
     "leadState": "lead_visited",
-    "leadStateFamily": "visit",
+    "leadTrack": "website_visits",
     "leadStateRank": 1
    },
    {
@@ -8335,7 +8347,7 @@
     "lifecycleRank": 6,
     "subjectKind": "person",
     "leadState": "meeting_attended",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 3
    },
    {
@@ -8347,7 +8359,7 @@
     "lifecycleRank": 5,
     "subjectKind": "person",
     "leadState": "meeting_booked",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 2
    },
    {
@@ -8359,7 +8371,7 @@
     "lifecycleRank": 2,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8371,7 +8383,7 @@
     "lifecycleRank": null,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8383,7 +8395,7 @@
     "lifecycleRank": 7,
     "subjectKind": "person",
     "leadState": "paid_client",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 4
    },
    {
@@ -8395,7 +8407,7 @@
     "lifecycleRank": null,
     "subjectKind": "person",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8407,7 +8419,7 @@
     "lifecycleRank": null,
     "subjectKind": "object",
     "leadState": null,
-    "leadStateFamily": null,
+    "leadTrack": null,
     "leadStateRank": null
    },
    {
@@ -8419,7 +8431,7 @@
     "lifecycleRank": 7,
     "subjectKind": "person",
     "leadState": "paid_client",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 4
    },
    {
@@ -8431,7 +8443,7 @@
     "lifecycleRank": 4,
     "subjectKind": "person",
     "leadState": "lead_interested",
-    "leadStateFamily": "interest",
+    "leadTrack": "crm_lifecycle",
     "leadStateRank": 1
    },
    {
@@ -8443,7 +8455,7 @@
     "lifecycleRank": 3,
     "subjectKind": "person",
     "leadState": "lead_visited",
-    "leadStateFamily": "visit",
+    "leadTrack": "website_visits",
     "leadStateRank": 1
    }
   ]
