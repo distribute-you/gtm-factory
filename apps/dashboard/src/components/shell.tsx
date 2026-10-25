@@ -99,6 +99,7 @@ function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
   const { model, scope, pins } = useSim();
+  const { shadow } = useShadow();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
   const campaigns = model ? model.campaigns.filter((c) => !scope || c.brandId === scope) : [];
   const campaignId = search.get("id");
@@ -107,65 +108,81 @@ function Sidebar() {
   const audience = model?.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired);
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
-      <div className="space-y-2 px-2 pt-2">
-        <ScopeSwitcher />
-        <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
-          <PlusIcon size={14} weight="bold" />
-          New campaign
-        </Link>
-      </div>
-      <nav className="k-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-3">
-        <div className="space-y-px">
-          <NavItem href="/" label="Today" icon={<HouseIcon size={15} />} active={at("/")} />
+      {shadow ? (
+        <div className="px-2 pt-2">
+          <div className="flex h-9 items-center gap-2 px-2">
+            <Mark kind="audience" id="shadow" size={22} quiet />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium">{shadow.snapshot.name}</span>
+              <span className="k-fg3 block truncate text-[11px] leading-3">Shadow mode · read only</span>
+            </span>
+          </div>
         </div>
+      ) : (
+        <div className="space-y-2 px-2 pt-2">
+          <ScopeSwitcher />
+          <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
+            <PlusIcon size={14} weight="bold" />
+            New campaign
+          </Link>
+        </div>
+      )}
+      <nav className="k-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-3">
         <ShadowNav at={at} />
-        <Group title="Campaigns">
-          <NavItem href="/campaigns/" label="Overview" icon={<SquaresFourIcon size={15} />} active={at("/campaigns")} />
-          {model &&
-            campaigns.map((c) => {
-              const active = pathname.startsWith("/campaigns/view") && campaignId === c.id;
-              const brand = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name ?? "";
-              return (
-                <NavItem
-                  key={c.id}
-                  href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
-                  label={scope ? c.name : `${brand}: ${c.name}`}
-                  icon={c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={16} /> : <Mark kind="funnel" id={c.id} size={16} />}
-                  active={active}
-                  trailing={
-                    c.status === "running" ? (
-                      <span className="k-dot-pulse ml-auto mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--run)] text-[var(--run)]" aria-label="Running" />
-                    ) : (
-                      <span className="ml-auto mr-1 h-2 w-2 shrink-0 rounded-full border-[1.5px] border-[var(--fg-3)]" aria-label="Paused" />
-                    )
-                  }
-                />
-              );
-            })}
-        </Group>
-        <Group title="Records">
-          <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} trailing={<Count n={leadsInScope} />} />
-          <NavItem href="/companies/" label="Companies" icon={<BuildingsIcon size={15} />} active={at("/companies")} />
-          {audience && <NavItem href="/audiences/" label={audience.plural ?? audience.label} icon={<UsersThreeIcon size={15} />} active={at("/audiences")} />}
-        </Group>
-        {pins.length > 0 && (
-          <Group title="Pinned">
-            {pins.map((p) => (
-              <NavItem
-                key={pinKey(p)}
-                href={pinHref(p)}
-                label={p.label}
-                icon={<Mark kind={p.kind === "outcome" ? "object" : p.kind} id={p.id} icon={p.icon} size={16} />}
-                active={pathname.startsWith("/pinned") && pinned === pinKey(p)}
-              />
-            ))}
-          </Group>
+        {!shadow && (
+          <>
+            <div className="space-y-px">
+              <NavItem href="/" label="Today" icon={<HouseIcon size={15} />} active={at("/")} />
+            </div>
+            <Group title="Campaigns">
+              <NavItem href="/campaigns/" label="Overview" icon={<SquaresFourIcon size={15} />} active={at("/campaigns")} />
+              {model &&
+                campaigns.map((c) => {
+                  const active = pathname.startsWith("/campaigns/view") && campaignId === c.id;
+                  const brand = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name ?? "";
+                  return (
+                    <NavItem
+                      key={c.id}
+                      href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
+                      label={scope ? c.name : `${brand}: ${c.name}`}
+                      icon={c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={16} /> : <Mark kind="funnel" id={c.id} size={16} />}
+                      active={active}
+                      trailing={
+                        c.status === "running" ? (
+                          <span className="k-dot-pulse ml-auto mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--run)] text-[var(--run)]" aria-label="Running" />
+                        ) : (
+                          <span className="ml-auto mr-1 h-2 w-2 shrink-0 rounded-full border-[1.5px] border-[var(--fg-3)]" aria-label="Paused" />
+                        )
+                      }
+                    />
+                  );
+                })}
+            </Group>
+            <Group title="Records">
+              <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} trailing={<Count n={leadsInScope} />} />
+              <NavItem href="/companies/" label="Companies" icon={<BuildingsIcon size={15} />} active={at("/companies")} />
+              {audience && <NavItem href="/audiences/" label={audience.plural ?? audience.label} icon={<UsersThreeIcon size={15} />} active={at("/audiences")} />}
+            </Group>
+            {pins.length > 0 && (
+              <Group title="Pinned">
+                {pins.map((p) => (
+                  <NavItem
+                    key={pinKey(p)}
+                    href={pinHref(p)}
+                    label={p.label}
+                    icon={<Mark kind={p.kind === "outcome" ? "object" : p.kind} id={p.id} icon={p.icon} size={16} />}
+                    active={pathname.startsWith("/pinned") && pinned === pinKey(p)}
+                  />
+                ))}
+              </Group>
+            )}
+            <Group title="Engine">
+              <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
+              <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
+              <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
+            </Group>
+          </>
         )}
-        <Group title="Engine">
-          <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
-          <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
-          <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
-        </Group>
         <Group title="Learn">
           <NavItem href="/how-it-works/" label="How it works" icon={<BookOpenIcon size={15} />} active={at("/how-it-works")} />
           <a href={REPO_URL} target="_blank" rel="noreferrer" className="flex h-7 items-center gap-2 rounded-[8px] pl-2 pr-1.5 text-[13px] text-[var(--fg-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--fg-1)]">

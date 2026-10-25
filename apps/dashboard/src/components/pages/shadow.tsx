@@ -310,6 +310,7 @@ function Line({ s, entry, legs }: { s: ShadowState; entry: string; legs: { to: s
 
 function funnelFigures(f: RankedFunnel | null): string {
   if (!f) return "Not measured on every leg yet";
+  if (!(f.costPerTarget > 0)) return `No spend of ours on its legs: every leg is another factory's (the client's team) · ${f.label}`;
   return `${formatUsd(f.costPerTarget)} per target · ${formatRoi(f.valuePerDollar)} per $1 · ${f.label}`;
 }
 
