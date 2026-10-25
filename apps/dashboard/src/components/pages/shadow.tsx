@@ -265,31 +265,45 @@ function ShadowClient({ s, id }: { s: ShadowState; id: string }) {
   );
 }
 
-/** A sales funnel's line: its entry, then every pipe each leg runs through and what each makes. */
+/**
+ * A sales funnel's line: its entry, then every pipe each leg runs through and what each makes. A
+ * pipe making an object for another (an LLM completion, a template) rides as a small mark beside
+ * the pipe it feeds.
+ */
 function Line({ s, entry, legs }: { s: ShadowState; entry: string; legs: { to: string; pipes: string[] }[] }) {
+  const c = s.session.catalogue;
+  const feeds = (p: string) => c.outcome(c.pipe(p)?.output ?? "")?.subject === "object";
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[12px]">
       <span className="k-fg2">{outcomeName(s, entry)}</span>
-      {legs.map((l, k) =>
-        l.pipes.length === 0 ? (
-          <span key={`${k}:${l.to}`} className="inline-flex items-center gap-1.5">
-            <span className="k-fg4">→</span>
-            <span className="k-fg2">{outcomeName(s, l.to)}</span>
-          </span>
-        ) : (
-          l.pipes.map((p, i) => (
-            <span key={`${k}:${p}`} className="inline-flex items-center gap-1.5" data-pipe={p}>
+      {legs.map((l, k) => {
+        const main = l.pipes.filter((p, i) => i === l.pipes.length - 1 || !feeds(p));
+        const side = l.pipes.filter((p, i) => i !== l.pipes.length - 1 && feeds(p));
+        if (main.length === 0)
+          return (
+            <span key={`${k}:${l.to}`} className="inline-flex items-center gap-1.5">
               <span className="k-fg4">→</span>
-              <span className="inline-flex items-center gap-1">
-                <Mark kind="pipe" id={p} icon={s.session.catalogue.pipe(p)?.icon} size={14} />
-                <span>{pipeName(s, p)}</span>
-              </span>
-              <span className="k-fg4">→</span>
-              <span className="k-fg2">{outcomeName(s, i === l.pipes.length - 1 ? l.to : s.session.catalogue.pipe(p)?.output ?? l.to)}</span>
+              <span className="k-fg2">{outcomeName(s, l.to)}</span>
             </span>
-          ))
-        ),
-      )}
+          );
+        return main.map((p, i) => (
+          <span key={`${k}:${p}`} className="inline-flex items-center gap-1.5" data-pipe={p}>
+            <span className="k-fg4">→</span>
+            <span className="inline-flex items-center gap-1">
+              {i === main.length - 1 &&
+                side.map((x) => (
+                  <span key={x} title={`${pipeName(s, x)} feeds it`} data-pipe={x} className="inline-flex">
+                    <Mark kind="pipe" id={x} icon={c.pipe(x)?.icon} size={12} />
+                  </span>
+                ))}
+              <Mark kind="pipe" id={p} icon={c.pipe(p)?.icon} size={14} />
+              <span>{pipeName(s, p)}</span>
+            </span>
+            <span className="k-fg4">→</span>
+            <span className="k-fg2">{outcomeName(s, i === main.length - 1 ? l.to : c.pipe(p)?.output ?? l.to)}</span>
+          </span>
+        ));
+      })}
     </span>
   );
 }
