@@ -111,7 +111,7 @@ export interface AttestedOccurrence {
   day: number;
   reporters: string[];
   /** 1 - product over reporters of (1 - reliability): how sure we are it happened. */
-  credence: number;
+  confidence: number;
 }
 
 /** Merge evidence into occurrences, each weighted by its reporters' reliability. */
@@ -120,7 +120,7 @@ export function attest(evidence: readonly Evidence[], reliability: readonly Repo
   const groups = new Map<string, AttestedOccurrence>();
   for (const e of evidence) {
     const k = `${e.clientId}\u0000${e.subject}\u0000${e.outcome}`;
-    const g = groups.get(k) ?? { clientId: e.clientId, subject: e.subject, outcome: e.outcome, day: e.day, reporters: [], credence: 0 };
+    const g = groups.get(k) ?? { clientId: e.clientId, subject: e.subject, outcome: e.outcome, day: e.day, reporters: [], confidence: 0 };
     g.day = Math.min(g.day, e.day);
     if (!g.reporters.includes(e.reporterId)) g.reporters.push(e.reporterId);
     groups.set(k, g);
@@ -128,7 +128,7 @@ export function attest(evidence: readonly Evidence[], reliability: readonly Repo
   for (const g of groups.values()) {
     let miss = 1;
     for (const r of g.reporters) miss *= 1 - (rel.get(`${r}\u0000${g.outcome}`) ?? 0);
-    g.credence = 1 - miss;
+    g.confidence = 1 - miss;
     g.reporters.sort();
   }
   return [...groups.values()];

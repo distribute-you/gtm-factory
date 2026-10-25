@@ -145,13 +145,31 @@ export interface SimulationResult {
 // Internal state
 // ---------------------------------------------------------------------------
 
-interface SimLead extends Lead {
+/** One thing that happened to a simulated lead: a trial of a pipe, or an outcome landing. */
+export interface LeadEvent {
+  day: number;
+  kind: "trial" | "outcome";
+  pipeId: string;
+  runId: string;
+  /** For a trial: the workflow and the slot options it ran with. */
+  workflowId?: string;
+  slotChoice?: Record<string, string>;
+  /** For an outcome: the step reached and the occurrence it made (none when the lead was already past it). */
+  step?: StepKey;
+  occurrenceId?: string | null;
+}
+
+/** A lead of the simulated world, as the engine sees it, plus what happened to it. */
+export interface SimLead extends Lead {
   campaignId: string;
   funnel: string[];
   audienceId: string | null;
   occurrenceByStep: Record<StepKey, string>;
   stateOccurrence: Record<string, string>;
   stepsReached: StepKey[];
+  /** First day the lead was served. */
+  createdDay: number;
+  timeline: LeadEvent[];
 }
 
 interface SegmentRecordEntry {
@@ -185,12 +203,13 @@ export class SimulationSession {
   private readonly world: WorldSpec;
   private readonly rng: Rng;
   private dayIndex = 0;
-  private readonly leads = new Map<string, SimLead>();
+  private readonly leads_ = new Map<string, SimLead>();
   private readonly audiences: Audience[] = [];
   private readonly pending: Pending[] = [];
   private readonly queues = new Map<string, QueueItem[]>();
   private readonly runs: LedgerRun[] = [];
   private readonly runIndex = new Map<string, RunGroup>();
+  private readonly runById = new Map<string, LedgerRun>();
   private readonly occurrences: LedgerOccurrence[] = [];
   private readonly evidence: Evidence[] = [];
   /** Cohorts per learning key: key -> day -> counts. */
@@ -212,23 +231,113 @@ export class SimulationSession {
     this.catalogue = world.catalogue;
     this.rng = createRng(world.seed);
     this.fleetOffers = world.clients.map((c) => c.offer);
-    for (const c of world.clients) {
-      this.audiences.push(...audiencesFromExpert(c.brand, () => c.expertAudiences));
-      this.spent.set(c.campaign.id, 0);
-      this.clientOfCampaign.set(c.campaign.id, c);
-      const setup = world.settings?.setupCentsPerClient ?? 0;
-      if (setup > 0) {
-        this.runs.push({
-          id: `run:setup:${c.brand.id}`,
-          pipeId: null,
-          target: null,
-          day: 0,
-          spendCents: setup,
-          consumed: [],
-          support: { kind: "brand_setup", reason: "first setup of the brand" },
-        });
-      }
+    for (const c of world.clients) this.register(c);
+  }
+
+  private register(c: SimClient): void {
+    const known = this.audiences.some((a) => a.brandId === c.brand.id);
+    if (!known && c.expertAudiences.length > 0) this.audiences.push(...audiencesFromExpert(c.brand, () => c.expertAudiences));
+    this.spent.set(c.campaign.id, 0);
+    this.clientOfCampaign.set(c.campaign.id, c);
+    const setup = this.world.settings?.setupCentsPerClient ?? 0;
+    if (setup > 0 && !this.runs.some((r) => r.id === `run:setup:${c.brand.id}`)) {
+      this.runs.push({
+        id: `run:setup:${c.brand.id}`,
+        pipeId: null,
+        target: null,
+        day: this.dayIndex,
+        spendCents: setup,
+        consumed: [],
+        support: { kind: "brand_setup", reason: "first setup of the brand" },
+      });
     }
+  }
+
+  /** The clients (one per campaign) of the world, in launch order. */
+  get clients(): readonly SimClient[] {
+    return this.world.clients;
+  }
+
+  /**
+   * Launch a campaign while the world runs: a new client, or a new campaign of a
+   * known brand. A brand seen for the first time gets its expert audiences and its
+   * setup run. `truthMultiplier` is the new brand's hidden yield multiplier.
+   */
+  addClient(client: SimClient, truthMultiplier = 1): void {
+    if (this.clientOfCampaign.has(client.campaign.id)) throw new Error(`campaign "${client.campaign.id}" already exists`);
+    if (this.world.truth.clients[client.brand.id] === undefined) this.world.truth.clients[client.brand.id] = truthMultiplier;
+    this.world.clients.push(client);
+    if (!this.fleetOffers.some((o) => o.id === client.offer.id)) this.fleetOffers.push(client.offer);
+    this.register(client);
+  }
+
+  /** Turn a campaign on or off. */
+  setCampaignStatus(campaignId: string, status: Campaign["status"]): void {
+    const c = this.clientOfCampaign.get(campaignId);
+    if (!c) throw new Error(`campaign "${campaignId}" not found`);
+    c.campaign.status = status;
+  }
+
+  /** Change a campaign's daily budget (cents) and volume cap. */
+  setCampaignBudget(campaignId: string, dailyBudgetCents: number, maxVolume?: number): void {
+    const c = this.clientOfCampaign.get(campaignId);
+    if (!c) throw new Error(`campaign "${campaignId}" not found`);
+    c.campaign.dailyBudgetCents = Math.max(0, Math.round(dailyBudgetCents));
+    if (maxVolume === undefined) delete c.campaign.maxVolume;
+    else c.campaign.maxVolume = maxVolume;
+  }
+
+  /** Every lead served so far, in creation order. */
+  leads(): SimLead[] {
+    return [...this.leads_.values()];
+  }
+
+  lead(id: string): SimLead | undefined {
+    return this.leads_.get(id);
+  }
+
+  /** Total spent by a campaign so far, cents. */
+  spentCents(campaignId: string): number {
+    return this.spent.get(campaignId) ?? 0;
+  }
+
+  /** The plays a campaign runs now (its sales funnel), from Start. */
+  funnelOfCampaign(campaignId: string): string[] | null {
+    return this.funnelOf.get(campaignId) ?? null;
+  }
+
+  /**
+   * What the engine would propose today for an offer and a target outcome:
+   * the value of one target outcome and the best sales funnels by value per
+   * dollar, on the leg estimates a choice reads (the brand's own data pooled
+   * with the fleet; a new brand reads the fleet).
+   */
+  proposeFunnels(offer: Offer, target: StepKey, options: { brandId?: string; limit?: number; value?: number } = {}): { value: number | null; valueLabel: "stated" | "expected" | null; funnels: RankedFunnel[] } {
+    const tv = options.value !== undefined ? { amount: options.value, label: "stated" as const } : targetValue(offer, target, this.fleetOffers, this.catalogue);
+    const brandId = options.brandId ?? offer.brandId;
+    const funnels = rankSalesFunnels(
+      this.catalogue,
+      offer,
+      target,
+      (play, pipe) => this.legEstimate(pipe, play, brandId, this.dayIndex),
+      tv?.amount ?? 0,
+      options.limit ?? 6,
+      { proactiveEntry: true },
+    );
+    return { value: tv?.amount ?? null, valueLabel: tv?.label ?? null, funnels };
+  }
+
+  /** The leg estimate a choice reads for a play today (null when the play cannot run). */
+  estimateLeg(playId: string, brandId: string): LegEstimate | null {
+    const play = this.catalogue.play(playId);
+    const pipe = play ? this.catalogue.pipe(play.pipeId) : undefined;
+    if (!play || !pipe) return null;
+    return this.legEstimate(pipe, play, brandId, this.dayIndex);
+  }
+
+  /** Unique brand ids of the world. */
+  private brandIds(): string[] {
+    return [...new Set(this.world.clients.map((c) => c.brand.id))];
   }
 
   get day(): number {
@@ -242,11 +351,12 @@ export class SimulationSession {
 
     this.deliverArrivals(day, snap);
 
-    for (const client of this.world.clients) {
+    for (const client of [...this.world.clients]) {
       const campaign = client.campaign;
       if (campaign.status !== "running") continue;
       const every = this.world.settings?.funnelEveryDays ?? 7;
-      if (!this.funnelOf.has(campaign.id) || day % every === 0) this.chooseFunnel(day, client);
+      if (campaign.salesFunnel && campaign.salesFunnel.length > 0) this.funnelOf.set(campaign.id, [...campaign.salesFunnel]);
+      else if (!this.funnelOf.has(campaign.id) || day % every === 0) this.chooseFunnel(day, client);
       const funnel = this.funnelOf.get(campaign.id);
       if (!funnel) continue;
       snap.funnelOf[campaign.id] = funnel.join(" > ");
@@ -260,7 +370,7 @@ export class SimulationSession {
     }
 
     const discoverEvery = this.world.settings?.discoverEveryDays ?? 15;
-    if (day > 0 && day % discoverEvery === 0) for (const c of this.world.clients) this.discover(day, c);
+    if (day > 0 && day % discoverEvery === 0) for (const c of [...this.world.clients]) this.discover(day, c);
 
     this.days.push(snap);
     this.dayIndex++;
@@ -278,7 +388,7 @@ export class SimulationSession {
     const reporters = this.world.reporters ?? [];
     const connections: ReporterConnection[] = [];
     for (const r of reporters)
-      for (const c of this.world.clients) connections.push({ reporterId: r.reporter.id, clientId: c.brand.id, outcomes: r.outcomes });
+      for (const b of this.brandIds()) connections.push({ reporterId: r.reporter.id, clientId: b, outcomes: r.outcomes });
     const policy = this.world.evidencePolicy ?? { referenceReporter: {}, minReliability: 0.8 };
     const reliability = measureReliability(this.evidence, connections, policy);
     const outcomes = [...new Set(reporters.flatMap((r) => r.outcomes))];
@@ -292,7 +402,7 @@ export class SimulationSession {
       findings: this.findings,
       evidence: this.evidence,
       reliability,
-      coverage: outcomeCoverage(this.world.clients.map((c) => c.brand.id), outcomes, connections, reliability, policy),
+      coverage: outcomeCoverage(this.brandIds(), outcomes, connections, reliability, policy),
       attested: attest(this.evidence, reliability),
     };
   }
@@ -305,7 +415,7 @@ export class SimulationSession {
   pipeMaturity(pipeId: string, brandId?: string): MaturityViews | null {
     const pipe = this.catalogue.pipe(pipeId);
     if (!pipe) return null;
-    const brands = brandId ? [brandId] : this.world.clients.map((c) => c.brand.id);
+    const brands = brandId ? [brandId] : this.brandIds();
     const cohorts = brands.flatMap((b) =>
       [...(this.cohorts.get(lk(pipeId, PIPE_NODE, "*", b)) ?? new Map<number, { trials: number; successes: number; spend: number }>())].map(([d, c]) => ({
         ageDays: this.dayIndex - d,
@@ -340,7 +450,7 @@ export class SimulationSession {
   /** Pipe-level yield for a client: pipe fleet -> client, k fitted across clients. */
   private pipePosterior(pipe: Pipe, brandId: string, day: number): BetaPosterior {
     const delay = this.delayOf(pipe);
-    const perClient = this.world.clients.map((c) => this.countsOf(lk(pipe.id, PIPE_NODE, "*", c.brand.id), day, delay));
+    const perClient = this.brandIds().map((b) => this.countsOf(lk(pipe.id, PIPE_NODE, "*", b), day, delay));
     const fleet = sumCounts(perClient);
     const root = pooledPosterior(fleet, { rate: this.expectedYieldOf(pipe), strength: 2 });
     const mine = this.countsOf(lk(pipe.id, PIPE_NODE, "*", brandId), day, delay);
@@ -354,7 +464,7 @@ export class SimulationSession {
   private optionPosterior(pipe: Pipe, node: string, optionIds: readonly string[], optionId: string, brandId: string, day: number, scopeAllClients = true): BetaPosterior {
     const delay = this.delayOf(pipe);
     const base = this.pipePosterior(pipe, brandId, day);
-    const clients = scopeAllClients ? this.world.clients.map((c) => c.brand.id) : [brandId];
+    const clients = scopeAllClients ? this.brandIds() : [brandId];
     const fleetOf = (id: string) => sumCounts(clients.map((b) => this.countsOf(lk(pipe.id, node, id, b), day, delay)));
     const optionFleet = fleetOf(optionId);
     const kOptions = fitPoolingStrength(optionIds.map(fleetOf));
@@ -519,7 +629,7 @@ export class SimulationSession {
     const keep: QueueItem[] = [];
     const choosers = new Map<string, ReturnType<SimulationSession["makeChooser"]>>();
     for (const item of queue) {
-      const lead = this.leads.get(item.leadId)!;
+      const lead = this.leads_.get(item.leadId)!;
       const playId = lead.funnel.find((id) => this.catalogue.pipe(this.catalogue.play(id)!.pipeId)!.from === item.step);
       if (!playId) continue;
       const play = this.catalogue.play(playId)!;
@@ -553,7 +663,7 @@ export class SimulationSession {
     const values = this.funnelStepValues(funnel, client, day);
     const chooser = this.makeChooser(day, client, pipe, play, values.get(pipe.to) ?? 0, true);
     const maxVolume = client.campaign.maxVolume ?? Number.POSITIVE_INFINITY;
-    let created = [...this.leads.values()].filter((l) => l.campaignId === client.campaign.id).length;
+    let created = [...this.leads_.values()].filter((l) => l.campaignId === client.campaign.id).length;
     for (let guard = 0; guard < 100_000 && created < maxVolume; guard++) {
       const c = chooser.choose();
       if (!c.workflow) break;
@@ -600,8 +710,10 @@ export class SimulationSession {
       occurrenceByStep: {},
       stateOccurrence: {},
       stepsReached: [],
+      createdDay: this.dayIndex,
+      timeline: [],
     };
-    this.leads.set(id, lead);
+    this.leads_.set(id, lead);
     return lead;
   }
 
@@ -620,8 +732,21 @@ export class SimulationSession {
     let g = this.runIndex.get(key);
     if (!g) {
       const target = this.catalogue.step(pipe.to)?.leadState?.state ?? pipe.to;
-      const run: LedgerRun = { id: `run:${++this.runCounter}`, pipeId: pipe.id, target, day, spendCents: 0, consumed: [], inputs: 0 };
+      const run: LedgerRun = {
+        id: `run:${++this.runCounter}`,
+        pipeId: pipe.id,
+        target,
+        day,
+        spendCents: 0,
+        consumed: [],
+        inputs: 0,
+        campaignId: client.campaign.id,
+        workflowId: workflow.id,
+        slotChoice: { ...slotChoice },
+        audienceId,
+      };
       this.runs.push(run);
+      this.runById.set(run.id, run);
       g = { run };
       this.runIndex.set(key, g);
     }
@@ -636,6 +761,7 @@ export class SimulationSession {
     // The pipe's to step, read as a lead state when it is one (what reporters attest).
     const toOutcome = this.catalogue.step(pipe.to)?.leadState?.state ?? pipe.to;
     if (input) run.consumed.push(input);
+    lead.timeline.push({ day, kind: "trial", pipeId: pipe.id, runId: run.id, workflowId: workflow.id, slotChoice: { ...slotChoice } });
     this.spent.set(client.campaign.id, (this.spent.get(client.campaign.id) ?? 0) + costCents);
     snap.spendCents[client.campaign.id] = (snap.spendCents[client.campaign.id] ?? 0) + costCents;
     const byWf = (snap.spendByWorkflow[pipe.id] ??= {});
@@ -667,6 +793,10 @@ export class SimulationSession {
     }
   }
 
+  private runIndexById(runId: string): LedgerRun | undefined {
+    return this.runById.get(runId);
+  }
+
   private sampleDelay(t: PipeTruth): number {
     if (t.delayMeanDays <= 0) return 0;
     const q = 1 / (1 + t.delayMeanDays);
@@ -689,12 +819,14 @@ export class SimulationSession {
     this.pending.length = 0;
     this.pending.push(...rest);
     for (const p of due) {
-      const lead = this.leads.get(p.leadId)!;
+      const lead = this.leads_.get(p.leadId)!;
       const client = this.clientOfCampaign.get(lead.campaignId)!;
       for (const k of p.learningKeys) this.bump(k, p.trialDay, "successes");
       if (p.segmentRecord) p.segmentRecord.record = { ...p.segmentRecord.record, success: true };
       if (lead.stepsReached.includes(p.step)) continue;
       lead.stepsReached.push(p.step);
+      const event: LeadEvent = { day, kind: "outcome", pipeId: this.runIndexById(p.runId)?.pipeId ?? "", runId: p.runId, step: p.step, occurrenceId: null };
+      lead.timeline.push(event);
 
       const state = this.catalogue.step(p.step)?.leadState ?? null;
       if (this.advance(lead, p.step)) {
@@ -702,6 +834,7 @@ export class SimulationSession {
         const occ: LedgerOccurrence = { id: `occ:${++this.occCounter}`, outcome: state?.state ?? p.step, subject: lead.id, runId: p.runId, day };
         this.occurrences.push(occ);
         lead.occurrenceByStep[p.step] = occ.id;
+        event.occurrenceId = occ.id;
         if (state) lead.stateOccurrence[state.leadTrack] = occ.id;
         snap.outcomes[occ.outcome] = (snap.outcomes[occ.outcome] ?? 0) + 1;
         for (const r of this.world.reporters ?? []) {

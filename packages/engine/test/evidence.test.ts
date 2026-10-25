@@ -45,8 +45,8 @@ describe("evidence", () => {
     const att = attest(evidence, rel);
     const s0 = att.find((a) => a.subject === "s0")!;
     expect(s0.reporters).toEqual(["crm", "judge", "tracker"]);
-    expect(s0.credence).toBeCloseTo(1, 12);
+    expect(s0.confidence).toBeCloseTo(1, 12);
     const x0 = att.find((a) => a.subject === "x0")!;
-    expect(x0.credence).toBeCloseTo(5 / 18, 12);
+    expect(x0.confidence).toBeCloseTo(5 / 18, 12);
   });
 });

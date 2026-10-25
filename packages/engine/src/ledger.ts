@@ -44,6 +44,11 @@ export interface LedgerRun {
   support?: { kind: string; reason: string };
   /** Abnormal loss (a run on a lead already past its target, a loop): stated apart. */
   abnormalLoss?: string;
+  /** Context, for reports only (the arithmetic never reads it): the campaign, workflow, slot options and audience the run used. */
+  campaignId?: string;
+  workflowId?: string;
+  slotChoice?: Record<string, string>;
+  audienceId?: string | null;
 }
 
 export interface PipeOwnCost {

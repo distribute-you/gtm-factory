@@ -31,8 +31,8 @@ export interface FunnelLeg {
   from: StepKey;
   to: StepKey;
   estimate: LegEstimate;
-  /** Inputs this leg must process per target outcome. */
-  inputsPerTarget: number;
+  /** Leads needed: inputs this leg must process per target outcome. */
+  leadsNeeded: number;
   /** Dollars this leg spends per target outcome. */
   costPerTarget: number;
 }
@@ -167,15 +167,15 @@ function toRanked(s: SearchState, targetValue: number): RankedFunnel {
   const legs: FunnelLeg[] = [];
   let reach = s.reach;
   for (const l of s.legs) {
-    const inputsPerTarget = 1 / reach;
+    const leadsNeeded = 1 / reach;
     legs.push({
       playId: l.play.id,
       pipeId: l.pipe.id,
       from: l.pipe.from,
       to: l.pipe.to,
       estimate: l.estimate,
-      inputsPerTarget,
-      costPerTarget: l.estimate.costPerTrial * inputsPerTarget,
+      leadsNeeded,
+      costPerTarget: l.estimate.costPerTrial * leadsNeeded,
     });
     reach /= l.estimate.yieldRate;
   }
