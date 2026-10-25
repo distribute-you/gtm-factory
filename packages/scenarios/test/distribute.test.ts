@@ -9,16 +9,22 @@ const PUB = JSON.parse(readFileSync(seed("distribute-catalogue.json"), "utf8")) 
 const WORLD = JSON.parse(readFileSync(seed("distribute-world.json"), "utf8")) as WorldData;
 
 describe("distribute.you's public catalogue in the framework's model", () => {
-  test("every channel leg of the public catalogue is a pipe", () => {
+  test("a pipe is a leg; every channel's leg runs on one, and the channel is a tactic of its scripts", () => {
     const t = translateCatalogue(PUB);
     const ids = new Set(t.catalogue.pipes.map((p) => p.id));
     let legs = 0;
     for (const c of PUB.channels) for (const tr of c.transitions) {
       legs++;
-      expect(ids.has(`${c.slug}|${tr.legKey}`)).toBe(true);
+      const pipe = t.pipeOf(c.slug, tr.legKey);
+      expect(pipe && ids.has(pipe)).toBe(true);
     }
     expect(legs).toBeGreaterThan(80);
+    expect(t.catalogue.pipes.length).toBeLessThan(legs / 2);
+    const channel = t.catalogue.tactics.find((x) => x.id === "channel")!;
+    expect(channel.type).toEqual({ kind: "list", values: expect.arrayContaining(PUB.channels.map((c) => c.name)) });
     expect(new Catalogue(t.catalogue).validate()).toEqual([]);
+    const world = buildDistributeWorld(PUB);
+    for (const s of world.catalogue.scripts.filter((x) => !["llm", "template_writing", "icp_client", "icp_finder"].includes(x.pipeId))) expect(typeof s.tactics.channel).toBe("string");
   });
 
   test("lead states are tracks; evidence steps are their state unless a pipe would loop on it", () => {

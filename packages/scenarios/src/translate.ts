@@ -12,9 +12,10 @@
  *  - Evidence a pipe would turn into the same state it starts from (a booking
  *    call made after a reply, a purchase before the paid client) stays an
  *    outcome of its own, off the tracks, so the pipe keeps a meaning.
- *  - A channel's leg is a pipe "<channel>|<leg>". A reactive leg whose trigger
- *    is reaching the leg's own start is a plain pipe (the funnel walks it); a
- *    leg reacting to anything else waits on its trigger.
+ *  - A pipe is a leg (per factory, and per trigger it waits on); a channel is
+ *    the value of the "Channel" tactic its scripts carry, never an object. A
+ *    reactive leg whose trigger is reaching the leg's own start is a plain pipe
+ *    (the funnel walks it); a leg reacting to anything else waits on it.
  *  - Sourcing pipes consume an ICP; pipes of the client's own team are another
  *    factory.
  */
@@ -38,18 +39,23 @@ const TRACKS: Record<string, LeadTrack> = {
 };
 
 export interface TranslateOptions {
-  /** Pipes that write a message from a template (they get a template input). */
-  templatePipes?: (pipeId: string, channel: PublicCatalogue["channels"][number]) => boolean;
-  /** Pipes that ask an LLM on demand (they get an LLM completion input). */
-  llmPipes?: (pipeId: string, channel: PublicCatalogue["channels"][number]) => boolean;
+  /** Channels that write a message from a template (their pipes get a template input). */
+  templateChannel?: (channel: PublicCatalogue["channels"][number]) => boolean;
+  /** Channels whose scripts ask an LLM on demand (their pipes get an LLM completion input). */
+  llmChannel?: (channel: PublicCatalogue["channels"][number]) => boolean;
 }
+
+/** The tactic every script carries: the channel it works on (a list of the catalogue's channel names). */
+export const CHANNEL_TACTIC = "channel";
 
 export interface TranslatedCatalogue {
   catalogue: CatalogueData;
   /** The outcome a step is (its state, or its own outcome). */
   outcomeOfStep(step: string | null): OutcomeId | null;
-  /** The pipe of a channel's leg (legacy leg keys accepted), or null when the catalogue has none. */
+  /** The pipe a channel's leg runs on (legacy leg keys accepted), or null when the catalogue has none. */
   pipeOf(channelSlug: string, legKey: string): string | null;
+  /** A channel's name: the value of the channel tactic its scripts carry. */
+  channelName(channelSlug: string): string | null;
   /** The event outcome of a trigger. */
   eventOf(triggerId: string): OutcomeId | null;
   /** Served leg key of a legacy one, for a channel. */
@@ -60,8 +66,9 @@ export function eventOutcomeId(triggerId: string): string {
   return `event:${triggerId}`;
 }
 
-export function pipeIdOf(channelSlug: string, legKey: string): string {
-  return `${channelSlug}|${legKey}`;
+/** A pipe is a leg, per factory (ours, the client's team) and per trigger it waits on. */
+export function legPipeId(from: OutcomeId | null, to: OutcomeId, factory: string, triggerId: string | null): string {
+  return `${factory === CLIENT_TEAM ? "team:" : ""}${from ?? "start"}>${to}${triggerId ? `@${triggerId}` : ""}`;
 }
 
 export function translateCatalogue(pub: PublicCatalogue, options: TranslateOptions = {}): TranslatedCatalogue {
@@ -156,42 +163,48 @@ export function translateCatalogue(pub: PublicCatalogue, options: TranslateOptio
   ];
   const pipes: Pipe[] = [];
   const legByKey = new Map(pub.legs.map((l) => [l.legKey, l]));
-  const label = (o: OutcomeId) => outcomes.find((x) => x.id === o)?.label ?? o;
-  for (const c of [...pub.channels].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || (a.slug < b.slug ? -1 : 1))) {
+  const label = (o: OutcomeId | null) => (o === null ? "Start" : outcomes.find((x) => x.id === o)?.label ?? o);
+  /** channel|leg -> pipe id */
+  const channelPipe = new Map<string, string>();
+  const channels = [...pub.channels].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || (a.slug < b.slug ? -1 : 1));
+  for (const c of channels) {
     for (const t of c.transitions) {
-      const id = pipeIdOf(c.slug, t.legKey);
       const from = outcomeOfStep(t.from);
       const to = outcomeOfStep(t.to)!;
       if (from === to) continue;
       const trigger = t.triggerId ? byId.get(t.triggerId) : undefined;
       const onItsStart = trigger && trigger.type === "outcome" && trigger.outcomeKey && outcomeOfStep(trigger.outcomeKey) === from;
-      const inputs: OutcomeId[] = [];
       let triggerId: string | null = null;
-      if (t.mode === "reactive" && t.triggerId === ON_DEMAND) {
-        triggerId = ON_DEMAND;
+      if (t.mode === "reactive" && t.triggerId === ON_DEMAND) triggerId = ON_DEMAND;
+      else if (t.mode === "reactive" && t.triggerId && !onItsStart && eventOf(t.triggerId)) triggerId = t.triggerId;
+      const factory = c.operatedBy === "customer" ? CLIENT_TEAM : OUR_FACTORY;
+      // A pipe is a leg: what it consumes and what it makes. Channels are tactics of its scripts.
+      const id = legPipeId(from, to, factory, triggerId);
+      channelPipe.set(`${c.slug}|${t.legKey}`, id);
+      let pipe = pipes.find((p) => p.id === id);
+      if (!pipe) {
+        const inputs: OutcomeId[] = [];
+        if (triggerId && triggerId !== ON_DEMAND) inputs.push(eventOf(triggerId)!);
         if (from) inputs.push(from);
-      } else if (t.mode === "reactive" && t.triggerId && !onItsStart && eventOf(t.triggerId)) {
-        triggerId = t.triggerId;
-        inputs.push(eventOf(t.triggerId)!);
-        if (from) inputs.push(from);
-      } else if (from) inputs.push(from);
-      if (c.channelType === "sourcing") inputs.push(ICP);
-      if (options.templatePipes?.(id, c)) inputs.push(TEMPLATE);
-      if (options.llmPipes?.(id, c)) inputs.push(LLM);
-      const leg = legByKey.get(t.legKey);
-      const duration = leg?.maturity?.durationDays ?? 0;
-      const several = c.transitions.length > 1;
-      pipes.push({
-        id,
-        name: several ? `${c.name}: ${label(to)}` : c.name,
-        inputs,
-        output: to,
-        factory: c.operatedBy === "customer" ? CLIENT_TEAM : OUR_FACTORY,
-        ...(triggerId ? { triggerId } : {}),
-        maturity: { durationDays: duration, outcomesRequired: leg?.maturity?.outcomesRequired ?? 10, delayMeanDays: Math.round((duration / 6) * 10) / 10, horizonDays: duration },
-        ...(c.shortDescription || c.description ? { description: (c.shortDescription ?? c.description)! } : {}),
-        ...(c.icon ? { icon: c.icon } : {}),
-      });
+        const leg = legByKey.get(t.legKey);
+        const duration = leg?.maturity?.durationDays ?? 0;
+        const who = factory === CLIENT_TEAM ? "Your team: " : "";
+        const when = triggerId && triggerId !== ON_DEMAND ? ` on ${(trigger?.label ?? triggerId).toLowerCase()}` : "";
+        pipe = {
+          id,
+          name: `${who}${label(from)} to ${label(to).toLowerCase()}${when}`,
+          inputs,
+          output: to,
+          factory,
+          ...(triggerId ? { triggerId } : {}),
+          maturity: { durationDays: duration, outcomesRequired: leg?.maturity?.outcomesRequired ?? 10, delayMeanDays: Math.round((duration / 6) * 10) / 10, horizonDays: duration },
+          ...(outcomes.find((o) => o.id === to)?.icon ? { icon: outcomes.find((o) => o.id === to)!.icon! } : {}),
+        };
+        pipes.push(pipe);
+      }
+      const extra = [c.channelType === "sourcing" ? ICP : null, options.templateChannel?.(c) ? TEMPLATE : null, options.llmChannel?.(c) ? LLM : null];
+      for (const x of extra) if (x && !pipe.inputs.includes(x)) pipe.inputs.push(x);
+      pipe.description = `Channels: ${channels.filter((ch) => [...channelPipe].some(([k, v]) => v === id && k.startsWith(`${ch.slug}|`))).map((ch) => ch.name).join(", ")}.`;
     }
   }
   const zero = { durationDays: 0, outcomesRequired: 10, delayMeanDays: 0, horizonDays: 0 };
@@ -203,17 +216,15 @@ export function translateCatalogue(pub: PublicCatalogue, options: TranslateOptio
   );
 
   const tracks = Object.values(TRACKS);
-  const catalogue: CatalogueData = { leadTracks: tracks, outcomes, factories, pipes, scripts: [], triggers, tactics: [], strategies: [] };
+  const channelTactic = { id: CHANNEL_TACTIC, name: "Channel", type: { kind: "list" as const, values: channels.map((c) => c.name) }, describes: ["script" as const], source: "data" as const, description: "The channel a script works on: a pipe is a leg, and scripts of every channel compete on it." };
+  const catalogue: CatalogueData = { leadTracks: tracks, outcomes, factories, pipes, scripts: [], triggers, tactics: [channelTactic], strategies: [] };
 
   const served = new Map<string, string>();
   for (const c of pub.channels) {
     for (const x of pub.legKeyCorrespondence) if (x.channelType === c.channelType) served.set(`${c.slug}|${x.legacyLegKey}`, x.legKey);
   }
   const servedLegKey = (slug: string, legKey: string) => served.get(`${slug}|${legKey}`) ?? legKey;
-  const pipeIds = new Set(pipes.map((p) => p.id));
-  const pipeOf = (slug: string, legKey: string) => {
-    const id = pipeIdOf(slug, servedLegKey(slug, legKey));
-    return pipeIds.has(id) ? id : null;
-  };
-  return { catalogue, outcomeOfStep, pipeOf, eventOf, servedLegKey };
+  const pipeOf = (slug: string, legKey: string) => channelPipe.get(`${slug}|${legKey}`) ?? channelPipe.get(`${slug}|${servedLegKey(slug, legKey)}`) ?? null;
+  const channelName = (slug: string) => pub.channels.find((c) => c.slug === slug)?.name ?? null;
+  return { catalogue, outcomeOfStep, pipeOf, channelName, eventOf, servedLegKey };
 }
