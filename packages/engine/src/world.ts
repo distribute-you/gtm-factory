@@ -1,243 +1,268 @@
 /**
- * A fictional world built from ANY catalogue: fictional clients, offers,
- * audiences and lead attributes, plus hidden truths drawn from a seed. Nothing
- * here knows a particular channel, pipe or step: every pipe of the catalogue
- * gets workflows, slot options and a hidden yield the same way.
+ * A simulated world: the clients, their market (fictional people and
+ * companies), the catalogue they run on, and the HIDDEN truth the engine must
+ * learn (yields, costs, delays, the effect of every script, occurrence and lead
+ * tactic). Every number of a scenario is data here, never in the engine or the
+ * dashboard.
  */
 
-import type { Catalogue, Pipe, SlotOption, StepKey, Strategy, Tactic, Workflow } from "./catalogue";
-import { START } from "./catalogue";
-import type { AudienceProposal, SegmentRule } from "./client";
-import { createRng, type Rng } from "./rng";
-import type { PipeTruth, SimAttribute, SimClient, SimReporter, WorldSpec } from "./simulator";
+import type { Catalogue, OutcomeId } from "./catalogue";
+import { hashString } from "./rng";
+import type { Condition, TacticValue } from "./tactics";
+import { meetsAll } from "./tactics";
 
-export interface FictionalWorldOptions {
-  seed?: number | string;
-  clients?: number;
-  /** Share of optional steps each fictional offer leaves out. */
-  stepDropRate?: number;
+export interface Org {
+  id: string;
+  name: string;
 }
 
-const COMPANIES = ["Northwind Analytics", "Bluepeak Logistics", "Lumen Dental Labs", "Copperleaf Studio", "Harbor & Pine Legal", "Quillstone Payroll"];
-const ICPS = [
-  "Heads of operations at mid-sized logistics companies in Europe",
-  "Founders of software startups who just raised a first round",
-  "Dental clinic owners with two or more practices",
-  "Marketing managers at consumer brands selling online",
-  "Partners at small law firms handling business clients",
-  "Finance leads at companies with 50 to 500 employees",
-];
-
-export const FICTIONAL_ATTRIBUTES: SimAttribute[] = [
-  { name: "country", values: ["France", "Germany", "United Kingdom", "United States"], weights: [3, 2, 2, 3] },
-  { name: "company_size", values: ["1-10", "11-50", "51-200", "201-1000"], weights: [3, 3, 2, 1] },
-  { name: "seniority", values: ["founder", "head", "manager"], weights: [2, 2, 3] },
-  { name: "source", values: ["cold filters", "buying signals", "engagement"], weights: [4, 2, 2] },
-];
-
-function between(rng: Rng, lo: number, hi: number): number {
-  return lo + (hi - lo) * rng.next();
+export interface Brand {
+  id: string;
+  orgId: string;
+  name: string;
+  /** Brand tactic values: clients sharing them share a pooling level. */
+  tactics: Record<string, TacticValue>;
 }
 
-function round(x: number, digits = 4): number {
-  const f = 10 ** digits;
-  return Math.round(x * f) / f;
+export interface Offer {
+  id: string;
+  brandId: string;
+  name: string;
+  /** The outcomes this business has (a business with no website never walks a visit). */
+  outcomes: OutcomeId[];
+  /** Lifetime revenue of a paid client, dollars, when the client stated it. */
+  lifetimeRevenue?: number;
+  /** Value of other target outcomes, dollars, when stated. */
+  outcomeValues?: Record<OutcomeId, number>;
 }
 
-/** The step a paid client is: the highest rank of any lead track. */
-export function topStep(catalogue: Catalogue): StepKey | null {
-  let best: { key: StepKey; rank: number } | null = null;
-  for (const s of catalogue.steps) {
-    if (s.retired || !s.leadState) continue;
-    const better = !best || s.leadState.rank > best.rank || (s.leadState.rank === best.rank && s.key === s.leadState.state);
-    if (better) best = { key: s.key, rank: s.leadState.rank };
+/** Where a campaign's sales funnel starts: the market, or a trigger's events. */
+export type CampaignEntry = { kind: "start" } | { kind: "trigger"; triggerId: string };
+
+export interface Campaign {
+  id: string;
+  brandId: string;
+  offerId: string;
+  name: string;
+  entry: CampaignEntry;
+  /** The lead states of its sales funnel after the entry; the last one is the target. */
+  line: OutcomeId[];
+  dailyBudgetCents: number;
+  maxVolume?: number;
+  status: "running" | "paused";
+  /** The strategy chosen per pipe (a play = pipe x strategy). A pipe left out plays its default. */
+  strategies: Record<string, string>;
+  /** A play pinned per leg (leg index -> pipe id). Unset: the prioritizer picks. */
+  pinned?: Record<number, string>;
+}
+
+/** An occurrence that exists before the campaign runs: the client's ICP, a template. */
+export interface SeedOccurrence {
+  outcome: OutcomeId;
+  /** The script producing it (its pipe and factory follow). */
+  scriptId: string;
+  /** Object occurrences have dynasties too: a template is a version of its template dynasty. */
+  dynasty: string;
+  version: number;
+  /** A fork starts from its parent dynasty's posterior. */
+  parentDynasty?: string;
+  name: string;
+  /** The text itself (an ICP sentence, a template's opening). */
+  text: string;
+  /** For an ICP: who it describes, as conditions on lead tactics (what a judge would read from the sentence). */
+  conditions?: Condition[];
+  /** Hidden: how much this occurrence changes the end of the leg it serves. */
+  truthEnd?: number;
+}
+
+export interface WorldClient {
+  org: Org;
+  brand: Brand;
+  offer: Offer;
+  campaigns: Campaign[];
+  seeds: SeedOccurrence[];
+  /** Pipes of other factories this client connected (its CRM import). */
+  connected: string[];
+  /** Hidden: how much this client's market answers, all else equal. */
+  truthMultiplier: number;
+  /** Organic leads reaching the brand per day (another factory). */
+  organicPerDay: number;
+}
+
+/** A lead or company tactic of the market, and how values are drawn. */
+export interface MarketAttribute {
+  tactic: string;
+  level: "lead" | "company";
+  /** For a list or yes/no tactic. */
+  values?: TacticValue[];
+  weights?: number[];
+  /** For a number tactic: log-uniform between these bounds, rounded to one decimal. */
+  range?: [number, number];
+}
+
+/** Hidden effect of one script (or one script at one input). */
+export interface ScriptTruth {
+  /** True cost of one run on one subject, cents (each run varies around it). */
+  costCents: number;
+  /** Multiplies its own pipe's yield. */
+  step?: number;
+  /** Multiplies the fact at the end of the leg its decision serves. */
+  end?: number;
+  /** For an attesting pipe: share of true facts it attests, and of non-facts it attests anyway. */
+  recall?: number;
+  falsePositive?: number;
+  /** For a script creating subjects: the share of the market its source covers. */
+  coverage?: number;
+}
+
+export interface PipeTruth {
+  /** Base yield of the pipe (the fact rate before every multiplier). */
+  base: number;
+  delayMeanDays: number;
+  horizonDays: number;
+  /** For a pipe whose input may be a false attestation: yield multiplier then. */
+  onFalseInput?: number;
+}
+
+export interface WorldTruth {
+  pipes: Record<string, PipeTruth>;
+  scripts: Record<string, ScriptTruth>;
+  /** Per input (point key "consumer|input"), the effects that differ there. */
+  at: Record<string, Record<string, Partial<ScriptTruth>>>;
+  /** Lead tactics that change the first leg's fact. */
+  segments: { when: Condition[]; mult: number }[];
+  /** Fact multiplier for a person picked again after an earlier pick. */
+  recontactMult: number;
+}
+
+export interface WorldSettings {
+  /** Days between two split studies. */
+  splitEveryDays: number;
+  /** Mature age (days) of a decision before a split study reads it. */
+  splitMatureDays: number;
+  /** Most finer ICPs the AI proposes per brand. */
+  maxProposedIcps: number;
+  /** One-off setup spend per brand (support), cents. */
+  setupCentsPerBrand: number;
+  /** Reliability a producer needs for its coverage to count a client in. */
+  minReliability: number;
+  /** People per brand market. */
+  marketSize: number;
+  /** People per company in the market. */
+  peoplePerCompany: number;
+  /** The script that writes finer ICPs from splits (an AI ICP finder). */
+  icpFinderScript: string;
+  /** Tactic that groups clients for pooling. */
+  clientGroupTactic: string;
+}
+
+export interface WorldSpec {
+  seed: number | string;
+  catalogue: Catalogue;
+  clients: WorldClient[];
+  attributes: MarketAttribute[];
+  truth: WorldTruth;
+  settings: WorldSettings;
+}
+
+// ---------------------------------------------------------------------------
+// The market: fictional people and companies, drawn from the seed
+// ---------------------------------------------------------------------------
+
+function unit(...parts: (string | number)[]): number {
+  return hashString(parts.join("\u0000")) / 4294967296;
+}
+
+function drawValue(a: MarketAttribute, u: number): TacticValue {
+  if (a.range) {
+    const [lo, hi] = a.range;
+    return Math.round(Math.exp(Math.log(lo) + (Math.log(hi) - Math.log(lo)) * u) * 10) / 10;
   }
-  return best?.key ?? null;
-}
-
-/** Build a fictional world on a catalogue (the catalogue is cloned, then given workflows and slot options). */
-export function fictionalWorld(source: Catalogue, options: FictionalWorldOptions = {}): WorldSpec {
-  const seed = options.seed ?? 1;
-  const rng = createRng(`world:${seed}`);
-  const catalogue = source.clone();
-  const target = topStep(catalogue);
-  if (!target) throw new Error("the catalogue has no lead state to aim at");
-
-  // Shared LLM-like slot options (usable on every pipe).
-  const llms: SlotOption[] = [
-    { id: "llm:swift", slot: "llm", name: "Swift model", pipeId: null, tactics: [], costPerTrialCents: 1, status: "active" },
-    { id: "llm:balanced", slot: "llm", name: "Balanced model", pipeId: null, tactics: [], costPerTrialCents: 3, status: "active" },
-    { id: "llm:deep", slot: "llm", name: "Deep model", pipeId: null, tactics: [], costPerTrialCents: 9, status: "active" },
-  ];
-  for (const o of llms) if (!catalogue.slotOption(o.id)) catalogue.add("slotOptions", o);
-
-  const truthPipes: PipeTruth[] = [];
-  const workflowTruth: Record<string, number> = {};
-  const slotTruth: Record<string, number> = {};
-  for (const o of llms) slotTruth[o.id] = round(between(rng, 0.8, 1.25));
-
-  for (const pipe of catalogue.pipes) {
-    if (!catalogue.isPipeLive(pipe)) continue;
-    furnishPipe(rng, catalogue, pipe, truthPipes, workflowTruth, slotTruth);
+  const values = a.values ?? [];
+  const weights = a.weights ?? values.map(() => 1);
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = u * total;
+  for (let i = 0; i < values.length; i++) {
+    r -= weights[i] ?? 1;
+    if (r < 0) return values[i]!;
   }
+  return values[values.length - 1]!;
+}
 
-  const optional = catalogue.steps.filter((s) => !s.retired && s.key !== target).map((s) => s.key);
-  const dropRate = options.stepDropRate ?? 0.25;
-  const clients: SimClient[] = [];
-  const clientTruth: Record<string, number> = {};
-  const n = Math.min(options.clients ?? 3, COMPANIES.length);
-  for (let i = 0; i < n; i++) {
-    const name = COMPANIES[i]!;
-    const brandId = `brand-${i + 1}`;
-    const steps = [...optional.filter(() => rng.next() >= dropRate), target];
-    clients.push({
-      org: { id: `org-${i + 1}`, name },
-      brand: { id: brandId, orgId: `org-${i + 1}`, name, icp: ICPS[i]! },
-      offer: {
-        id: `offer-${i + 1}`,
-        brandId,
-        name: `${name} main offer`,
-        steps,
-        ...(i === n - 1 && n > 1 ? {} : { lifetimeRevenue: Math.round(between(rng, 2000, 20000)) }),
-      },
-      campaign: {
-        id: `campaign-${i + 1}`,
-        offerId: `offer-${i + 1}`,
-        target,
-        dailyBudgetCents: Math.round(between(rng, 5000, 20000)),
-        status: "running",
-      },
-      expertAudiences: expertAudiences(rng),
-    });
-    clientTruth[brandId] = round(between(rng, 0.7, 1.3));
+export interface Person {
+  id: string;
+  index: number;
+  brandId: string;
+  companyId: string;
+  /** Lead and company tactic values (read from data). */
+  values: Record<string, TacticValue>;
+}
+
+/** Person `index` of a brand's market, the same on every call. */
+export function personOf(world: WorldSpec, brandId: string, index: number): Person {
+  const c = Math.floor(index / world.settings.peoplePerCompany);
+  const values: Record<string, TacticValue> = {};
+  for (const a of world.attributes) {
+    values[a.tactic] = a.level === "company" ? drawValue(a, unit(world.seed, brandId, "c", c, a.tactic)) : drawValue(a, unit(world.seed, brandId, "p", index, a.tactic));
   }
-
-  const segments = FICTIONAL_ATTRIBUTES.flatMap((a) => a.values.map((value) => ({ attribute: a.name, value, multiplier: round(between(rng, 0.6, 1.6)) })));
-
-  const states = [...new Set(catalogue.steps.flatMap((s) => (s.leadState ? [s.leadState.state] : [])))];
-  const reporters: SimReporter[] = [
-    { reporter: { id: "crm", name: "Client CRM" }, outcomes: states, recall: 0.98, spuriousRate: 0 },
-    { reporter: { id: "tracker", name: "Website tracker" }, outcomes: states, recall: 0.6, spuriousRate: 0.004 },
-    { reporter: { id: "reply_judge", name: "AI reply judge" }, outcomes: states.slice(0, 1), recall: 0.92, spuriousRate: 0.002 },
-  ];
-
-  return {
-    seed,
-    catalogue,
-    clients,
-    attributes: FICTIONAL_ATTRIBUTES,
-    truth: { pipes: truthPipes, workflows: workflowTruth, slotOptions: slotTruth, segments, clients: clientTruth },
-    reporters,
-    evidencePolicy: { referenceReporter: Object.fromEntries(states.map((s) => [s, "crm"])), minReliability: 0.8 },
-    settings: { funnelCandidates: 4, funnelEveryDays: 7, discoverEveryDays: 15, setupCentsPerClient: 5000 },
-  };
+  return { id: `${brandId}:p${index}`, index, brandId, companyId: `${brandId}:c${c}`, values };
 }
 
-/**
- * Give one pipe what the world needs to run it: workflows (rules and AI, or
- * people), two templates, and its hidden truths (base yield, delay, each
- * option's multiplier). Generic: reads only the pipe's ends and its channel.
- */
-function furnishPipe(
-  rng: Rng,
-  catalogue: Catalogue,
-  pipe: Pipe,
-  truthPipes: PipeTruth[],
-  workflowTruth: Record<string, number>,
-  slotTruth: Record<string, number>,
-): void {
-  ensureWorldTactics(catalogue);
-  const channel = catalogue.channel(pipe.channel);
-  const toState = catalogue.step(pipe.to)?.leadState ?? null;
-  const fromState = pipe.from === START ? null : catalogue.step(pipe.from)?.leadState ?? null;
-  const fromStart = pipe.from === START;
-  // Generic truth: the further a pipe moves a lead up its lead track, the lower its yield.
-  let baseYield: number;
-  if (!toState) baseYield = between(rng, 0.5, 0.9);
-  else if (fromState && fromState.leadTrack === toState.leadTrack) baseYield = between(rng, 0.2, 0.6) ** Math.max(1, toState.rank - fromState.rank);
-  else if (fromState) baseYield = between(rng, 0.05, 0.3) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
-  else baseYield = between(rng, 0.02, 0.08) * between(rng, 0.3, 0.6) ** (toState.rank - 1);
-  truthPipes.push({
-    pipeId: pipe.id,
-    baseYield: round(baseYield),
-    delayMeanDays: pipe.maturity.delayMeanDays,
-    maxDelayDays: Math.max(1, Math.ceil(pipe.maturity.durationDays || pipe.maturity.delayMeanDays * 4)),
-  });
-  const cheap = fromStart || pipe.mode === "proactive";
-  const baseCost = cheap ? Math.round(between(rng, 30, 150)) : Math.round(between(rng, 100, 1500));
-  const expectedYield = round(baseYield * between(rng, 0.6, 1.4));
-  const person = channel?.performedBy === "person";
-  const flows: Workflow[] = person
-    ? [
-        { id: `${pipe.id}:wf:human`, dynasty: `${pipe.id}:human`, pipeId: pipe.id, kind: "human", slots: [], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
-        { id: `${pipe.id}:wf:scripted`, dynasty: `${pipe.id}:scripted`, pipeId: pipe.id, kind: "human", slots: ["template"], tactics: [], costPerTrialCents: baseCost * 2, expectedYield, status: "active" },
-      ]
-    : [
-        { id: `${pipe.id}:wf:rules`, dynasty: `${pipe.id}:rules`, pipeId: pipe.id, kind: "rules", slots: ["template"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
-        { id: `${pipe.id}:wf:ai`, dynasty: `${pipe.id}:ai`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: [], costPerTrialCents: baseCost, expectedYield, status: "active" },
-        { id: `${pipe.id}:wf:ai-research`, dynasty: `${pipe.id}:ai-research`, pipeId: pipe.id, kind: "ai", slots: ["template", "llm"], tactics: ["research-first"], costPerTrialCents: Math.round(baseCost * 1.6), expectedYield, status: "active" },
-      ];
-  for (const w of flows) {
-    if (catalogue.workflow(w.id)) continue;
-    catalogue.add("workflows", w);
-    workflowTruth[w.id] = round(between(rng, 0.6, 1.6));
-  }
-  for (const name of ["short", "story"]) {
-    const o: SlotOption = { id: `${pipe.id}:template:${name}`, slot: "template", name: `${name} template`, pipeId: pipe.id, tactics: [`${name}-copy`], costPerTrialCents: 0, status: "active" };
-    if (catalogue.slotOption(o.id)) continue;
-    catalogue.add("slotOptions", o);
-    slotTruth[o.id] = round(between(rng, 0.75, 1.3));
-  }
+/** Does a source (a script creating subjects) cover person `index`? */
+export function covers(world: WorldSpec, dynasty: string, brandId: string, index: number, coverage: number): boolean {
+  return unit(world.seed, "cover", dynasty, brandId, index) < coverage;
 }
 
-/** The tactics and strategies the fictional workflows and templates are tagged with. */
-export const FICTIONAL_TACTICS: Tactic[] = [
-  { id: "research-first", name: "Researches the company first", appliesTo: "workflow", description: "Reads the company before it writes or calls." },
-  { id: "short-copy", name: "Short copy", appliesTo: "slot_option", description: "Three sentences or fewer." },
-  { id: "story-copy", name: "Story copy", appliesTo: "slot_option", description: "Opens on a short client story." },
-];
-
-export const FICTIONAL_STRATEGIES: Strategy[] = [
-  { id: "researched", name: "Researched outreach", required: ["research-first"], excluded: [] },
-  { id: "short-and-direct", name: "Short and direct", required: ["short-copy"], excluded: ["research-first"] },
-];
-
-function ensureWorldTactics(catalogue: Catalogue): void {
-  for (const t of FICTIONAL_TACTICS) if (!catalogue.tactics.some((x) => x.id === t.id)) catalogue.add("tactics", t);
-  for (const st of FICTIONAL_STRATEGIES) if (!catalogue.strategy(st.id)) catalogue.add("strategies", st);
+/** The hidden multiplier of a person on the first leg's fact. */
+export function segmentMultiplier(world: WorldSpec, values: Readonly<Record<string, TacticValue>>): number {
+  let m = 1;
+  for (const s of world.truth.segments) if (meetsAll(values, s.when)) m *= s.mult;
+  return m;
 }
 
-/**
- * Add a pipe to a running world: the pipe must already be in the world's
- * catalogue. It gets workflows, templates and hidden truths the same generic way
- * as at creation, from a seed of its own (the rest of the world is unchanged).
- */
-export function extendWorldWithPipe(world: WorldSpec, pipeId: string): void {
-  const pipe = world.catalogue.pipe(pipeId);
-  if (!pipe) throw new Error(`pipe "${pipeId}" not found`);
-  if (world.truth.pipes.some((t) => t.pipeId === pipeId)) return;
-  const rng = createRng(`world:${world.seed}:pipe:${pipeId}`);
-  furnishPipe(rng, world.catalogue, pipe, world.truth.pipes, world.truth.workflows, world.truth.slotOptions);
-}
-
-/** Draw the hidden yield multiplier of a workflow or slot option added while the world runs. */
-export function extendWorldWithOption(world: WorldSpec, kind: "workflows" | "slotOptions", id: string): number {
-  const table = kind === "workflows" ? world.truth.workflows : world.truth.slotOptions;
-  if (table[id] !== undefined) return table[id]!;
-  const rng = createRng(`world:${world.seed}:${kind}:${id}`);
-  table[id] = round(between(rng, 0.6, 1.6));
-  return table[id]!;
-}
-
-function expertAudiences(rng: Rng): AudienceProposal[] {
-  const out: AudienceProposal[] = [];
-  const picks = [FICTIONAL_ATTRIBUTES[1]!, FICTIONAL_ATTRIBUTES[2]!];
-  for (let i = 0; i < 2; i++) {
-    const a = picks[i]!;
-    const values = a.values.filter(() => rng.next() < 0.6);
-    const chosen = values.length > 0 ? values : [a.values[0]!];
-    const rule: SegmentRule = { [a.name]: chosen };
-    out.push({ name: `${a.name.replace("_", " ")}: ${chosen.join(", ")}`, description: `Leads whose ${a.name.replace("_", " ")} is ${chosen.join(" or ")}.`, rule });
-  }
+/** A fixed sample of a brand's market, for hidden-truth figures. */
+export function marketSample(world: WorldSpec, brandId: string, n = 3000): Person[] {
+  const out: Person[] = [];
+  const step = Math.max(1, Math.floor(world.settings.marketSize / n));
+  for (let i = 0; i < world.settings.marketSize && out.length < n; i += step) out.push(personOf(world, brandId, i));
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Loading a world from data
+// ---------------------------------------------------------------------------
+
+/** A pinned menu entry: an outcome or a pipe given its own page (configuration, no code). */
+export interface Pin {
+  kind: "outcome" | "pipe";
+  id: string;
+  label: string;
+  icon?: string;
+}
+
+/** A world as published data (the shape of seed/fictional-world.json). */
+export interface WorldData {
+  name: string;
+  description?: string;
+  seed: number;
+  catalogue: import("./catalogue").CatalogueData;
+  clients: WorldClient[];
+  attributes: MarketAttribute[];
+  truth: WorldTruth;
+  settings: WorldSettings;
+  /** Menu entries the dashboard shows by default. */
+  pins?: Pin[];
+}
+
+/** Build a world from its data. The data is cloned: a world never edits its source. */
+export function loadWorld(data: WorldData, options: { seed?: number | string; Catalogue: typeof import("./catalogue").Catalogue }): WorldSpec {
+  const copy = JSON.parse(JSON.stringify(data)) as WorldData;
+  return {
+    seed: options.seed ?? copy.seed,
+    catalogue: new options.Catalogue(copy.catalogue),
+    clients: copy.clients,
+    attributes: copy.attributes,
+    truth: copy.truth,
+    settings: copy.settings,
+  };
 }

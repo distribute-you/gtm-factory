@@ -1,193 +1,224 @@
 /**
- * Funnel construction. For a client's offer and a target outcome: keep the
- * steps the offer has, keep the pipes between kept steps, then enumerate the
- * straight-line sales funnels (one play per leg) lazily, cheapest cost per
- * target outcome first. Never a full combinatorial expansion.
+ * Sales funnels and the two calculations.
  *
- * Cost of a funnel per target outcome, legs 1..n, leg i with cost per input
- * processed c_i and yield y_i (share of inputs reaching the next step):
- *   T = sum_i c_i / (y_i x y_(i+1) x ... x y_n)
- * Value per dollar = value of the target / T.
+ * A sales funnel is a straight line of lead states from Start (or a trigger
+ * event) to a target, one play per leg. A leg A -> B is served by any pipe
+ * producing B whose subject comes from A.
+ *
+ * Cost flows FORWARD from Start: C(to) = (C(from) + c) / y.
+ * Value flows BACKWARD from the target: V(s) = max(0, y x V(to) - c).
+ * Per target outcome, a line of legs costs T = sum_i c_i / (y_i ... y_n) and
+ * returns value / T per dollar.
  */
 
-import { START, type Catalogue, type Pipe, type Play, type StepKey } from "./catalogue";
-import type { Offer } from "./client";
+import { START, type Catalogue, type OutcomeId, type Pipe } from "./catalogue";
 
-/** What a choice reads about a play: its own cost per input processed and its yield. */
+/** What a decision reads about a leg: cost per attempt and the share of attempts reaching its end. */
 export interface LegEstimate {
-  /** Dollars spent per input processed by the pipe (its own cost, never its inputs'). */
-  costPerTrial: number;
-  /** Share of inputs that reach the pipe's to step. */
+  /** Dollars per attempt (the leg's own production, never its inputs from earlier legs). */
+  costPerAttempt: number;
   yieldRate: number;
-  /** "measured" once the play has its own data, else "expected". */
   label: "expected" | "measured";
 }
 
-export type PlayEstimator = (play: Play, pipe: Pipe) => LegEstimate | null;
-
-export interface FunnelLeg {
-  playId: string;
+export interface LegEdge {
+  from: OutcomeId;
+  to: OutcomeId;
   pipeId: string;
-  from: StepKey;
-  to: StepKey;
+}
+
+/**
+ * Every leg a client's business can walk: from Start, a lead state the offer
+ * has, or an entry trigger's event, to a lead state the offer has.
+ */
+export function legEdges(catalogue: Catalogue, offerOutcomes: readonly OutcomeId[], entry: OutcomeId = START): LegEdge[] {
+  const kept = new Set([entry, ...offerOutcomes]);
+  const edges: LegEdge[] = [];
+  for (const p of catalogue.pipes) {
+    if (!catalogue.isPipeLive(p) || p.triggerId) continue;
+    const out = catalogue.outcome(p.output);
+    if (!out?.track || !kept.has(p.output)) continue;
+    for (const r of catalogue.rootsOf(p)) if (kept.has(r) && r !== p.output) edges.push({ from: r, to: p.output, pipeId: p.id });
+  }
+  return edges;
+}
+
+export interface FunnelLeg extends LegEdge {
   estimate: LegEstimate;
-  /** Leads needed: inputs this leg must process per target outcome. */
+  /** Leads needed: attempts this leg makes per target outcome. */
   leadsNeeded: number;
   /** Dollars this leg spends per target outcome. */
   costPerTarget: number;
 }
 
 export interface RankedFunnel {
-  /** Plays joined by " > ", in order from Start. */
-  id: string;
-  steps: StepKey[];
+  /** The line of outcomes, entry first. */
+  line: OutcomeId[];
   legs: FunnelLeg[];
-  /** Dollars per target outcome, all legs. */
   costPerTarget: number;
-  /** Target value / cost per target. A funnel is worth funding when above 1. */
   valuePerDollar: number;
   label: "expected" | "measured";
 }
 
-/** The steps a client can walk for this offer: the offer's steps, plus Start. */
-export function keptSteps(offer: Offer): Set<StepKey> {
-  return new Set([START, ...offer.steps]);
-}
-
-/** Live pipes whose both ends are steps the offer has. */
-export function keptPipes(catalogue: Catalogue, offer: Offer): Pipe[] {
-  const kept = keptSteps(offer);
-  return catalogue.pipes.filter((p) => catalogue.isPipeLive(p) && kept.has(p.from) && kept.has(p.to));
-}
-
-export interface EnumerateOptions {
-  /** Only funnels whose first pipe is proactive (runnable on a budget alone). */
-  proactiveEntry?: boolean;
-  /** Safety cap on search expansions. */
-  maxExpansions?: number;
-}
-
-interface SearchState {
-  step: StepKey;
-  /** Product of yields from this step to the target. */
-  reach: number;
-  /** Cost per target outcome of the suffix. */
-  cost: number;
-  legs: { play: Play; pipe: Pipe; estimate: LegEstimate }[];
-  visited: Set<StepKey>;
-}
+export type LegEstimator = (edge: LegEdge, pipe: Pipe) => LegEstimate | null;
 
 /**
- * Lazily enumerate sales funnels Start -> target, cheapest per target first.
- * Best-first search walking backward from the target: extending a suffix by a
- * leg only adds cost, so states pop in increasing cost order.
+ * Lazily enumerate funnels entry -> target, cheapest per target first: a
+ * best-first search backward from the target. Extending a suffix by one leg can
+ * only add cost, so funnels come out in increasing cost.
  */
-export function* enumerateSalesFunnels(
+export function* enumerateFunnels(
   catalogue: Catalogue,
-  offer: Offer,
-  target: StepKey,
-  estimator: PlayEstimator,
+  offerOutcomes: readonly OutcomeId[],
+  target: OutcomeId,
+  estimator: LegEstimator,
   targetValue: number,
-  options: EnumerateOptions = {},
+  entry: OutcomeId = START,
+  maxExpansions = 50_000,
 ): Generator<RankedFunnel> {
-  if (!offer.steps.includes(target)) return;
-  const pipes = keptPipes(catalogue, offer);
-  const into = new Map<StepKey, Pipe[]>();
-  for (const p of pipes) into.set(p.to, [...(into.get(p.to) ?? []), p]);
-  const estimates = new Map<string, LegEstimate | null>();
-  const estimateOf = (play: Play, pipe: Pipe) => {
-    if (!estimates.has(play.id)) estimates.set(play.id, estimator(play, pipe));
-    return estimates.get(play.id) ?? null;
-  };
-
-  const heap = new MinHeap<SearchState>((a, b) => a.cost - b.cost || a.legs.length - b.legs.length);
-  heap.push({ step: target, reach: 1, cost: 0, legs: [], visited: new Set([target]) });
-  const maxExpansions = options.maxExpansions ?? 100_000;
-  let expansions = 0;
-
-  while (heap.size > 0 && expansions < maxExpansions) {
+  if (!offerOutcomes.includes(target)) return;
+  const edges = legEdges(catalogue, offerOutcomes, entry);
+  const into = new Map<OutcomeId, LegEdge[]>();
+  for (const e of edges) into.set(e.to, [...(into.get(e.to) ?? []), e]);
+  interface State {
+    at: OutcomeId;
+    reach: number;
+    cost: number;
+    legs: { edge: LegEdge; estimate: LegEstimate }[];
+  }
+  const heap = new MinHeap<State>((a, b) => a.cost - b.cost || a.legs.length - b.legs.length);
+  heap.push({ at: target, reach: 1, cost: 0, legs: [] });
+  let n = 0;
+  while (heap.size > 0 && n++ < maxExpansions) {
     const s = heap.pop()!;
-    expansions++;
-    if (s.step === START) {
-      const first = s.legs[0];
-      if (options.proactiveEntry && first && first.pipe.mode !== "proactive") continue;
-      yield toRanked(s, targetValue);
+    if (s.at === entry) {
+      yield toRanked(s.legs, s.cost, targetValue);
       continue;
     }
-    for (const pipe of into.get(s.step) ?? []) {
-      if (s.visited.has(pipe.from)) continue;
-      for (const play of catalogue.playsOf(pipe.id)) {
-        const e = estimateOf(play, pipe);
-        if (!e || !(e.yieldRate > 0) || !(e.costPerTrial >= 0)) continue;
-        const reach = s.reach * e.yieldRate;
-        heap.push({
-          step: pipe.from,
-          reach,
-          cost: s.cost + e.costPerTrial / reach,
-          legs: [{ play, pipe, estimate: e }, ...s.legs],
-          visited: new Set([...s.visited, pipe.from]),
-        });
-      }
+    for (const e of into.get(s.at) ?? []) {
+      if (s.legs.some((l) => l.edge.from === e.from || l.edge.to === e.from)) continue;
+      const pipe = catalogue.pipe(e.pipeId)!;
+      const est = estimator(e, pipe);
+      if (!est || !(est.yieldRate > 0)) continue;
+      const reach = s.reach * est.yieldRate;
+      heap.push({ at: e.from, reach, cost: s.cost + est.costPerAttempt / reach, legs: [{ edge: e, estimate: est }, ...s.legs] });
     }
   }
 }
 
-/** The first `limit` funnels of the lazy enumeration. */
-export function rankSalesFunnels(
+export function rankFunnels(
   catalogue: Catalogue,
-  offer: Offer,
-  target: StepKey,
-  estimator: PlayEstimator,
+  offerOutcomes: readonly OutcomeId[],
+  target: OutcomeId,
+  estimator: LegEstimator,
   targetValue: number,
-  limit = 10,
-  options: EnumerateOptions = {},
+  limit = 6,
+  entry: OutcomeId = START,
 ): RankedFunnel[] {
   const out: RankedFunnel[] = [];
-  for (const f of enumerateSalesFunnels(catalogue, offer, target, estimator, targetValue, options)) {
+  const seenLines = new Set<string>();
+  for (const f of enumerateFunnels(catalogue, offerOutcomes, target, estimator, targetValue, entry)) {
+    const key = f.line.join(">");
+    if (seenLines.has(key)) continue;
+    seenLines.add(key);
     out.push(f);
     if (out.length >= limit) break;
   }
   return out;
 }
 
-/** Cost per target outcome of a chain of leg estimates (in order from Start). */
-export function chainCostPerTarget(legs: readonly { costPerTrial: number; yieldRate: number }[]): number {
+function toRanked(legs: { edge: LegEdge; estimate: LegEstimate }[], cost: number, targetValue: number): RankedFunnel {
+  const per = legBreakdown(legs.map((l) => l.estimate));
+  return {
+    line: [legs[0]?.edge.from ?? START, ...legs.map((l) => l.edge.to)],
+    legs: legs.map((l, i) => ({ ...l.edge, estimate: l.estimate, leadsNeeded: per[i]!.leadsNeeded, costPerTarget: per[i]!.costPerTarget })),
+    costPerTarget: cost,
+    valuePerDollar: cost > 0 ? targetValue / cost : Number.POSITIVE_INFINITY,
+    label: legs.every((l) => l.estimate.label === "measured") ? "measured" : "expected",
+  };
+}
+
+/** Per leg: attempts per target outcome (leads needed) and dollars per target outcome. */
+export function legBreakdown(legs: readonly { costPerAttempt: number; yieldRate: number }[]): { leadsNeeded: number; costPerTarget: number }[] {
+  const out: { leadsNeeded: number; costPerTarget: number }[] = [];
+  let reach = 1;
+  for (let i = legs.length - 1; i >= 0; i--) {
+    reach *= legs[i]!.yieldRate;
+    const leadsNeeded = reach > 0 ? 1 / reach : Number.POSITIVE_INFINITY;
+    out.unshift({ leadsNeeded, costPerTarget: legs[i]!.costPerAttempt * leadsNeeded });
+  }
+  return out;
+}
+
+/** Cost per target outcome of a line of legs: T = sum_i c_i / (y_i ... y_n). */
+export function chainCostPerTarget(legs: readonly { costPerAttempt: number; yieldRate: number }[]): number {
   let reach = 1;
   let cost = 0;
   for (let i = legs.length - 1; i >= 0; i--) {
-    const leg = legs[i]!;
-    reach *= leg.yieldRate;
+    reach *= legs[i]!.yieldRate;
     if (!(reach > 0)) return Number.POSITIVE_INFINITY;
-    cost += leg.costPerTrial / reach;
+    cost += legs[i]!.costPerAttempt / reach;
   }
   return cost;
 }
 
-function toRanked(s: SearchState, targetValue: number): RankedFunnel {
-  const legs: FunnelLeg[] = [];
-  let reach = s.reach;
-  for (const l of s.legs) {
-    const leadsNeeded = 1 / reach;
-    legs.push({
-      playId: l.play.id,
-      pipeId: l.pipe.id,
-      from: l.pipe.from,
-      to: l.pipe.to,
-      estimate: l.estimate,
-      leadsNeeded,
-      costPerTarget: l.estimate.costPerTrial * leadsNeeded,
-    });
-    reach /= l.estimate.yieldRate;
+/** Cost forward: the cost of one occurrence at each step of a line, from its entry. */
+export function costForwardLine(legs: readonly { costPerAttempt: number; yieldRate: number }[]): number[] {
+  const out: number[] = [];
+  let c = 0;
+  for (const l of legs) {
+    c = (c + l.costPerAttempt) / l.yieldRate;
+    out.push(c);
   }
-  const steps = [START, ...s.legs.map((l) => l.pipe.to)];
-  return {
-    id: s.legs.map((l) => l.play.id).join(" > "),
-    steps,
-    legs,
-    costPerTarget: s.cost,
-    valuePerDollar: s.cost > 0 ? targetValue / s.cost : Number.POSITIVE_INFINITY,
-    label: s.legs.every((l) => l.estimate.label === "measured") ? "measured" : "expected",
-  };
+  return out;
+}
+
+/**
+ * Value backward along a line: V(target) = value, V(s) = max(0, y x V(next) - c).
+ * Returns the net value at each step, entry first, and the value per dollar of
+ * each leg (y x V(next) / c).
+ */
+export function valueBackwardLine(legs: readonly { costPerAttempt: number; yieldRate: number }[], value: number): { values: number[]; valuePerDollar: (number | null)[] } {
+  const values = new Array<number>(legs.length + 1).fill(0);
+  const vpd = new Array<number | null>(legs.length).fill(null);
+  values[legs.length] = value;
+  for (let i = legs.length - 1; i >= 0; i--) {
+    const l = legs[i]!;
+    const gross = l.yieldRate * values[i + 1]!;
+    values[i] = Math.max(0, gross - l.costPerAttempt);
+    vpd[i] = l.costPerAttempt > 0 ? gross / l.costPerAttempt : null;
+  }
+  return { values, valuePerDollar: vpd };
+}
+
+export interface FundableAction {
+  id: string;
+  valuePerDollar: number;
+  /** Most this action can absorb, dollars. */
+  capacity: number;
+}
+
+export interface BudgetAllocation {
+  funded: { id: string; amount: number; valuePerDollar: number }[];
+  unspent: number;
+  /** Value of one more dollar: the marginal funded action's value per dollar when the budget binds, else 1. */
+  shadowPrice: number;
+}
+
+/** Fund actions by value per dollar, only those returning more than they cost, until the budget. */
+export function allocateBudget(actions: readonly FundableAction[], budget: number): BudgetAllocation {
+  const sorted = [...actions].filter((a) => a.valuePerDollar > 1 && a.capacity > 0).sort((a, b) => b.valuePerDollar - a.valuePerDollar || (a.id < b.id ? -1 : 1));
+  let left = budget;
+  const funded: BudgetAllocation["funded"] = [];
+  let shadowPrice = 1;
+  for (const a of sorted) {
+    if (left <= 0) break;
+    const amount = Math.min(a.capacity, left);
+    funded.push({ id: a.id, amount, valuePerDollar: a.valuePerDollar });
+    left -= amount;
+    if (left <= 0) shadowPrice = a.valuePerDollar;
+  }
+  return { funded, unspent: Math.max(0, left), shadowPrice };
 }
 
 /** A small binary heap. */

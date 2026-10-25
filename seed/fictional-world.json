@@ -1,0 +1,2328 @@
+{
+ "name": "Four fictional B2B clients",
+ "description": "A data firm, a logistics firm, a dental lab and a design studio, on one fictional market.",
+ "seed": 11,
+ "catalogue": {
+  "leadTracks": [
+   {
+    "id": "crm_lifecycle",
+    "name": "CRM lifecycle",
+    "description": "Lead interested, then meeting booked, then meeting attended, then paid client."
+   },
+   {
+    "id": "website_visits",
+    "name": "Website visits",
+    "description": "Lead visited the brand's website."
+   }
+  ],
+  "outcomes": [
+   {
+    "id": "offer_described",
+    "label": "Offer described",
+    "plural": "Offers described",
+    "subject": "object",
+    "contentType": "text",
+    "icon": "tag",
+    "description": "What the client sells, in its own words."
+   },
+   {
+    "id": "audience_built",
+    "label": "ICP",
+    "plural": "ICPs",
+    "subject": "object",
+    "contentType": "audience",
+    "icon": "users-three",
+    "description": "Who to reach, as one plain sentence. A judge reads who fits it."
+   },
+   {
+    "id": "template_written",
+    "label": "Template",
+    "plural": "Templates",
+    "subject": "object",
+    "contentType": "text_with_variables",
+    "icon": "note-pencil",
+    "description": "A message model with variables a writer fills for each lead."
+   },
+   {
+    "id": "brand_context",
+    "label": "Brand context",
+    "plural": "Brand contexts",
+    "subject": "object",
+    "contentType": "text",
+    "icon": "book-open",
+    "description": "A summary of the brand, made when a script asks for one."
+   },
+   {
+    "id": "llm_completion",
+    "label": "LLM completion",
+    "plural": "LLM completions",
+    "subject": "object",
+    "contentType": "text",
+    "icon": "sparkle",
+    "description": "One answer from a language model, made when a script asks for one."
+   },
+   {
+    "id": "lead_found",
+    "label": "Lead found",
+    "plural": "Leads found",
+    "subject": "lead",
+    "icon": "user-focus",
+    "description": "A raw record of a person, before we know who it is."
+   },
+   {
+    "id": "lead_identified",
+    "label": "Lead identified",
+    "plural": "Leads identified",
+    "subject": "lead",
+    "icon": "fingerprint",
+    "description": "Who the person is, in the one id space every pipe shares."
+   },
+   {
+    "id": "email_found",
+    "label": "Verified email",
+    "plural": "Verified emails",
+    "subject": "lead",
+    "icon": "at"
+   },
+   {
+    "id": "company_researched",
+    "label": "Company researched",
+    "plural": "Companies researched",
+    "subject": "company",
+    "icon": "magnifying-glass"
+   },
+   {
+    "id": "message_written",
+    "label": "Message written",
+    "plural": "Messages written",
+    "subject": "lead",
+    "icon": "pencil-simple-line"
+   },
+   {
+    "id": "reply_received",
+    "label": "Reply received",
+    "plural": "Replies received",
+    "subject": "lead",
+    "icon": "envelope-open"
+   },
+   {
+    "id": "lead_interested",
+    "label": "Lead interested",
+    "plural": "Leads interested",
+    "subject": "lead",
+    "track": {
+     "track": "crm_lifecycle",
+     "rank": 1
+    },
+    "referencePipe": "crm_import",
+    "icon": "hand-heart"
+   },
+   {
+    "id": "meeting_booked",
+    "label": "Meeting booked",
+    "plural": "Meetings booked",
+    "subject": "lead",
+    "track": {
+     "track": "crm_lifecycle",
+     "rank": 2
+    },
+    "icon": "calendar-check"
+   },
+   {
+    "id": "meeting_attended",
+    "label": "Meeting attended",
+    "plural": "Meetings attended",
+    "subject": "lead",
+    "track": {
+     "track": "crm_lifecycle",
+     "rank": 3
+    },
+    "icon": "handshake"
+   },
+   {
+    "id": "paid_client",
+    "label": "Paid client",
+    "plural": "Paid clients",
+    "subject": "lead",
+    "track": {
+     "track": "crm_lifecycle",
+     "rank": 4
+    },
+    "icon": "currency-dollar"
+   },
+   {
+    "id": "lead_visited",
+    "label": "Lead visited",
+    "plural": "Leads visited",
+    "subject": "lead",
+    "track": {
+     "track": "website_visits",
+     "rank": 1
+    },
+    "icon": "cursor-click"
+   },
+   {
+    "id": "unsubscribed",
+    "label": "Unsubscribed",
+    "plural": "Unsubscribed",
+    "subject": "lead",
+    "icon": "prohibit",
+    "description": "An end state: the person asked us to stop."
+   },
+   {
+    "id": "follow_up_due",
+    "label": "Follow-up due",
+    "plural": "Follow-ups due",
+    "subject": "event",
+    "icon": "alarm",
+    "description": "A trigger event: a message went out 4 days ago and no reply came."
+   }
+  ],
+  "factories": [
+   {
+    "id": "ours",
+    "name": "Our factory",
+    "ours": true,
+    "description": "Runs we start and pay for."
+   },
+   {
+    "id": "client_team",
+    "name": "Your team",
+    "ours": false,
+    "description": "The client's own people."
+   },
+   {
+    "id": "client_crm",
+    "name": "Client CRM",
+    "ours": false,
+    "description": "The client's CRM, imported."
+   },
+   {
+    "id": "mailbox",
+    "name": "Mailbox",
+    "ours": false,
+    "description": "The sending mailboxes, read back."
+   },
+   {
+    "id": "organic",
+    "name": "Organic market",
+    "ours": false,
+    "description": "People who come by themselves."
+   }
+  ],
+  "pipes": [
+   {
+    "id": "offer_description",
+    "name": "Offer description",
+    "inputs": [],
+    "output": "offer_described",
+    "factory": "client_team",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "The client describes its offer."
+   },
+   {
+    "id": "icp_client",
+    "name": "ICP from the client",
+    "inputs": [
+     "offer_described"
+    ],
+    "output": "audience_built",
+    "factory": "client_team",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "The client says who to reach."
+   },
+   {
+    "id": "icp_finder",
+    "name": "ICP finder",
+    "inputs": [
+     "offer_described"
+    ],
+    "output": "audience_built",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "An AI proposes who to reach, and a finer ICP when the data shows one."
+   },
+   {
+    "id": "template_writing",
+    "name": "Template writing",
+    "inputs": [
+     "offer_described"
+    ],
+    "output": "template_written",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "Writes message models with variables."
+   },
+   {
+    "id": "brand_context",
+    "name": "Brand context",
+    "inputs": [
+     "offer_described"
+    ],
+    "output": "brand_context",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "triggerId": "on_demand",
+    "description": "Summarises the brand when a script asks."
+   },
+   {
+    "id": "llm",
+    "name": "LLM",
+    "inputs": [],
+    "output": "llm_completion",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "triggerId": "on_demand",
+    "description": "Answers a prompt when a script asks.",
+    "icon": "sparkle"
+   },
+   {
+    "id": "sourcing",
+    "name": "Lead sourcing",
+    "inputs": [
+     "audience_built"
+    ],
+    "output": "lead_found",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "Turns the market into raw records, one ICP at a time."
+   },
+   {
+    "id": "identity",
+    "name": "Identity",
+    "inputs": [
+     "lead_found"
+    ],
+    "output": "lead_identified",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "Resolves who a raw record is: dedup and merge into one id."
+   },
+   {
+    "id": "email_finding",
+    "name": "Email finding",
+    "inputs": [
+     "lead_identified"
+    ],
+    "output": "email_found",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    }
+   },
+   {
+    "id": "company_research",
+    "name": "Company research",
+    "inputs": [
+     "lead_identified"
+    ],
+    "output": "company_researched",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "Reads the lead's company. One research serves every lead of a company."
+   },
+   {
+    "id": "writer",
+    "name": "Message writer",
+    "inputs": [
+     "email_found",
+     "company_researched",
+     "template_written",
+     "brand_context",
+     "llm_completion"
+    ],
+    "output": "message_written",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    }
+   },
+   {
+    "id": "cold_email",
+    "name": "Cold email",
+    "inputs": [
+     "message_written"
+    ],
+    "output": "reply_received",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 12,
+     "outcomesRequired": 10,
+     "delayMeanDays": 2.5,
+     "horizonDays": 12
+    }
+   },
+   {
+    "id": "linkedin",
+    "name": "LinkedIn outreach",
+    "inputs": [
+     "lead_identified",
+     "template_written",
+     "llm_completion"
+    ],
+    "output": "reply_received",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 12,
+     "outcomesRequired": 10,
+     "delayMeanDays": 3,
+     "horizonDays": 12
+    }
+   },
+   {
+    "id": "reply_judging",
+    "name": "Reply judge",
+    "inputs": [
+     "reply_received",
+     "llm_completion"
+    ],
+    "output": "lead_interested",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "Reads a reply and says whether the lead is interested."
+   },
+   {
+    "id": "crm_import",
+    "name": "CRM import",
+    "inputs": [
+     "lead_identified"
+    ],
+    "output": "lead_interested",
+    "factory": "client_crm",
+    "maturity": {
+     "durationDays": 1,
+     "outcomesRequired": 10,
+     "delayMeanDays": 1,
+     "horizonDays": 1
+    },
+    "reports": true,
+    "description": "The client's CRM marks interested leads. The reference for this outcome."
+   },
+   {
+    "id": "opt_outs",
+    "name": "Opt-out reader",
+    "inputs": [
+     "reply_received"
+    ],
+    "output": "unsubscribed",
+    "factory": "mailbox",
+    "maturity": {
+     "durationDays": 1,
+     "outcomesRequired": 10,
+     "delayMeanDays": 1,
+     "horizonDays": 1
+    },
+    "reports": true,
+    "description": "The mailbox reports people asking to stop."
+   },
+   {
+    "id": "organic",
+    "name": "Organic inbound",
+    "inputs": [],
+    "output": "lead_interested",
+    "factory": "organic",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "reports": true,
+    "description": "People who reach out by themselves."
+   },
+   {
+    "id": "follow_up",
+    "name": "Follow-up email",
+    "inputs": [
+     "follow_up_due",
+     "message_written",
+     "llm_completion"
+    ],
+    "output": "reply_received",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 10,
+     "outcomesRequired": 10,
+     "delayMeanDays": 2,
+     "horizonDays": 10
+    },
+    "triggerId": "follow_up"
+   },
+   {
+    "id": "ads",
+    "name": "Ads",
+    "inputs": [
+     "audience_built"
+    ],
+    "output": "lead_visited",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 5,
+     "outcomesRequired": 10,
+     "delayMeanDays": 1,
+     "horizonDays": 5
+    }
+   },
+   {
+    "id": "website",
+    "name": "Website",
+    "inputs": [
+     "lead_visited"
+    ],
+    "output": "lead_interested",
+    "factory": "client_team",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "The client's website turns a visit into a signup."
+   },
+   {
+    "id": "ai_booking",
+    "name": "AI meeting booking",
+    "inputs": [
+     "lead_interested"
+    ],
+    "output": "meeting_booked",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 6,
+     "outcomesRequired": 10,
+     "delayMeanDays": 1,
+     "horizonDays": 6
+    }
+   },
+   {
+    "id": "team_booking",
+    "name": "Your team books",
+    "inputs": [
+     "lead_interested"
+    ],
+    "output": "meeting_booked",
+    "factory": "client_team",
+    "maturity": {
+     "durationDays": 8,
+     "outcomesRequired": 10,
+     "delayMeanDays": 2,
+     "horizonDays": 8
+    }
+   },
+   {
+    "id": "reminders",
+    "name": "Meeting reminders",
+    "inputs": [
+     "meeting_booked"
+    ],
+    "output": "meeting_attended",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 10,
+     "outcomesRequired": 10,
+     "delayMeanDays": 3,
+     "horizonDays": 10
+    }
+   },
+   {
+    "id": "closing",
+    "name": "Your team closing",
+    "inputs": [
+     "meeting_attended"
+    ],
+    "output": "paid_client",
+    "factory": "client_team",
+    "maturity": {
+     "durationDays": 21,
+     "outcomesRequired": 10,
+     "delayMeanDays": 7,
+     "horizonDays": 21
+    }
+   }
+  ],
+  "scripts": [
+   {
+    "id": "offer_client",
+    "pipeId": "offer_description",
+    "dynasty": "offer_client",
+    "version": 1,
+    "name": "Client describes the offer",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "icp_client_states",
+    "pipeId": "icp_client",
+    "dynasty": "icp_client_states",
+    "version": 1,
+    "name": "Client states it",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "icp_ai",
+    "pipeId": "icp_finder",
+    "dynasty": "icp_ai",
+    "version": 1,
+    "name": "AI ICP finder",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 200,
+    "status": "active"
+   },
+   {
+    "id": "tpl_copywriter",
+    "pipeId": "template_writing",
+    "dynasty": "tpl_copywriter",
+    "version": 1,
+    "name": "Copywriter",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 3000,
+    "status": "active"
+   },
+   {
+    "id": "tpl_ai",
+    "pipeId": "template_writing",
+    "dynasty": "tpl_ai",
+    "version": 1,
+    "name": "AI template writer",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 50,
+    "status": "active"
+   },
+   {
+    "id": "ctx_short",
+    "pipeId": "brand_context",
+    "dynasty": "ctx_short",
+    "version": 1,
+    "name": "Short summary",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 1,
+    "status": "active"
+   },
+   {
+    "id": "ctx_full",
+    "pipeId": "brand_context",
+    "dynasty": "ctx_full",
+    "version": 1,
+    "name": "Full summary",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 2,
+    "status": "active"
+   },
+   {
+    "id": "glm",
+    "pipeId": "llm",
+    "dynasty": "glm",
+    "version": 1,
+    "name": "GLM",
+    "kind": "ai",
+    "tactics": {
+     "tier": "fast"
+    },
+    "costCents": 1,
+    "status": "active",
+    "provider": {
+     "name": "Zhipu",
+     "color": "#3b5bdb"
+    },
+    "description": "A fast, low-cost model."
+   },
+   {
+    "id": "gemini_flash",
+    "pipeId": "llm",
+    "dynasty": "gemini_flash",
+    "version": 1,
+    "name": "Gemini Flash",
+    "kind": "ai",
+    "tactics": {
+     "tier": "fast"
+    },
+    "costCents": 2,
+    "status": "active",
+    "provider": {
+     "name": "Google",
+     "color": "#1a73e8"
+    }
+   },
+   {
+    "id": "gemini_pro",
+    "pipeId": "llm",
+    "dynasty": "gemini_pro",
+    "version": 1,
+    "name": "Gemini Pro",
+    "kind": "ai",
+    "tactics": {
+     "tier": "pro"
+    },
+    "costCents": 5,
+    "status": "active",
+    "provider": {
+     "name": "Google",
+     "color": "#1a73e8"
+    }
+   },
+   {
+    "id": "src_filters",
+    "pipeId": "sourcing",
+    "dynasty": "src_filters",
+    "version": 1,
+    "name": "Cold filters",
+    "kind": "rules",
+    "tactics": {
+     "recontact_days": 90
+    },
+    "costCents": 2,
+    "status": "active",
+    "provider": {
+     "name": "Apollo",
+     "color": "#f1c40f"
+    }
+   },
+   {
+    "id": "src_filters_30",
+    "pipeId": "sourcing",
+    "dynasty": "src_filters_30",
+    "version": 1,
+    "name": "Cold filters, fresh data",
+    "kind": "rules",
+    "tactics": {
+     "recontact_days": 30
+    },
+    "costCents": 10,
+    "status": "active",
+    "provider": {
+     "name": "Apollo",
+     "color": "#f1c40f"
+    }
+   },
+   {
+    "id": "src_signals",
+    "pipeId": "sourcing",
+    "dynasty": "src_signals",
+    "version": 1,
+    "name": "Buying signals",
+    "kind": "rules",
+    "tactics": {
+     "recontact_days": 90
+    },
+    "costCents": 25,
+    "status": "active"
+   },
+   {
+    "id": "id_email",
+    "pipeId": "identity",
+    "dynasty": "id_email",
+    "version": 1,
+    "name": "Email and domain match",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 1,
+    "status": "active"
+   },
+   {
+    "id": "id_merge",
+    "pipeId": "identity",
+    "dynasty": "id_merge",
+    "version": 1,
+    "name": "Name, company and title merge",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 3,
+    "status": "active"
+   },
+   {
+    "id": "ef_pattern",
+    "pipeId": "email_finding",
+    "dynasty": "ef_pattern",
+    "version": 1,
+    "name": "Pattern and verify",
+    "kind": "rules",
+    "tactics": {
+     "retry_days": 30
+    },
+    "costCents": 3,
+    "status": "active"
+   },
+   {
+    "id": "ef_lookup",
+    "pipeId": "email_finding",
+    "dynasty": "ef_lookup",
+    "version": 1,
+    "name": "Provider lookup",
+    "kind": "rules",
+    "tactics": {
+     "retry_days": 30
+    },
+    "costCents": 5,
+    "status": "active"
+   },
+   {
+    "id": "cr_site",
+    "pipeId": "company_research",
+    "dynasty": "cr_site",
+    "version": 1,
+    "name": "Website reader",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 2,
+    "status": "active"
+   },
+   {
+    "id": "cr_deep",
+    "pipeId": "company_research",
+    "dynasty": "cr_deep",
+    "version": 1,
+    "name": "Deep research",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 12,
+    "status": "active"
+   },
+   {
+    "id": "wr_short",
+    "pipeId": "writer",
+    "dynasty": "wr_short",
+    "version": 1,
+    "name": "Short writer",
+    "kind": "ai",
+    "tactics": {
+     "researches_first": false
+    },
+    "costCents": 2,
+    "status": "active"
+   },
+   {
+    "id": "wr_research",
+    "pipeId": "writer",
+    "dynasty": "wr_research",
+    "version": 1,
+    "name": "Research-led writer",
+    "kind": "ai",
+    "tactics": {
+     "researches_first": true
+    },
+    "costCents": 3,
+    "status": "active"
+   },
+   {
+    "id": "ce_now",
+    "pipeId": "cold_email",
+    "dynasty": "ce_now",
+    "version": 1,
+    "name": "Send now",
+    "kind": "rules",
+    "tactics": {
+     "send_window": "now"
+    },
+    "costCents": 4,
+    "status": "active"
+   },
+   {
+    "id": "ce_morning",
+    "pipeId": "cold_email",
+    "dynasty": "ce_morning",
+    "version": 1,
+    "name": "Send at local morning",
+    "kind": "rules",
+    "tactics": {
+     "send_window": "morning"
+    },
+    "costCents": 4,
+    "status": "active"
+   },
+   {
+    "id": "li_connect",
+    "pipeId": "linkedin",
+    "dynasty": "li_connect",
+    "version": 1,
+    "name": "Connect and message",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 40,
+    "status": "active"
+   },
+   {
+    "id": "rj_ai",
+    "pipeId": "reply_judging",
+    "dynasty": "rj_ai",
+    "version": 1,
+    "name": "AI reply judge",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 5,
+    "status": "active"
+   },
+   {
+    "id": "crm_sync",
+    "pipeId": "crm_import",
+    "dynasty": "crm_sync",
+    "version": 1,
+    "name": "CRM sync",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "mb_sync",
+    "pipeId": "opt_outs",
+    "dynasty": "mb_sync",
+    "version": 1,
+    "name": "Mailbox sync",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "org_inbound",
+    "pipeId": "organic",
+    "dynasty": "org_inbound",
+    "version": 1,
+    "name": "Inbound",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "fu_bump",
+    "pipeId": "follow_up",
+    "dynasty": "fu_bump",
+    "version": 1,
+    "name": "Short bump",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 2,
+    "status": "active"
+   },
+   {
+    "id": "fu_angle",
+    "pipeId": "follow_up",
+    "dynasty": "fu_angle",
+    "version": 1,
+    "name": "New angle",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 3,
+    "status": "active"
+   },
+   {
+    "id": "ad_search",
+    "pipeId": "ads",
+    "dynasty": "ad_search",
+    "version": 1,
+    "name": "Search ads",
+    "kind": "rules",
+    "tactics": {
+     "recontact_days": 365
+    },
+    "costCents": 25,
+    "status": "active"
+   },
+   {
+    "id": "ad_social",
+    "pipeId": "ads",
+    "dynasty": "ad_social",
+    "version": 1,
+    "name": "Social ads",
+    "kind": "rules",
+    "tactics": {
+     "recontact_days": 365
+    },
+    "costCents": 20,
+    "status": "active"
+   },
+   {
+    "id": "web_signup",
+    "pipeId": "website",
+    "dynasty": "web_signup",
+    "version": 1,
+    "name": "Signup page",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "bk_link",
+    "pipeId": "ai_booking",
+    "dynasty": "bk_link",
+    "version": 1,
+    "name": "Calendar link",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 10,
+    "status": "active"
+   },
+   {
+    "id": "bk_slots",
+    "pipeId": "ai_booking",
+    "dynasty": "bk_slots",
+    "version": 1,
+    "name": "Two-slot proposal",
+    "kind": "ai",
+    "tactics": {},
+    "costCents": 15,
+    "status": "active"
+   },
+   {
+    "id": "tb_rep",
+    "pipeId": "team_booking",
+    "dynasty": "tb_rep",
+    "version": 1,
+    "name": "Sales rep calls",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 400,
+    "status": "active"
+   },
+   {
+    "id": "rm_email",
+    "pipeId": "reminders",
+    "dynasty": "rm_email",
+    "version": 1,
+    "name": "Email reminder",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 5,
+    "status": "active"
+   },
+   {
+    "id": "rm_sms",
+    "pipeId": "reminders",
+    "dynasty": "rm_sms",
+    "version": 1,
+    "name": "Email and SMS",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 12,
+    "status": "active"
+   },
+   {
+    "id": "cl_call",
+    "pipeId": "closing",
+    "dynasty": "cl_call",
+    "version": 1,
+    "name": "Closing call",
+    "kind": "human",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   }
+  ],
+  "triggers": [
+   {
+    "id": "on_demand",
+    "label": "On demand",
+    "when": [],
+    "delayDays": 0,
+    "unless": [],
+    "reported": true,
+    "description": "A consuming script asks the engine for this input."
+   },
+   {
+    "id": "follow_up",
+    "label": "Follow-up due",
+    "when": [
+     "message_written"
+    ],
+    "delayDays": 4,
+    "unless": [
+     "reply_received"
+    ],
+    "event": "follow_up_due",
+    "description": "4 days after a message, unless a reply came."
+   }
+  ],
+  "tactics": [
+   {
+    "id": "country",
+    "name": "Country",
+    "type": {
+     "kind": "list",
+     "values": [
+      "United States",
+      "United Kingdom",
+      "France",
+      "Germany"
+     ]
+    },
+    "describes": [
+     "lead"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "seniority",
+    "name": "Seniority",
+    "type": {
+     "kind": "list",
+     "values": [
+      "founder",
+      "head",
+      "manager"
+     ]
+    },
+    "describes": [
+     "lead"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "revenue",
+    "name": "Revenue",
+    "type": {
+     "kind": "number",
+     "unit": "$M"
+    },
+    "describes": [
+     "company"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "headcount",
+    "name": "Headcount",
+    "type": {
+     "kind": "number",
+     "unit": "people"
+    },
+    "describes": [
+     "company"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "hiring",
+    "name": "Hiring",
+    "type": {
+     "kind": "yesno"
+    },
+    "describes": [
+     "company"
+    ],
+    "source": "judged"
+   },
+   {
+    "id": "recontact_days",
+    "name": "Days before recontact",
+    "type": {
+     "kind": "number",
+     "unit": "days"
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "retry_days",
+    "name": "Days before retry",
+    "type": {
+     "kind": "number",
+     "unit": "days"
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "tier",
+    "name": "Model tier",
+    "type": {
+     "kind": "list",
+     "values": [
+      "fast",
+      "pro"
+     ]
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "researches_first",
+    "name": "Researches the company first",
+    "type": {
+     "kind": "yesno"
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "judged"
+   },
+   {
+    "id": "send_window",
+    "name": "Send window",
+    "type": {
+     "kind": "list",
+     "values": [
+      "now",
+      "morning"
+     ]
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data"
+   },
+   {
+    "id": "sells_to",
+    "name": "Sells to",
+    "type": {
+     "kind": "list",
+     "values": [
+      "SMB",
+      "Mid-market"
+     ]
+    },
+    "describes": [
+     "brand"
+    ],
+    "source": "data"
+   }
+  ],
+  "strategies": [
+   {
+    "id": "identity#recontact-60",
+    "name": "Recontact after 60 days or more",
+    "pipeId": "identity",
+    "rules": [
+     {
+      "input": "lead_found",
+      "conditions": [
+       {
+        "op": "range",
+        "tactic": "recontact_days",
+        "min": 60
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "writer#pro-models",
+    "name": "Pro models only",
+    "pipeId": "writer",
+    "rules": [
+     {
+      "input": "llm_completion",
+      "conditions": [
+       {
+        "op": "equals",
+        "tactic": "tier",
+        "value": "pro"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "reply_judging#no-opt-outs",
+    "name": "Never write to people who asked to stop",
+    "pipeId": "reply_judging",
+    "rules": [],
+    "subject": [
+     {
+      "op": "notReached",
+      "outcomes": [
+       "unsubscribed"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "clients": [
+  {
+   "org": {
+    "id": "org-1",
+    "name": "Northwind Analytics"
+   },
+   "brand": {
+    "id": "brand-1",
+    "orgId": "org-1",
+    "name": "Northwind Analytics",
+    "tactics": {
+     "sells_to": "Mid-market"
+    }
+   },
+   "offer": {
+    "id": "offer-1",
+    "brandId": "brand-1",
+    "name": "Northwind Analytics main offer",
+    "outcomes": [
+     "lead_interested",
+     "meeting_booked",
+     "meeting_attended",
+     "paid_client",
+     "lead_visited"
+    ],
+    "lifetimeRevenue": 900,
+    "outcomeValues": {
+     "lead_interested": 40
+    }
+   },
+   "campaigns": [
+    {
+     "id": "campaign-1",
+     "brandId": "brand-1",
+     "offerId": "offer-1",
+     "name": "Paid clients from cold outreach",
+     "entry": {
+      "kind": "start"
+     },
+     "line": [
+      "lead_interested",
+      "meeting_booked",
+      "meeting_attended",
+      "paid_client"
+     ],
+     "dailyBudgetCents": 3000,
+     "status": "running",
+     "strategies": {
+      "reply_judging": "reply_judging#no-opt-outs"
+     }
+    },
+    {
+     "id": "campaign-1f",
+     "brandId": "brand-1",
+     "offerId": "offer-1",
+     "name": "Follow-ups",
+     "entry": {
+      "kind": "trigger",
+      "triggerId": "follow_up"
+     },
+     "line": [
+      "lead_interested"
+     ],
+     "dailyBudgetCents": 800,
+     "status": "running",
+     "strategies": {}
+    }
+   ],
+   "seeds": [
+    {
+     "outcome": "offer_described",
+     "scriptId": "offer_client",
+     "dynasty": "offer",
+     "version": 1,
+     "name": "Main offer",
+     "text": "Analytics dashboards your team reads every morning."
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_client_states",
+     "dynasty": "icp-client",
+     "version": 1,
+     "name": "The client's ICP",
+     "text": "Founders and heads of growing companies.",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "seniority",
+       "values": [
+        "founder",
+        "head"
+       ]
+      }
+     ]
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_ai",
+     "dynasty": "icp-revenue",
+     "version": 1,
+     "name": "Revenue of $5M or more",
+     "text": "Companies with a revenue of $5M or more.",
+     "conditions": [
+      {
+       "op": "range",
+       "tactic": "revenue",
+       "min": 5
+      }
+     ]
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-intro",
+     "version": 1,
+     "name": "Short intro",
+     "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
+     "truthEnd": 1.0
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_copywriter",
+     "dynasty": "tpl-story",
+     "version": 1,
+     "name": "Client story",
+     "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
+     "truthEnd": 1.6
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 1,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
+     "truthEnd": 0.9
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 2,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
+     "truthEnd": 1.15
+    }
+   ],
+   "connected": [
+    "crm_import"
+   ],
+   "truthMultiplier": 1.0,
+   "organicPerDay": 0.5
+  },
+  {
+   "org": {
+    "id": "org-2",
+    "name": "Bluepeak Logistics"
+   },
+   "brand": {
+    "id": "brand-2",
+    "orgId": "org-2",
+    "name": "Bluepeak Logistics",
+    "tactics": {
+     "sells_to": "Mid-market"
+    }
+   },
+   "offer": {
+    "id": "offer-2",
+    "brandId": "brand-2",
+    "name": "Bluepeak Logistics main offer",
+    "outcomes": [
+     "lead_interested",
+     "meeting_booked",
+     "meeting_attended",
+     "paid_client",
+     "lead_visited"
+    ],
+    "outcomeValues": {
+     "meeting_booked": 150
+    }
+   },
+   "campaigns": [
+    {
+     "id": "campaign-2",
+     "brandId": "brand-2",
+     "offerId": "offer-2",
+     "name": "Meetings from cold outreach",
+     "entry": {
+      "kind": "start"
+     },
+     "line": [
+      "lead_interested",
+      "meeting_booked"
+     ],
+     "dailyBudgetCents": 2500,
+     "status": "running",
+     "strategies": {
+      "identity": "identity#recontact-60"
+     }
+    }
+   ],
+   "seeds": [
+    {
+     "outcome": "offer_described",
+     "scriptId": "offer_client",
+     "dynasty": "offer",
+     "version": 1,
+     "name": "Main offer",
+     "text": "Freight booking that answers in one minute."
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_client_states",
+     "dynasty": "icp-client",
+     "version": 1,
+     "name": "The client's ICP",
+     "text": "Founders and heads of growing companies.",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "seniority",
+       "values": [
+        "founder",
+        "head"
+       ]
+      }
+     ]
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_ai",
+     "dynasty": "icp-revenue",
+     "version": 1,
+     "name": "Revenue of $5M or more",
+     "text": "Companies with a revenue of $5M or more.",
+     "conditions": [
+      {
+       "op": "range",
+       "tactic": "revenue",
+       "min": 5
+      }
+     ]
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-intro",
+     "version": 1,
+     "name": "Short intro",
+     "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
+     "truthEnd": 1.0
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_copywriter",
+     "dynasty": "tpl-story",
+     "version": 1,
+     "name": "Client story",
+     "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
+     "truthEnd": 1.6
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 1,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
+     "truthEnd": 0.9
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 2,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
+     "truthEnd": 1.15
+    }
+   ],
+   "connected": [
+    "crm_import"
+   ],
+   "truthMultiplier": 1.1,
+   "organicPerDay": 0.5
+  },
+  {
+   "org": {
+    "id": "org-3",
+    "name": "Lumen Dental Labs"
+   },
+   "brand": {
+    "id": "brand-3",
+    "orgId": "org-3",
+    "name": "Lumen Dental Labs",
+    "tactics": {
+     "sells_to": "SMB"
+    }
+   },
+   "offer": {
+    "id": "offer-3",
+    "brandId": "brand-3",
+    "name": "Lumen Dental Labs main offer",
+    "outcomes": [
+     "lead_interested",
+     "meeting_booked",
+     "meeting_attended",
+     "paid_client",
+     "lead_visited"
+    ],
+    "outcomeValues": {
+     "lead_interested": 40
+    }
+   },
+   "campaigns": [
+    {
+     "id": "campaign-3",
+     "brandId": "brand-3",
+     "offerId": "offer-3",
+     "name": "Paid clients, pro models for writing",
+     "entry": {
+      "kind": "start"
+     },
+     "line": [
+      "lead_interested",
+      "meeting_booked",
+      "meeting_attended",
+      "paid_client"
+     ],
+     "dailyBudgetCents": 2000,
+     "status": "running",
+     "strategies": {
+      "writer": "writer#pro-models"
+     }
+    },
+    {
+     "id": "campaign-3f",
+     "brandId": "brand-3",
+     "offerId": "offer-3",
+     "name": "Follow-ups",
+     "entry": {
+      "kind": "trigger",
+      "triggerId": "follow_up"
+     },
+     "line": [
+      "lead_interested"
+     ],
+     "dailyBudgetCents": 600,
+     "status": "running",
+     "strategies": {}
+    }
+   ],
+   "seeds": [
+    {
+     "outcome": "offer_described",
+     "scriptId": "offer_client",
+     "dynasty": "offer",
+     "version": 1,
+     "name": "Main offer",
+     "text": "Crowns and aligners delivered in 48 hours."
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_client_states",
+     "dynasty": "icp-client",
+     "version": 1,
+     "name": "The client's ICP",
+     "text": "Founders and heads of growing companies.",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "seniority",
+       "values": [
+        "founder",
+        "head"
+       ]
+      }
+     ]
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_ai",
+     "dynasty": "icp-revenue",
+     "version": 1,
+     "name": "Revenue of $5M or more",
+     "text": "Companies with a revenue of $5M or more.",
+     "conditions": [
+      {
+       "op": "range",
+       "tactic": "revenue",
+       "min": 5
+      }
+     ]
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-intro",
+     "version": 1,
+     "name": "Short intro",
+     "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
+     "truthEnd": 1.0
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_copywriter",
+     "dynasty": "tpl-story",
+     "version": 1,
+     "name": "Client story",
+     "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
+     "truthEnd": 1.6
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 1,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
+     "truthEnd": 0.9
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 2,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
+     "truthEnd": 1.15
+    }
+   ],
+   "connected": [],
+   "truthMultiplier": 0.9,
+   "organicPerDay": 0.5
+  },
+  {
+   "org": {
+    "id": "org-4",
+    "name": "Copperleaf Studio"
+   },
+   "brand": {
+    "id": "brand-4",
+    "orgId": "org-4",
+    "name": "Copperleaf Studio",
+    "tactics": {
+     "sells_to": "SMB"
+    }
+   },
+   "offer": {
+    "id": "offer-4",
+    "brandId": "brand-4",
+    "name": "Copperleaf Studio main offer",
+    "outcomes": [
+     "lead_interested",
+     "meeting_booked",
+     "meeting_attended",
+     "paid_client",
+     "lead_visited"
+    ],
+    "lifetimeRevenue": 1200
+   },
+   "campaigns": [
+    {
+     "id": "campaign-4",
+     "brandId": "brand-4",
+     "offerId": "offer-4",
+     "name": "Paid clients from ads",
+     "entry": {
+      "kind": "start"
+     },
+     "line": [
+      "lead_visited",
+      "lead_interested",
+      "meeting_booked",
+      "meeting_attended",
+      "paid_client"
+     ],
+     "dailyBudgetCents": 2500,
+     "status": "running",
+     "strategies": {}
+    }
+   ],
+   "seeds": [
+    {
+     "outcome": "offer_described",
+     "scriptId": "offer_client",
+     "dynasty": "offer",
+     "version": 1,
+     "name": "Main offer",
+     "text": "Brand identities for growing consumer brands."
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_client_states",
+     "dynasty": "icp-client",
+     "version": 1,
+     "name": "The client's ICP",
+     "text": "Founders and heads of growing companies.",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "seniority",
+       "values": [
+        "founder",
+        "head"
+       ]
+      }
+     ]
+    },
+    {
+     "outcome": "audience_built",
+     "scriptId": "icp_ai",
+     "dynasty": "icp-revenue",
+     "version": 1,
+     "name": "Revenue of $5M or more",
+     "text": "Companies with a revenue of $5M or more.",
+     "conditions": [
+      {
+       "op": "range",
+       "tactic": "revenue",
+       "min": 5
+      }
+     ]
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-intro",
+     "version": 1,
+     "name": "Short intro",
+     "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
+     "truthEnd": 1.0
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_copywriter",
+     "dynasty": "tpl-story",
+     "version": 1,
+     "name": "Client story",
+     "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
+     "truthEnd": 1.6
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 1,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
+     "truthEnd": 0.9
+    },
+    {
+     "outcome": "template_written",
+     "scriptId": "tpl_ai",
+     "dynasty": "tpl-question",
+     "version": 2,
+     "name": "Question first",
+     "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
+     "truthEnd": 1.15
+    }
+   ],
+   "connected": [],
+   "truthMultiplier": 1.0,
+   "organicPerDay": 0.5
+  }
+ ],
+ "attributes": [
+  {
+   "tactic": "country",
+   "level": "lead",
+   "values": [
+    "United States",
+    "United Kingdom",
+    "France",
+    "Germany"
+   ],
+   "weights": [
+    3,
+    2,
+    3,
+    2
+   ]
+  },
+  {
+   "tactic": "seniority",
+   "level": "lead",
+   "values": [
+    "founder",
+    "head",
+    "manager"
+   ],
+   "weights": [
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "tactic": "revenue",
+   "level": "company",
+   "range": [
+    0.5,
+    50
+   ]
+  },
+  {
+   "tactic": "headcount",
+   "level": "company",
+   "range": [
+    5,
+    2000
+   ]
+  },
+  {
+   "tactic": "hiring",
+   "level": "company",
+   "values": [
+    true,
+    false
+   ],
+   "weights": [
+    4,
+    6
+   ]
+  }
+ ],
+ "truth": {
+  "pipes": {
+   "offer_description": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "icp_client": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "icp_finder": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "template_writing": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "brand_context": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "llm": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "sourcing": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "identity": {
+    "base": 0.9,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "email_finding": {
+    "base": 0.85,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "company_research": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "writer": {
+    "base": 0.98,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "cold_email": {
+    "base": 0.14,
+    "delayMeanDays": 2.5,
+    "horizonDays": 12
+   },
+   "linkedin": {
+    "base": 0.12,
+    "delayMeanDays": 3,
+    "horizonDays": 12
+   },
+   "reply_judging": {
+    "base": 0.03,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "crm_import": {
+    "base": 1,
+    "delayMeanDays": 1,
+    "horizonDays": 1
+   },
+   "opt_outs": {
+    "base": 0.2,
+    "delayMeanDays": 1,
+    "horizonDays": 1
+   },
+   "organic": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "follow_up": {
+    "base": 0.07,
+    "delayMeanDays": 2,
+    "horizonDays": 10
+   },
+   "ads": {
+    "base": 0.2,
+    "delayMeanDays": 1,
+    "horizonDays": 5
+   },
+   "website": {
+    "base": 0.05,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "ai_booking": {
+    "base": 0.45,
+    "delayMeanDays": 1,
+    "horizonDays": 6,
+    "onFalseInput": 0.1
+   },
+   "team_booking": {
+    "base": 0.45,
+    "delayMeanDays": 2,
+    "horizonDays": 8,
+    "onFalseInput": 0.1
+   },
+   "reminders": {
+    "base": 0.65,
+    "delayMeanDays": 3,
+    "horizonDays": 10
+   },
+   "closing": {
+    "base": 0.15,
+    "delayMeanDays": 7,
+    "horizonDays": 21
+   }
+  },
+  "scripts": {
+   "offer_client": {
+    "costCents": 0
+   },
+   "icp_client_states": {
+    "costCents": 0
+   },
+   "icp_ai": {
+    "costCents": 200
+   },
+   "tpl_copywriter": {
+    "costCents": 3000
+   },
+   "tpl_ai": {
+    "costCents": 50
+   },
+   "ctx_short": {
+    "costCents": 1,
+    "end": 1.0
+   },
+   "ctx_full": {
+    "costCents": 2,
+    "end": 1.5
+   },
+   "glm": {
+    "costCents": 1
+   },
+   "gemini_flash": {
+    "costCents": 2
+   },
+   "gemini_pro": {
+    "costCents": 5
+   },
+   "src_filters": {
+    "costCents": 2,
+    "coverage": 0.8
+   },
+   "src_filters_30": {
+    "costCents": 10,
+    "coverage": 0.8
+   },
+   "src_signals": {
+    "costCents": 25,
+    "coverage": 0.05,
+    "end": 1.4
+   },
+   "id_email": {
+    "costCents": 1,
+    "step": 0.7,
+    "end": 0.7
+   },
+   "id_merge": {
+    "costCents": 3,
+    "step": 0.95,
+    "end": 1.0
+   },
+   "ef_pattern": {
+    "costCents": 3,
+    "step": 0.5
+   },
+   "ef_lookup": {
+    "costCents": 5,
+    "step": 1.0
+   },
+   "cr_site": {
+    "costCents": 2,
+    "end": 1.0
+   },
+   "cr_deep": {
+    "costCents": 12,
+    "end": 1.15
+   },
+   "wr_short": {
+    "costCents": 2,
+    "end": 1.0
+   },
+   "wr_research": {
+    "costCents": 3,
+    "end": 1.5
+   },
+   "ce_now": {
+    "costCents": 4,
+    "step": 1.0
+   },
+   "ce_morning": {
+    "costCents": 4,
+    "step": 1.45
+   },
+   "li_connect": {
+    "costCents": 40,
+    "step": 1.0
+   },
+   "rj_ai": {
+    "costCents": 5
+   },
+   "crm_sync": {
+    "costCents": 0,
+    "recall": 0.97
+   },
+   "mb_sync": {
+    "costCents": 0
+   },
+   "org_inbound": {
+    "costCents": 0
+   },
+   "fu_bump": {
+    "costCents": 2,
+    "step": 1.0
+   },
+   "fu_angle": {
+    "costCents": 3,
+    "step": 1.6
+   },
+   "ad_search": {
+    "costCents": 25,
+    "step": 1.0,
+    "coverage": 1
+   },
+   "ad_social": {
+    "costCents": 20,
+    "step": 0.55,
+    "coverage": 1
+   },
+   "web_signup": {
+    "costCents": 0
+   },
+   "bk_link": {
+    "costCents": 10,
+    "step": 1.0
+   },
+   "bk_slots": {
+    "costCents": 15,
+    "step": 1.5
+   },
+   "tb_rep": {
+    "costCents": 400,
+    "step": 1.0
+   },
+   "rm_email": {
+    "costCents": 5,
+    "step": 1.0
+   },
+   "rm_sms": {
+    "costCents": 12,
+    "step": 1.4
+   },
+   "cl_call": {
+    "costCents": 0
+   }
+  },
+  "at": {
+   "writer|llm_completion": {
+    "glm": {
+     "end": 1.3
+    },
+    "gemini_flash": {
+     "end": 1.0
+    },
+    "gemini_pro": {
+     "end": 1.4
+    }
+   },
+   "reply_judging|llm_completion": {
+    "glm": {
+     "recall": 0.35,
+     "falsePositive": 0.02
+    },
+    "gemini_flash": {
+     "recall": 0.45,
+     "falsePositive": 0.01
+    },
+    "gemini_pro": {
+     "recall": 0.97,
+     "falsePositive": 0.005
+    }
+   },
+   "follow_up|llm_completion": {
+    "glm": {
+     "end": 0.7
+    },
+    "gemini_flash": {
+     "end": 1.2
+    },
+    "gemini_pro": {
+     "end": 1.3
+    }
+   },
+   "linkedin|llm_completion": {
+    "glm": {
+     "end": 1.3
+    },
+    "gemini_flash": {
+     "end": 1.0
+    },
+    "gemini_pro": {
+     "end": 1.4
+    }
+   }
+  },
+  "segments": [
+   {
+    "when": [
+     {
+      "op": "range",
+      "tactic": "revenue",
+      "min": 5
+     }
+    ],
+    "mult": 2.2
+   },
+   {
+    "when": [
+     {
+      "op": "in",
+      "tactic": "country",
+      "values": [
+       "United States",
+       "United Kingdom"
+      ]
+     }
+    ],
+    "mult": 1.8
+   },
+   {
+    "when": [
+     {
+      "op": "in",
+      "tactic": "country",
+      "values": [
+       "Germany"
+      ]
+     }
+    ],
+    "mult": 0.5
+   },
+   {
+    "when": [
+     {
+      "op": "equals",
+      "tactic": "hiring",
+      "value": true
+     }
+    ],
+    "mult": 1.2
+   }
+  ],
+  "recontactMult": 0.4
+ },
+ "settings": {
+  "splitEveryDays": 10,
+  "splitMatureDays": 14,
+  "maxProposedIcps": 1,
+  "setupCentsPerBrand": 5000,
+  "minReliability": 0.8,
+  "marketSize": 30000,
+  "peoplePerCompany": 5,
+  "icpFinderScript": "icp_ai",
+  "clientGroupTactic": "sells_to"
+ },
+ "pins": [
+  {
+   "kind": "outcome",
+   "id": "template_written",
+   "label": "Templates",
+   "icon": "note-pencil"
+  },
+  {
+   "kind": "pipe",
+   "id": "llm",
+   "label": "LLMs",
+   "icon": "sparkle"
+  }
+ ]
+}
