@@ -120,4 +120,54 @@ describe("shadow mode on an observed world", () => {
     expect(v.points.length).toBeGreaterThan(0);
     expect(v.spendCents).toBe(0);
   });
+
+  test("a campaign whose last leg nobody completed still gets a priced funnel and a budget proposal, labelled expected", () => {
+    const snap = structuredClone(SNAP);
+    const c = snap.clients[0]!.campaigns.find((x) => x.line.length > 1)!;
+    const last = c.line.length - 1;
+    for (const l of snap.observations.legs) if (l.campaignId === c.id && l.legIndex === last) l.reached = 0;
+    // Nobody in the fleet completed that leg either: only its default prices it.
+    for (const l of snap.observations.legs) if (l.legIndex === last) l.reached = 0;
+    snap.legPriors = [{ from: c.line[last - 1]!, to: c.line[last]!, yieldRate: 0.2, source: "a stated benchmark" }];
+    const v = new ShadowSession(snap).compute().clients[0]!.campaigns.find((x) => x.campaignId === c.id)!;
+    const leg = v.legs[last]!;
+    expect(leg.priced.label).toBe("expected");
+    expect(leg.priced.yieldRate).toBeGreaterThan(0);
+    expect(v.budget.valuePerDollar).not.toBeNull();
+    expect(v.budget.label).toBe("expected");
+    expect(v.funnels.today).not.toBeNull();
+    expect(v.funnels.today!.label).toBe("expected");
+    expect(v.funnels.engine.length).toBeGreaterThan(0);
+  });
+
+  test("an option with 169 picks and no outcome reads well below the options that produce, and is still explored", () => {
+    const snap = structuredClone(SNAP);
+    snap.settings = { ...snap.settings, memoryHalfLifeDays: 0 };
+    const client = snap.clients[0]!;
+    const c = client.campaigns[0]!;
+    const audience = snap.catalogue.outcomes.find((o) => o.contentType === "audience")!.id;
+    const point = Object.keys(c.today.picks).find((p) => p.endsWith(`|${audience}`))!;
+    const cells = snap.observations.choices.filter((x) => x.point === point && x.brandId === client.brand.id);
+    const perDecision = cells.reduce((s, x) => s + x.costCents, 0) / Math.max(1, cells.reduce((s, x) => s + x.decisions, 0));
+    client.objects.push({ outcome: audience, dynasty: "icp-silent", version: 1, name: "An ICP that never produced", text: "Nobody here answers." });
+    client.objects.push({ outcome: audience, dynasty: "icp-new", version: 1, name: "An ICP never tried", text: "Not tried yet." });
+    const days = [...new Set(cells.map((x) => x.day))].sort((a, b) => a - b);
+    let left = 169;
+    for (const day of days) {
+      const n = Math.min(left, Math.ceil(169 / days.length));
+      if (n <= 0) break;
+      snap.observations.choices.push({ point, option: "icp-silent", brandId: client.brand.id, campaignId: c.id, day, decisions: n, successes: 0, failures: n, costCents: n * perDecision });
+      left -= n;
+    }
+    const v = new ShadowSession(snap).compute().clients[0]!.campaigns.find((x) => x.campaignId === c.id)!;
+    const p = v.points.find((x) => x.point === point)!;
+    const silent = p.options.find((o) => o.option === "icp-silent")!;
+    const producers = p.options.filter((o) => o.successes > 0);
+    expect(silent.decisions).toBeCloseTo(169, 0);
+    expect(producers.length).toBeGreaterThan(0);
+    for (const o of producers) expect(silent.valuePerDollar).toBeLessThan(o.valuePerDollar / 2);
+    expect(p.engine).not.toBe("icp-silent");
+    // Exploration still happens through sampling: a never-tried option keeps a share of picks.
+    expect(p.options.find((o) => o.option === "icp-new")!.pickShare).toBeGreaterThan(0);
+  });
 });

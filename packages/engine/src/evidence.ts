@@ -97,6 +97,23 @@ export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day
   };
 }
 
+/** A leg's raw counts from its cohorts: attempts, reached, censoring-corrected trials, cents spent. */
+export function legCountsOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number): { attempts: number; reached: number; successes: number; trials: number; costCents: number } {
+  const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)));
+  const cohorts: Cohort[] = [];
+  let attempts = 0;
+  let reached = 0;
+  let costCents = 0;
+  for (const [d, c] of cohort ?? []) {
+    cohorts.push({ ageDays: day - d, trials: cellTrials(c, delayCdfAt(delay, day - d)), successes: c.s });
+    attempts += c.t;
+    reached += c.s;
+    costCents += c.c;
+  }
+  const cc = censoredCounts(cohorts, { cdf: [1] });
+  return { attempts, reached, successes: cc.successes, trials: cc.trials, costCents };
+}
+
 export class EvidenceBook {
   /** Per (point, option, client): cells by decision day. */
   readonly cohorts: CellStore = new Map();

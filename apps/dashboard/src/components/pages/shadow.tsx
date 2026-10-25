@@ -308,6 +308,13 @@ function Line({ s, entry, legs }: { s: ShadowState; entry: string; legs: { to: s
   );
 }
 
+const BASIS_WORDS: Record<"client" | "group" | "fleet" | "default", string> = {
+  client: "its own attempts and the levels above",
+  group: "clients sharing its tactics, then the fleet and the leg's default",
+  fleet: "every client running this pipe, then the leg's default",
+  default: "the leg's default (a stated benchmark)",
+};
+
 function funnelFigures(f: RankedFunnel | null): string {
   if (!f) return "Not measured on every leg yet";
   if (!(f.costPerTarget > 0)) return `No spend of ours on its legs: every leg is another factory's (the client's team) · ${f.label}`;
@@ -324,7 +331,7 @@ function CampaignShadow({ s, v, brandId }: { s: ShadowState; v: CampaignView; br
           <h2 className="truncate text-[16px] font-medium">{v.name}</h2>
           <p className="k-fg3 text-[12px]">
             {outcomeName(s, v.line[v.line.length - 1]!)} worth {formatUsd(v.targetValue.amount)}
-            {v.targetValue.label === "expected" ? " (fleet median: the client stated none)" : ""} · {formatCents(v.spendCents)} spent
+            {v.targetValue.label === "expected" ? " (expected: the client stated none)" : ""} · {formatCents(v.spendCents)} spent
           </p>
         </div>
         <StateDot running={v.status === "running"} />
@@ -351,7 +358,13 @@ function CampaignShadow({ s, v, brandId }: { s: ShadowState; v: CampaignView; br
           )}
           <p className="mt-2 text-[12px] tabular-nums">
             Daily budget {formatCents(v.budget.engineCents)}
-            {v.budget.valuePerDollar !== null ? <span className={`ml-1 ${roiIsGood(v.budget.valuePerDollar) ? "text-[var(--run)]" : "k-fg3"}`}>· {formatRoi(v.budget.valuePerDollar)} per $1 expected</span> : <span className="k-fg3 ml-1">· kept: a leg is not measured yet</span>}
+            {v.budget.valuePerDollar !== null ? (
+              <span className={`ml-1 ${roiIsGood(v.budget.valuePerDollar) ? "text-[var(--run)]" : "k-fg3"}`}>
+                · {Number.isFinite(v.budget.valuePerDollar) ? `${formatRoi(v.budget.valuePerDollar)} per $1` : "no spend of ours"}, {v.budget.label}
+              </span>
+            ) : (
+              <span className="k-fg3 ml-1">· the campaign has no value to aim at</span>
+            )}
           </p>
         </div>
       </div>
@@ -376,10 +389,13 @@ function CampaignShadow({ s, v, brandId }: { s: ShadowState; v: CampaignView; br
               </td>
               <td className={TD}>{pipeName(s, l.todayPipe)}</td>
               <td className={TD}>{l.enginePipe === l.todayPipe ? <span className="k-fg3">Same</span> : pipeName(s, l.enginePipe)}</td>
-              <td className={TDN}>{formatRatePct(l.estimate.yieldRate)}</td>
+              <td className={TDN}>
+                {formatRatePct(l.priced.yieldRate)}
+                {l.priced.label === "expected" && <span className="k-chip ml-1.5" title={`Not completed by this client yet: pooled from ${BASIS_WORDS[l.priced.basis]}`}>Expected</span>}
+              </td>
               <td className={TDN}>{formatCount(l.estimate.reached)}</td>
               <td className={TDN}>{formatCount(l.estimate.attempts)}</td>
-              <td className={TDN}>{l.estimate.costPerAttempt !== null ? formatUsd(l.estimate.costPerAttempt) : <span className="k-fg4">—</span>}</td>
+              <td className={TDN}>{formatUsd(l.priced.costPerAttempt)}</td>
             </tr>
           ))}
         </tbody>

@@ -15,13 +15,13 @@
  */
 
 import { Catalogue, START, defaultStrategyId, isOnDemand, type CatalogueData, type SalesFunnel, type SalesPath, type OutcomeId, type Pipe, type Script, type Strategy } from "./catalogue";
-import { EvidenceBook, SEP, bumpCell, legEstimateOf, type CellStore, type LegEstimateRead } from "./evidence";
+import { EvidenceBook, SEP, bumpCell, legCountsOf, legEstimateOf, type CellStore, type LegEstimateRead } from "./evidence";
 import { allocateBudget, chainCostPerTarget, enumerateFunnels, valueBackwardLine, type LegEdge, type LegEstimate, type RankedFunnel } from "./funnels";
 import { buildLedger, type LedgerOccurrence, type LedgerReport, type LedgerRun } from "./ledger";
 import { prioritize } from "./prioritizer";
 import { createRng } from "./rng";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
-import { betaMean, betaVariance } from "./stats";
+import { betaMean, betaVariance, pooledPosterior } from "./stats";
 import { describeCondition, meetsAll, type Condition, type TacticValue } from "./tactics";
 import { legConsumer, playPoint, pointKey } from "./simulator";
 import type { Brand, Campaign, Offer, Org } from "./world";
@@ -170,7 +170,29 @@ export interface ShadowObservations {
   leads?: LeadCell[];
 }
 
+/**
+ * What a leg is expected to yield (and cost per attempt, when known) before anyone completed it:
+ * the root of its pooling (an industry benchmark, a stated default). Never a production figure.
+ */
+export interface LegPrior {
+  from: OutcomeId;
+  to: OutcomeId;
+  yieldRate: number;
+  costPerAttempt?: number;
+  source: string;
+}
+
+/** A leg priced for a decision: measured when the client's own cohort carries it, else expected (pooled). */
+export interface PricedLeg extends LegEstimate {
+  /** The narrowest level holding evidence: the client, clients sharing its tactics, the fleet, or the leg's default. */
+  basis: "client" | "group" | "fleet" | "default";
+  attempts: number;
+  reached: number;
+}
+
 export interface ShadowSettings {
+  /** Trials a level above is worth when it pulls the leg's rate of the level below (default 20). */
+  legPoolingStrength?: number;
   /** Half-life of evidence, days (0 = never fade). */
   memoryHalfLifeDays?: number;
   /** Brand tactic grouping clients for pooling. */
@@ -198,6 +220,8 @@ export interface ShadowSnapshot {
   catalogue: CatalogueData;
   clients: ShadowClient[];
   observations: ShadowObservations;
+  /** Each leg's default, the root of its pooling. */
+  legPriors?: LegPrior[];
   settings?: ShadowSettings;
 }
 
@@ -256,6 +280,8 @@ export interface PointView {
 export interface LegView {
   from: OutcomeId;
   to: OutcomeId;
+  /** The leg as the engine prices it: measured, or expected when the client has not completed it yet. */
+  priced: PricedLeg;
   todayPipe: string | null;
   /** Every pipe the leg runs through today, in the order they run (the inputs' providers, then the play). */
   pipes: string[];
@@ -266,8 +292,10 @@ export interface LegView {
 export interface BudgetView {
   todayCents: number;
   engineCents: number;
-  /** Expected value per dollar of the campaign's line (null when a leg is not measured). */
+  /** Value per dollar of the campaign's line, on its priced legs (Infinity when none of its legs costs us anything). */
   valuePerDollar: number | null;
+  /** Measured when every leg is, else expected. */
+  label: "measured" | "expected";
 }
 
 export interface CampaignView {
@@ -337,6 +365,7 @@ export interface ShadowReport {
 // ---------------------------------------------------------------------------
 
 const DEFAULTS: Required<ShadowSettings> = {
+  legPoolingStrength: 20,
   memoryHalfLifeDays: 0,
   clientGroupTactic: "",
   maxBudgetMultiple: 2,
@@ -592,12 +621,39 @@ export class ShadowSession {
     return offer?.outcomeValues?.[target] ?? (this.isTop(target) ? offer?.lifetimeRevenue : undefined);
   }
 
-  /** The value of one target outcome of a campaign: stated by its offer, else the fleet median of stated ones. */
+  private medianLtr(): number | undefined {
+    const all = this.snapshot.clients
+      .flatMap((c) => c.offers)
+      .map((o) => o.lifetimeRevenue)
+      .filter((x): x is number => x !== undefined && x > 0)
+      .sort((x, y) => x - y);
+    if (all.length === 0) return undefined;
+    return all.length % 2 ? all[(all.length - 1) / 2]! : (all[all.length / 2 - 1]! + all[all.length / 2]!) / 2;
+  }
+
+  /**
+   * The value of one target outcome of a campaign: stated by its offer; else, for a lead state below
+   * the top of its track, what it is worth on the way to the top (the offer's lifetime revenue, else
+   * the fleet median, times the expected yield of each step up the track); else the fleet median of
+   * stated values. Anything not stated is labelled expected.
+   */
   targetValue(campaign: Campaign): { amount: number; label: "stated" | "expected" } {
     const target = campaign.line[campaign.line.length - 1]!;
     const offer = this.clientOf(campaign.id)?.offers.find((o) => o.id === campaign.offerId);
     const stated = this.statedValue(offer, target);
     if (stated !== undefined && stated > 0) return { amount: stated, label: "stated" };
+    const track = this.catalogue.outcome(target)?.track;
+    const ltr = (offer?.lifetimeRevenue && offer.lifetimeRevenue > 0 ? offer.lifetimeRevenue : undefined) ?? this.medianLtr();
+    if (track && ltr) {
+      const up = this.catalogue.outcomes.filter((o) => o.track?.track === track.track && o.track.rank > track.rank && !o.retired).sort((a, b) => a.track!.rank - b.track!.rank);
+      let p = 1;
+      let from = target;
+      for (const o of up) {
+        p *= this.pricedLeg(from, o.id, null, campaign as ShadowCampaign).yieldRate;
+        from = o.id;
+      }
+      if (up.length > 0 && p > 0) return { amount: ltr * p, label: "expected" };
+    }
     const all = this.snapshot.clients
       .flatMap((c) => c.offers)
       .map((o) => this.statedValue(o, target))
@@ -607,7 +663,7 @@ export class ShadowSession {
     return { amount: mid, label: "expected" };
   }
 
-  /** Each leg of a campaign as decisions read it: censoring-corrected yield, measured cost per attempt. */
+  /** Each leg of a campaign as decisions read it: raw counts, censoring-corrected yield, measured cost per attempt. */
   legEstimates(campaign: ShadowCampaign): (LegEstimateRead & { from: OutcomeId; to: OutcomeId })[] {
     return campaign.line.map((to, k) => {
       const from = this.legFrom(campaign, k);
@@ -617,23 +673,24 @@ export class ShadowSession {
     });
   }
 
-  /** What a leg costs and yields through one pipe across the fleet (every campaign playing it there). */
-  fleetLegEstimate(from: OutcomeId, to: OutcomeId, pipeId: string): LegEstimate | null {
-    const key = `${from}${SEP}${to}${SEP}${pipeId}`;
-    if (this.fleetLegCache.has(key)) return this.fleetLegCache.get(key)!;
-    const v = this.computeFleetLegEstimate(from, to, pipeId);
-    this.fleetLegCache.set(key, v);
-    return v;
+  /** Each leg of a campaign priced through today's pipe (see `pricedLeg`). */
+  pricedLegs(campaign: ShadowCampaign): (PricedLeg & { from: OutcomeId; to: OutcomeId })[] {
+    return campaign.line.map((to, k) => {
+      const from = this.legFrom(campaign, k);
+      return { from, to, ...this.pricedLeg(from, to, campaign.today.legPipes[k] ?? null, campaign) };
+    });
   }
 
-  private readonly fleetLegCache = new Map<string, LegEstimate | null>();
+  /** What a leg costs and yields through one pipe across the fleet: always priced, measured or expected. */
+  fleetLegEstimate(from: OutcomeId, to: OutcomeId, pipeId: string): PricedLeg {
+    return this.pricedLeg(from, to, pipeId, null);
+  }
 
-  private computeFleetLegEstimate(from: OutcomeId, to: OutcomeId, pipeId: string): LegEstimate | null {
+  private mergedLegCells(pred: (c: ShadowCampaign, k: number) => boolean): Map<number, { t: number; s: number; f: number; c: number }> {
     const merged = new Map<number, { t: number; s: number; f: number; c: number }>();
-    let delay = this.catalogue.pipe(pipeId)?.maturity.delayMeanDays ?? 0;
     for (const c of this.campaigns()) {
-      c.line.forEach((t, k) => {
-        if (t !== to || this.legFrom(c, k) !== from || c.today.legPipes[k] !== pipeId) return;
+      c.line.forEach((_, k) => {
+        if (!pred(c, k)) return;
         for (const [d, cell] of this.legCohorts.get(`${c.id}${SEP}${k}`) ?? []) {
           const m = merged.get(d) ?? { t: 0, s: 0, f: 0, c: 0 };
           m.t += cell.t;
@@ -644,11 +701,61 @@ export class ShadowSession {
         }
       });
     }
-    if (merged.size === 0) return null;
-    delay = Math.max(delay, 0);
-    const e = legEstimateOf(merged, this.day, delay);
-    if (e.yieldRate === null || e.costPerAttempt === null || e.reached === 0) return null;
-    return { costPerAttempt: e.costPerAttempt, yieldRate: e.yieldRate, label: e.label };
+    return merged;
+  }
+
+  private readonly pricedCache = new Map<string, PricedLeg>();
+
+  /**
+   * A leg priced for a decision, never left unpriced. Its yield is pooled level by level, each
+   * level the prior of the next: the leg's default (its stated benchmark, else every pipe of the
+   * fleet on the same leg) -> the fleet through this pipe -> clients sharing the client's tactics
+   * -> the client. Its cost per attempt: the client's own pulled toward the fleet's, else the
+   * fleet's, else the default's, else what attempts of the same leg cost elsewhere. Measured when
+   * the client's own cohort carries it (20 attempts, one reached), else expected.
+   */
+  pricedLeg(from: OutcomeId, to: OutcomeId, pipeId: string | null, campaign: ShadowCampaign | null): PricedLeg {
+    const key = `${from}${SEP}${to}${SEP}${pipeId ?? ""}${SEP}${campaign?.id ?? ""}`;
+    const hit = this.pricedCache.get(key);
+    if (hit) return hit;
+    const S = this.settings.legPoolingStrength;
+    const delay = (pipeId ? this.catalogue.pipe(pipeId)?.maturity.delayMeanDays : undefined) ?? 0;
+    const sameLeg = (c: ShadowCampaign, k: number) => c.line[k] === to && this.legFrom(c, k) === from;
+    const samePipe = (c: ShadowCampaign, k: number) => sameLeg(c, k) && (!pipeId || c.today.legPipes[k] === pipeId);
+    const counts = (pred: (c: ShadowCampaign, k: number) => boolean) => legCountsOf(this.mergedLegCells(pred), this.day, delay);
+    // The root: the leg's default, else every pipe on the leg, else a small rate.
+    const roots = this.entryRoots(from);
+    const prior = (this.snapshot.legPriors ?? []).find((p) => p.to === to && roots.includes(p.from));
+    const anyPipe = counts(sameLeg);
+    const rootRate = prior?.yieldRate ?? (anyPipe.trials > 0 ? (anyPipe.successes + 0.5) / (anyPipe.trials + 1) : 0.01);
+    const fleet = counts(samePipe);
+    const fleetPost = pooledPosterior(fleet, { rate: rootRate, strength: S });
+    let post = fleetPost;
+    let basis: PricedLeg["basis"] = fleet.trials > 0 ? "fleet" : "default";
+    let own = { attempts: 0, reached: 0, successes: 0, trials: 0, costCents: 0 };
+    if (campaign) {
+      const g = this.groupOf(campaign.brandId);
+      const group = this.settings.clientGroupTactic ? counts((c, k) => samePipe(c, k) && this.groupOf(c.brandId) === g) : fleet;
+      const groupPost = this.settings.clientGroupTactic ? pooledPosterior(group, { rate: betaMean(fleetPost), strength: S }) : fleetPost;
+      if (this.settings.clientGroupTactic && group.trials > 0) basis = "group";
+      own = counts((c, k) => c.id === campaign.id && samePipe(c, k));
+      post = pooledPosterior(own, { rate: betaMean(groupPost), strength: S });
+      if (own.trials > 0) basis = "client";
+    }
+    const fleetCpa = fleet.attempts > 0 ? fleet.costCents / 100 / fleet.attempts : null;
+    let cost: number;
+    if (own.attempts > 0) cost = fleetCpa !== null ? (own.costCents / 100 + 5 * fleetCpa) / (own.attempts + 5) : own.costCents / 100 / own.attempts;
+    else if (fleetCpa !== null) cost = fleetCpa;
+    else if (prior?.costPerAttempt !== undefined) cost = prior.costPerAttempt;
+    else {
+      const pipe = pipeId ? this.catalogue.pipe(pipeId) : undefined;
+      const ours = pipe ? this.catalogue.isOurs(pipe) : true;
+      const elsewhere = counts((c, k) => c.line[k] === to);
+      cost = ours && elsewhere.attempts > 0 ? elsewhere.costCents / 100 / elsewhere.attempts : 0;
+    }
+    const v: PricedLeg = { costPerAttempt: cost, yieldRate: betaMean(post), label: own.attempts >= 20 && own.reached > 0 ? "measured" : "expected", basis, attempts: own.attempts, reached: own.reached };
+    this.pricedCache.set(key, v);
+    return v;
   }
 
   /** The 3 cheapest distinct lines to a target (a bounded search: a real catalogue has many legs). */
@@ -668,8 +775,8 @@ export class ShadowSession {
   /** Value of one occurrence at the end of a campaign's leg (backward from its target). */
   legValue(campaign: ShadowCampaign, legIndex: number): number {
     const target = this.targetValue(campaign).amount;
-    const legs = this.legEstimates(campaign);
-    const { values } = valueBackwardLine(legs.map((l) => ({ costPerAttempt: l.costPerAttempt ?? 0, yieldRate: l.yieldRate ?? 0.5 })), target);
+    const legs = this.pricedLegs(campaign);
+    const { values } = valueBackwardLine(legs, target);
     return Math.max(values[legIndex + 1] ?? target, target * 0.01);
   }
 
@@ -768,9 +875,11 @@ export class ShadowSession {
       points.push({ point: p.point, kind: p.kind, consumer: p.consumer, input: p.input, legIndex: p.legIndex, today: campaign.today.picks[p.point] ?? (p.kind === "play" ? campaign.today.legPipes[p.legIndex] ?? null : null), engine, options: views });
     }
     const runs = this.legPipesOf(campaign);
+    const priced = this.pricedLegs(campaign);
     const legs: LegView[] = estimates.map((e, k) => ({
       from: e.from,
       to: e.to,
+      priced: priced[k]!,
       todayPipe: campaign.today.legPipes[k] ?? null,
       pipes: runs[k] ?? [],
       enginePipe: points.find((p) => p.kind === "play" && p.legIndex === k)?.engine ?? campaign.today.legPipes[k] ?? null,
@@ -780,12 +889,8 @@ export class ShadowSession {
     const target = campaign.line[campaign.line.length - 1]!;
     const entry = this.entryOf(campaign);
     const offerOutcomes = this.clientOf(campaign.id)?.offers.find((o) => o.id === campaign.offerId)?.outcomes ?? campaign.line;
-    let unmeasured = 0;
-    const estimator = (e: LegEdge): LegEstimate | null => {
-      const est = this.fleetLegEstimate(e.from, e.to, e.pipeId);
-      if (!est) unmeasured++;
-      return est;
-    };
+    // Every edge is priced for this client: measured where its own cohort carries it, else expected.
+    const estimator = (e: LegEdge): LegEstimate => this.pricedLeg(e.from, e.to, e.pipeId, campaign);
     const outcomes = [...new Set([...offerOutcomes, ...campaign.line])];
     const engine =
       tv.amount > 0
@@ -794,13 +899,9 @@ export class ShadowSession {
             .sort((a, b) => a.costPerTarget - b.costPerTarget || a.line.join(">").localeCompare(b.line.join(">")))
             .slice(0, 3)
         : [];
-    const todayLegs = campaign.line.map((to, k) => {
-      const pipe = campaign.today.legPipes[k];
-      return pipe ? this.fleetLegEstimate(this.legFrom(campaign, k), to, pipe) : null;
-    });
     let today: RankedFunnel | null = null;
-    if (todayLegs.every((l) => l)) {
-      const chain = todayLegs as LegEstimate[];
+    {
+      const chain: LegEstimate[] = priced;
       const cost = chainCostPerTarget(chain);
       if (Number.isFinite(cost)) {
         const per = chain.map((l, i) => ({ ...l, i }));
@@ -812,7 +913,7 @@ export class ShadowSession {
         }
         today = {
           line: [entry, ...campaign.line],
-          legs: chain.map((l, k) => ({ from: this.legFrom(campaign, k), to: campaign.line[k]!, pipeId: campaign.today.legPipes[k]!, estimate: l, leadsNeeded: needs[k]!, costPerTarget: l.costPerAttempt * needs[k]! })),
+          legs: chain.map((l, k) => ({ from: this.legFrom(campaign, k), to: campaign.line[k]!, pipeId: campaign.today.legPipes[k] ?? "", estimate: l, leadsNeeded: needs[k]!, costPerTarget: l.costPerAttempt * needs[k]! })),
           costPerTarget: cost,
           valuePerDollar: cost > 0 ? tv.amount / cost : Number.POSITIVE_INFINITY,
           label: chain.every((l) => l.label === "measured") ? "measured" : "expected",
@@ -820,11 +921,10 @@ export class ShadowSession {
       }
     }
     const spendCents = this.snapshot.observations.runs.filter((r) => r.campaignId === campaign.id).reduce((s, r) => s + r.spendCents, 0);
-    let vpd: number | null = null;
-    if (estimates.every((l) => l.yieldRate !== null && l.costPerAttempt !== null && l.reached > 0)) {
-      const t = chainCostPerTarget(estimates.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! })));
-      if (Number.isFinite(t) && t > 0) vpd = tv.amount / t;
-    }
+    // The campaign's line on its priced legs: always a figure, expected until every leg is measured.
+    const lineCost = chainCostPerTarget(priced);
+    const vpd: number | null = tv.amount > 0 && Number.isFinite(lineCost) ? (lineCost > 0 ? tv.amount / lineCost : Number.POSITIVE_INFINITY) : null;
+    const unmeasured = priced.filter((l) => l.label === "expected").length;
     const named = engine.map((f) => {
       const n = this.catalogue.peekSalesFunnel(f.line[0] ?? entry, f.line.slice(1), f.legs.map((l) => l.pipeId));
       return { ...f, name: n.name, id: n.id };
@@ -842,7 +942,7 @@ export class ShadowSession {
       salesPath: this.catalogue.peekSalesPath(entry, campaign.line),
       salesFunnel: campaign.today.legPipes.every((p) => p) ? this.catalogue.peekSalesFunnel(entry, campaign.line, campaign.today.legPipes as string[]) : null,
       funnels: { today, engine: named, unmeasuredLegs: unmeasured },
-      budget: { todayCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, engineCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, valuePerDollar: vpd },
+      budget: { todayCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, engineCents: campaign.status === "running" ? campaign.dailyBudgetCents : 0, valuePerDollar: vpd, label: priced.every((l) => l.label === "measured") ? "measured" : "expected" },
       spendCents,
     };
   }
@@ -894,7 +994,7 @@ export class ShadowSession {
         from: String(v.budget.todayCents),
         to: String(v.budget.engineCents),
         label: kind === "pause_campaign" ? "Fund nothing more on this campaign" : `Daily budget from ${money(v.budget.todayCents)} to ${money(v.budget.engineCents)}`,
-        reason: v.budget.valuePerDollar !== null ? `${fmt(v.budget.valuePerDollar)} expected per dollar on its measured legs.` : "Not measured.",
+        reason: v.budget.valuePerDollar !== null ? `${fmt(v.budget.valuePerDollar)} per dollar on its legs, ${v.budget.label}${v.budget.label === "expected" ? " (a leg not completed yet is priced on what clients sharing its tactics, then the fleet, then the leg's default yield)" : ""}.` : "The campaign states no value for its target.",
       });
     }
     const best = v.funnels.engine[0];
