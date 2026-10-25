@@ -8,7 +8,7 @@
 
 import { START, isOnDemand, type OutcomeId, type Pipe, type Script } from "./catalogue";
 import { legConsumer, playPoint, pointKey, type SimulationSession } from "./simulator";
-import { meetsAll } from "./tactics";
+import { meetsAll, type Condition } from "./tactics";
 import { marketSample, segmentMultiplier, type Campaign } from "./world";
 
 type Step =
@@ -26,6 +26,8 @@ interface Ctx {
   ends: number;
   segment: number;
   seenPoints: Set<string>;
+  produced: Set<OutcomeId>;
+  audience: Condition[];
 }
 
 function headScript(s: SimulationSession, dynasty: string): Script | undefined {
@@ -38,7 +40,8 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, scripts: Script[], 
   const options = [...new Set(scripts.map((x) => x.dynasty))];
   if (!c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, options });
   c.seenPoints.add(point);
-  const dyn = c.assign.get(point) ?? options[0]!;
+  const assigned = c.assign.get(point);
+  const dyn = assigned && options.includes(assigned) ? assigned : options[0]!;
   const script = headScript(c.session, dyn);
   if (!script) return false;
   const pipe = c.session.catalogue.pipe(script.pipeId)!;
@@ -61,7 +64,10 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, scripts: Script[], 
     }
   }
   const pt = c.session.world.truth.pipes[pipe.id] ?? { base: 1, delayMeanDays: 0, horizonDays: 0 };
-  c.steps.push({ kind: "run", point, yieldRate: Math.min(1, pt.base * (truth.step ?? 1)), costCents: truth.costCents, end: 1, recall, falsePositive: fp, final, segment: c.segment });
+  // A script creating subjects finds someone only while its reserve lasts.
+  const pick = c.session.catalogue.createsSubjects(pipe) ? c.session.pickChance(script, c.brandId, c.audience) : 1;
+  c.produced.add(o);
+  c.steps.push({ kind: "run", point, yieldRate: Math.min(1, pt.base * (truth.step ?? 1) * pick), costCents: truth.costCents, end: 1, recall, falsePositive: fp, final, segment: c.segment });
   return true;
 }
 
@@ -69,10 +75,14 @@ function planObtain(c: Ctx, consumer: Pipe, i: OutcomeId): boolean {
   const s = c.session;
   const out = s.catalogue.outcome(i);
   if (!out) return false;
-  if (out.subject === "event") return true;
+  if (out.subject === "event" || i === c.from) return true;
   const providers = s.catalogue.providersOf(i).filter((p) => !p.reports);
   if (out.subject === "lead" || out.subject === "company") {
+    // Produced earlier in this leg for the same subject: reused, no choice.
+    if (c.produced.has(i)) return true;
     const rooted = providers.filter((p) => isOnDemand(p) || s.catalogue.rootsOf(p).has(c.from) || (c.from === START && s.catalogue.rootsOf(p).has(START)));
+    // Nothing on this leg can make it: the subject brings it from before (a message written earlier).
+    if (rooted.length === 0) return true;
     return planProduce(c, consumer.id, i, s.allowedScripts(c.campaign, consumer, i, rooted), false);
   }
   const onDemand = providers.filter((p) => isOnDemand(p));
@@ -82,11 +92,15 @@ function planObtain(c: Ctx, consumer: Pipe, i: OutcomeId): boolean {
   if (options.length === 0) return false;
   if (!c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, options });
   c.seenPoints.add(point);
-  const dyn = c.assign.get(point) ?? options[0]!;
+  const assigned = c.assign.get(point);
+  const dyn = assigned && options.includes(assigned) ? assigned : options[0]!;
   const head = s.objectHead(c.brandId, i, dyn);
   if (head) {
     c.ends *= s.objectTruthEnd(head);
-    if (head.conditions && c.from === START) c.segment = segmentAverage(s, c.brandId, head.conditions);
+    if (head.conditions) {
+      c.audience = head.conditions;
+      if (c.from === START) c.segment = segmentAverage(s, c.brandId, head.conditions);
+    }
   }
   return true;
 }
@@ -109,7 +123,7 @@ export function segmentAverage(s: SimulationSession, brandId: string, conditions
 function plan(s: SimulationSession, campaign: Campaign, legIndex: number, assign: Map<string, string>): Ctx | null {
   const from = legIndex === 0 ? (campaign.entry.kind === "start" ? START : s.catalogue.trigger(campaign.entry.triggerId)?.event ?? START) : campaign.line[legIndex - 1]!;
   const to = campaign.line[legIndex]!;
-  const c: Ctx = { session: s, campaign, brandId: campaign.brandId, from, to, assign, steps: [], ends: 1, segment: 1, seenPoints: new Set() };
+  const c: Ctx = { session: s, campaign, brandId: campaign.brandId, from, to, assign, steps: [], ends: 1, segment: 1, seenPoints: new Set(), produced: new Set(), audience: [] };
   const plays = s.playsFor(campaign, from, to);
   if (plays.length === 0) return null;
   const pp = playPoint(from, to);
@@ -207,4 +221,52 @@ export function hiddenBest(s: SimulationSession, campaign: Campaign): Map<string
     }
   }
   return out;
+}
+
+export interface PointConvergence {
+  point: string;
+  /** Picks over every campaign, to date. */
+  picks: number;
+  /** The hidden best option per campaign (they may differ: a campaign's play can rule options out). */
+  bestByCampaign: Record<string, string>;
+  /** Per day: picks, and picks on the campaign's hidden best. */
+  daily: { picks: number; onBest: number }[];
+}
+
+/**
+ * How the prioritizer converged at every choice point: per day, the share of
+ * picks that went to the hidden best option (today's truth), over every
+ * campaign that chose there.
+ */
+export function convergence(s: SimulationSession): PointConvergence[] {
+  const byPoint = new Map<string, PointConvergence>();
+  for (const campaign of s.campaigns()) {
+    const best = hiddenBest(s, campaign);
+    for (const [point, h] of best) {
+      if (h.options.length < 2) continue;
+      const series = s.pickSeries(point, campaign.id);
+      let pc = byPoint.get(point);
+      if (!pc) byPoint.set(point, (pc = { point, picks: 0, bestByCampaign: {}, daily: Array.from({ length: s.day }, () => ({ picks: 0, onBest: 0 })) }));
+      pc.bestByCampaign[campaign.id] = h.best;
+      for (const [option, arr] of series) {
+        for (let d = 0; d < arr.length && d < s.day; d++) {
+          pc.daily[d]!.picks += arr[d]!;
+          if (option === h.best) pc.daily[d]!.onBest += arr[d]!;
+          pc.picks += arr[d]!;
+        }
+      }
+    }
+  }
+  return [...byPoint.values()];
+}
+
+/** Share of picks on the hidden best over days [from, to). */
+export function shareOnBest(pc: PointConvergence, from: number, to: number): number | null {
+  let p = 0;
+  let b = 0;
+  for (let d = Math.max(0, from); d < Math.min(to, pc.daily.length); d++) {
+    p += pc.daily[d]!.picks;
+    b += pc.daily[d]!.onBest;
+  }
+  return p > 0 ? b / p : null;
 }

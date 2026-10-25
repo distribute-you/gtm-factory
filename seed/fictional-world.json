@@ -1418,7 +1418,7 @@
      "version": 1,
      "name": "Short intro",
      "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
-     "truthEnd": 1.0
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1427,7 +1427,7 @@
      "version": 1,
      "name": "Client story",
      "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
-     "truthEnd": 1.6
+     "truthEnd": 1.0
     },
     {
      "outcome": "template_written",
@@ -1436,7 +1436,7 @@
      "version": 1,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
-     "truthEnd": 0.9
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1445,7 +1445,7 @@
      "version": 2,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
-     "truthEnd": 1.15
+     "truthEnd": 0.6
     }
    ],
    "connected": [
@@ -1551,7 +1551,7 @@
      "version": 1,
      "name": "Short intro",
      "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
-     "truthEnd": 1.0
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1560,7 +1560,7 @@
      "version": 1,
      "name": "Client story",
      "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
-     "truthEnd": 1.6
+     "truthEnd": 1.0
     },
     {
      "outcome": "template_written",
@@ -1569,7 +1569,7 @@
      "version": 1,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
-     "truthEnd": 0.9
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1578,7 +1578,7 @@
      "version": 2,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
-     "truthEnd": 1.15
+     "truthEnd": 0.6
     }
    ],
    "connected": [
@@ -1630,7 +1630,7 @@
       "meeting_attended",
       "paid_client"
      ],
-     "dailyBudgetCents": 2000,
+     "dailyBudgetCents": 2500,
      "status": "running",
      "strategies": {
       "writer": "writer#pro-models"
@@ -1702,7 +1702,7 @@
      "version": 1,
      "name": "Short intro",
      "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
-     "truthEnd": 1.0
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1711,7 +1711,7 @@
      "version": 1,
      "name": "Client story",
      "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
-     "truthEnd": 1.6
+     "truthEnd": 1.0
     },
     {
      "outcome": "template_written",
@@ -1720,7 +1720,7 @@
      "version": 1,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
-     "truthEnd": 0.9
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1729,7 +1729,7 @@
      "version": 2,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
-     "truthEnd": 1.15
+     "truthEnd": 0.6
     }
    ],
    "connected": [],
@@ -1832,7 +1832,7 @@
      "version": 1,
      "name": "Short intro",
      "text": "Hi {{first_name}}, we help {{company}} {{benefit}}. Worth a quick call?",
-     "truthEnd": 1.0
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1841,7 +1841,7 @@
      "version": 1,
      "name": "Client story",
      "text": "Hi {{first_name}}, last month a company like {{company}} {{client_story}}. Happy to show you how?",
-     "truthEnd": 1.6
+     "truthEnd": 1.0
     },
     {
      "outcome": "template_written",
@@ -1850,7 +1850,7 @@
      "version": 1,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today?",
-     "truthEnd": 0.9
+     "truthEnd": 0.5
     },
     {
      "outcome": "template_written",
@@ -1859,7 +1859,7 @@
      "version": 2,
      "name": "Question first",
      "text": "Hi {{first_name}}, how does {{company}} handle {{pain}} today? We cut it in half for teams like yours.",
-     "truthEnd": 1.15
+     "truthEnd": 0.6
     }
    ],
    "connected": [],
@@ -1985,7 +1985,7 @@
     "horizonDays": 0
    },
    "cold_email": {
-    "base": 0.14,
+    "base": 0.24,
     "delayMeanDays": 2.5,
     "horizonDays": 12
    },
@@ -1995,7 +1995,7 @@
     "horizonDays": 12
    },
    "reply_judging": {
-    "base": 0.03,
+    "base": 0.1,
     "delayMeanDays": 0,
     "horizonDays": 0
    },
@@ -2015,7 +2015,7 @@
     "horizonDays": 0
    },
    "follow_up": {
-    "base": 0.07,
+    "base": 0.11,
     "delayMeanDays": 2,
     "horizonDays": 10
    },
@@ -2030,7 +2030,7 @@
     "horizonDays": 0
    },
    "ai_booking": {
-    "base": 0.45,
+    "base": 0.8,
     "delayMeanDays": 1,
     "horizonDays": 6,
     "onFalseInput": 0.1
@@ -2070,11 +2070,11 @@
    },
    "ctx_short": {
     "costCents": 1,
-    "end": 1.0
+    "end": 0.6
    },
    "ctx_full": {
     "costCents": 2,
-    "end": 1.5
+    "end": 1.0
    },
    "glm": {
     "costCents": 1
@@ -2090,7 +2090,7 @@
     "coverage": 0.8
    },
    "src_filters_30": {
-    "costCents": 10,
+    "costCents": 16,
     "coverage": 0.8
    },
    "src_signals": {
@@ -2101,7 +2101,7 @@
    "id_email": {
     "costCents": 1,
     "step": 0.7,
-    "end": 0.7
+    "end": 0.5
    },
    "id_merge": {
     "costCents": 3,
@@ -2110,7 +2110,7 @@
    },
    "ef_pattern": {
     "costCents": 3,
-    "step": 0.5
+    "step": 0.35
    },
    "ef_lookup": {
     "costCents": 5,
@@ -2121,24 +2121,24 @@
     "end": 1.0
    },
    "cr_deep": {
-    "costCents": 12,
-    "end": 1.15
+    "costCents": 15,
+    "end": 1.1
    },
    "wr_short": {
     "costCents": 2,
-    "end": 1.0
+    "end": 0.55
    },
    "wr_research": {
     "costCents": 3,
-    "end": 1.5
+    "end": 1.0
    },
    "ce_now": {
     "costCents": 4,
-    "step": 1.0
+    "step": 0.6
    },
    "ce_morning": {
     "costCents": 4,
-    "step": 1.45
+    "step": 1.0
    },
    "li_connect": {
     "costCents": 40,
@@ -2159,11 +2159,11 @@
    },
    "fu_bump": {
     "costCents": 2,
-    "step": 1.0
+    "step": 0.6
    },
    "fu_angle": {
     "costCents": 3,
-    "step": 1.6
+    "step": 1.0
    },
    "ad_search": {
     "costCents": 25,
@@ -2172,7 +2172,7 @@
    },
    "ad_social": {
     "costCents": 20,
-    "step": 0.55,
+    "step": 0.45,
     "coverage": 1
    },
    "web_signup": {
@@ -2180,11 +2180,11 @@
    },
    "bk_link": {
     "costCents": 10,
-    "step": 1.0
+    "step": 0.55
    },
    "bk_slots": {
-    "costCents": 15,
-    "step": 1.5
+    "costCents": 12,
+    "step": 1.0
    },
    "tb_rep": {
     "costCents": 400,
@@ -2205,13 +2205,13 @@
   "at": {
    "writer|llm_completion": {
     "glm": {
-     "end": 1.3
-    },
-    "gemini_flash": {
      "end": 1.0
     },
+    "gemini_flash": {
+     "end": 0.6
+    },
     "gemini_pro": {
-     "end": 1.4
+     "end": 1.05
     }
    },
    "reply_judging|llm_completion": {
@@ -2220,7 +2220,7 @@
      "falsePositive": 0.02
     },
     "gemini_flash": {
-     "recall": 0.45,
+     "recall": 0.4,
      "falsePositive": 0.01
     },
     "gemini_pro": {
@@ -2230,24 +2230,24 @@
    },
    "follow_up|llm_completion": {
     "glm": {
-     "end": 0.7
-    },
-    "gemini_flash": {
-     "end": 1.2
-    },
-    "gemini_pro": {
-     "end": 1.3
-    }
-   },
-   "linkedin|llm_completion": {
-    "glm": {
-     "end": 1.3
+     "end": 0.4
     },
     "gemini_flash": {
      "end": 1.0
     },
     "gemini_pro": {
-     "end": 1.4
+     "end": 0.9
+    }
+   },
+   "linkedin|llm_completion": {
+    "glm": {
+     "end": 1.0
+    },
+    "gemini_flash": {
+     "end": 0.6
+    },
+    "gemini_pro": {
+     "end": 1.05
     }
    }
   },
@@ -2260,7 +2260,7 @@
       "min": 5
      }
     ],
-    "mult": 2.2
+    "mult": 2.5
    },
    {
     "when": [
@@ -2273,7 +2273,7 @@
       ]
      }
     ],
-    "mult": 1.8
+    "mult": 2.0
    },
    {
     "when": [
@@ -2301,15 +2301,16 @@
   "recontactMult": 0.4
  },
  "settings": {
-  "splitEveryDays": 10,
-  "splitMatureDays": 14,
+  "splitEveryDays": 7,
+  "splitMatureDays": 7,
   "maxProposedIcps": 1,
   "setupCentsPerBrand": 5000,
   "minReliability": 0.8,
-  "marketSize": 30000,
+  "marketSize": 80000,
   "peoplePerCompany": 5,
   "icpFinderScript": "icp_ai",
-  "clientGroupTactic": "sells_to"
+  "clientGroupTactic": "sells_to",
+  "memoryHalfLifeDays": 21
  },
  "pins": [
   {

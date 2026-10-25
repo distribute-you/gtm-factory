@@ -154,6 +154,8 @@ export interface WorldSettings {
   icpFinderScript: string;
   /** Tactic that groups clients for pooling. */
   clientGroupTactic: string;
+  /** Half-life of evidence, days: older decisions weigh less (0 = never fade). */
+  memoryHalfLifeDays?: number;
 }
 
 export interface WorldSpec {
