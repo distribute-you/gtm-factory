@@ -1,0 +1,14 @@
+{
+  "name": "gtm-factory",
+  "private": true,
+  "description": "An open framework for running go-to-market as an agentic factory.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
