@@ -9,14 +9,14 @@
  */
 
 import { START, defaultStrategyId, isOnDemand, type Catalogue, type OutcomeId, type Pipe, type Script, type Strategy } from "./catalogue";
-import { censoredCounts, delayCdfAt, geometricDelay, type Cohort, type DelayDistribution } from "./delay";
+import { EvidenceBook, SEP, bumpCell, legEstimateOf, type CellStore } from "./evidence";
 import { chainCostPerTarget, valueBackwardLine } from "./funnels";
 import { buildLedger, type LedgerOccurrence, type LedgerReport, type LedgerRun } from "./ledger";
-import { prioritize, type CostBelief, type PricedOption } from "./prioritizer";
+import { prioritize, type PricedOption } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
 import { createRng, type Rng } from "./rng";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
-import { betaMean, betaVariance, fitPoolingStrength, pooledPosterior, type BetaPosterior, type Counts } from "./stats";
+import { betaMean, betaVariance } from "./stats";
 import { StorageHouse, type PipeStorage, type StorageReport } from "./storage";
 import { describeCondition, meetsAll, type Condition, type TacticValue } from "./tactics";
 import { covers, personOf, segmentMultiplier, type Campaign, type Person, type ScriptTruth, type WorldClient, type WorldSpec } from "./world";
@@ -169,26 +169,7 @@ interface PendingLanding {
   final: boolean;
 }
 
-interface Cell {
-  /** Decisions (or attempts). */
-  t: number;
-  /** Reached the leg's end. */
-  s: number;
-  /** Known not to: the attempt ended without it. */
-  f: number;
-  /** Cents spent from the decision on. */
-  c: number;
-}
-
-/** Trials a cohort is worth today: settled ones in full, pending ones for the share of outcomes already due. */
-function effectiveTrials(c: Cell, F: number): number {
-  const pending = Math.max(0, c.t - c.s - c.f);
-  return c.s + Math.min(c.f, c.t - c.s) + pending * F;
-}
-
 type Obtained = { kind: "ok"; occ: string } | { kind: "wait" } | { kind: "fail"; reason: string } | { kind: "blocked" };
-
-const SEP = "\u0000";
 
 export function pointKey(consumer: string, input: OutcomeId): string {
   return `${consumer}|${input}`;
@@ -290,16 +271,12 @@ export class SimulationSession {
   private readonly valueCredited = new Set<string>();
   private readonly truePositive = new Map<string, number>();
   private readonly persons = new Map<string, Person>();
-  private readonly cohorts = new Map<string, Map<number, Cell>>();
-  private readonly legCohorts = new Map<string, Map<number, Cell>>();
-  private readonly pointOptions = new Map<string, Set<string>>();
-  private readonly optionPoints = new Map<string, Set<string>>();
-  private readonly pointDelay = new Map<string, { mean: number; horizon: number }>();
+  private readonly evidence: EvidenceBook;
+  private readonly legCohorts: CellStore = new Map();
   private readonly picks = new Map<string, Map<string, number[]>>();
   private readonly spent = new Map<string, number>();
   private readonly budgetLeft = new Map<string, number>();
   private readonly subjectsByCampaign = new Map<string, { entryDay: number; spendCents: number; value: number }>();
-  private readonly beliefCache = new Map<string, { posterior: BetaPosterior; cost: CostBelief }>();
   private readonly triggerChecks: { day: number; triggerId: string; subject: string; brandId: string; fromDay: number }[] = [];
   private readonly brandIds: string[];
   private ledgerCache: { day: number; runs: number; occ: number; report: LedgerReport } | null = null;
@@ -316,6 +293,13 @@ export class SimulationSession {
     this.catalogue = world.catalogue;
     this.rng = createRng(world.seed);
     this.brandIds = [...new Set(world.clients.map((c) => c.brand.id))];
+    this.evidence = new EvidenceBook({
+      catalogue: this.catalogue,
+      brandIds: () => this.brandIds,
+      groupOf: (b) => this.groupOf(b),
+      parentOf: (o) => this.parentOf(o),
+      ...(world.settings.memoryHalfLifeDays !== undefined ? { memoryHalfLifeDays: world.settings.memoryHalfLifeDays } : {}),
+    });
     for (const c of world.clients) this.register(c);
   }
 
@@ -477,8 +461,7 @@ export class SimulationSession {
 
   step(): DaySnapshot {
     const day = this.dayIndex;
-    this.beliefCache.clear();
-    this.baselineCache.clear();
+    this.evidence.newDay();
     this.dayPicks = new Map();
     const snap: DaySnapshot = { day, spendCents: {}, otherCents: {}, outcomes: {}, valueOurs: {}, valueOther: {}, attempts: {}, triggerEvents: 0 };
     this.today = snap;
@@ -564,7 +547,7 @@ export class SimulationSession {
     this.attempts.push(a);
     if (legIndex === 0) this.created.set(campaign.id, (this.created.get(campaign.id) ?? 0) + 1);
     if (person) this.setPerson(a, person);
-    this.bumpCell(this.legCohorts, `${campaign.id}${SEP}${legIndex}`, day, "t", 1);
+    bumpCell(this.legCohorts, `${campaign.id}${SEP}${legIndex}`, day, "t", 1);
     if (this.today) this.today.attempts[campaign.id] = (this.today.attempts[campaign.id] ?? 0) + 1;
     return a;
   }
@@ -614,9 +597,9 @@ export class SimulationSession {
     for (const d of a.decisions) {
       const dec = this.decisions[d]!;
       if (dec.credited) continue;
-      this.bumpCell(this.cohorts, `${dec.point}${SEP}${dec.option}${SEP}${dec.brandId}`, dec.day, "f", 1);
+      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "f", 1);
     }
-    if (status === "failed") this.bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "f", 1);
+    if (status === "failed") bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "f", 1);
     a.choices.clear();
     a.got.clear();
   }
@@ -1012,10 +995,10 @@ export class SimulationSession {
     a.spentCents += cents;
     for (const d of a.decisions) {
       const dec = this.decisions[d]!;
-      this.bumpCell(this.cohorts, `${dec.point}${SEP}${dec.option}${SEP}${dec.brandId}`, dec.day, "c", cents);
+      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "c", cents);
     }
     // Leg economics read our own spend: what another factory charges is its cost, not ours.
-    if (ours) this.bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "c", cents);
+    if (ours) bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "c", cents);
     const root = a.legIndex === 0 ? a : a.person ? this.attemptOf.get(`${a.campaign.id}${SEP}0${SEP}${a.person.id}`) : undefined;
     if (root && ours) {
       const k = `${a.campaign.id}${SEP}${root.id}`;
@@ -1082,8 +1065,8 @@ export class SimulationSession {
       if (at.person?.id !== occ.subject) continue;
       dec.credited = true;
       // Settled as a failure when its attempt ended, and reached after all (another producer attested it).
-      if (at.status !== "open") this.bumpCell(this.cohorts, `${dec.point}${SEP}${dec.option}${SEP}${dec.brandId}`, dec.day, "f", -1);
-      this.bumpCell(this.cohorts, `${dec.point}${SEP}${dec.option}${SEP}${dec.brandId}`, dec.day, "s", 1);
+      if (at.status !== "open") this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "f", -1);
+      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "s", 1);
     }
     if (!first) return;
 
@@ -1100,7 +1083,7 @@ export class SimulationSession {
       const done = this.attemptOf.get(`${cid}${SEP}${k}${SEP}${occ.subject}`);
       if (done && !this.legDone.has(done.id)) {
         this.legDone.add(done.id);
-        this.bumpCell(this.legCohorts, `${cid}${SEP}${k}`, done.startDay, "s", 1);
+        bumpCell(this.legCohorts, `${cid}${SEP}${k}`, done.startDay, "s", 1);
       }
       if (k === campaign.line.length - 1) this.creditValue(campaign, occ.subject, day);
       else this.startLeg(campaign, k + 1, occ.subject, day);
@@ -1245,25 +1228,9 @@ export class SimulationSession {
 
   // ---- decisions and beliefs -----------------------------------------------------------
 
-  private bumpCell(store: Map<string, Map<number, Cell>>, key: string, day: number, field: keyof Cell, by: number): void {
-    let m = store.get(key);
-    if (!m) store.set(key, (m = new Map()));
-    let c = m.get(day);
-    if (!c) m.set(day, (c = { t: 0, s: 0, f: 0, c: 0 }));
-    c[field] += by;
-  }
-
   /** One input choice for one subject: the universal prioritizer over the options at a point. */
   private decide(a: Attempt, point: string, options: string[], day: number, remDelay: number, horizon = 0): string {
-    if (!this.pointDelay.has(point)) this.pointDelay.set(point, { mean: remDelay, horizon: Math.max(horizon, Math.ceil(remDelay * 4)) });
-    let ps = this.pointOptions.get(point);
-    if (!ps) this.pointOptions.set(point, (ps = new Set()));
-    for (const o of options) {
-      ps.add(o);
-      let qs = this.optionPoints.get(o);
-      if (!qs) this.optionPoints.set(o, (qs = new Set()));
-      qs.add(point);
-    }
+    this.evidence.offer(point, options, remDelay, horizon);
     const offered = this.dayPicksAll.get(`${point}${SEP}${a.campaign.id}`) ?? new Set<string>();
     for (const o of options) offered.add(o);
     this.dayPicksAll.set(`${point}${SEP}${a.campaign.id}`, offered);
@@ -1278,7 +1245,7 @@ export class SimulationSession {
     this.decisions.push({ id, point, option: chosen, campaignId: a.campaign.id, brandId: a.client.brand.id, legTarget: a.to, attemptId: a.id, day, credited: false });
     a.decisions.push(id);
     a.decisionAt.set(point, id);
-    this.bumpCell(this.cohorts, `${point}${SEP}${chosen}${SEP}${a.client.brand.id}`, day, "t", 1);
+    this.evidence.bump(point, chosen, a.client.brand.id, day, "t", 1);
     const pk = `${point}${SEP}${a.campaign.id}`;
     let dp = this.dayPicks.get(pk);
     if (!dp) this.dayPicks.set(pk, (dp = new Map()));
@@ -1292,170 +1259,14 @@ export class SimulationSession {
     return chosen;
   }
 
-  private delayOf(point: string): DelayDistribution {
-    const d = this.pointDelay.get(point) ?? { mean: 0, horizon: 0 };
-    return geometricDelay(d.mean, Math.max(1, d.horizon));
-  }
-
-  /**
-   * Counts of one option at one point, delay-corrected (pending decisions count
-   * for the share of outcomes already due) and like-for-like in time: each
-   * day's trials are weighted by how that day's decisions did at this point,
-   * all options together, so an option tried mostly while the rest of the
-   * factory was still learning is not blamed for it.
-   */
-  private counts(point: string, option: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
-    const base = this.baselineOf(point, day, delay);
-    let successes = 0;
-    let trials = 0;
-    let cost = 0;
-    let n = 0;
-    for (const b of brands) {
-      const m = this.cohorts.get(`${point}${SEP}${option}${SEP}${b}`);
-      if (!m) continue;
-      for (const [d, c] of m) {
-        const w = this.memory(day - d);
-        const eff = effectiveTrials(c, delayCdfAt(delay, day - d));
-        successes += c.s * w;
-        trials += eff * (base.byDay.get(d) ?? 1) * w;
-        cost += c.c * w;
-        n += c.t * w;
-      }
-    }
-    return { successes, trials: Math.max(trials, successes), cost, n };
-  }
-
-  /** Weight of evidence of a given age: older days fade, so a world that changes (a reserve that empties, a better script elsewhere) is read again. */
-  private memory(ageDays: number): number {
-    const h = this.world.settings.memoryHalfLifeDays;
-    return h && h > 0 ? Math.pow(0.5, Math.max(0, ageDays) / h) : 1;
-  }
-
-  /** Per day, the point's rate (every option, every client), smoothed, over its overall rate. */
-  private baselineOf(point: string, day: number, delay: DelayDistribution): { byDay: Map<number, number> } {
-    const key = `${point}${SEP}${day}`;
-    const hit = this.baselineCache.get(key);
-    if (hit) return hit;
-    const S = new Map<number, number>();
-    const E = new Map<number, number>();
-    for (const o of this.pointOptions.get(point) ?? []) {
-      for (const b of this.brandIds) {
-        const m = this.cohorts.get(`${point}${SEP}${o}${SEP}${b}`);
-        if (!m) continue;
-        for (const [d, c] of m) {
-          S.set(d, (S.get(d) ?? 0) + c.s);
-          E.set(d, (E.get(d) ?? 0) + effectiveTrials(c, delayCdfAt(delay, day - d)));
-        }
-      }
-    }
-    let sAll = 0;
-    let eAll = 0;
-    for (const v of S.values()) sAll += v;
-    for (const v of E.values()) eAll += v;
-    const all = eAll > 0 ? (sAll + 0.5) / (eAll + 1) : 0;
-    const byDay = new Map<number, number>();
-    const k = 300;
-    for (const d of E.keys()) {
-      let s = 0;
-      let e = 0;
-      for (let x = d - 3; x <= d + 3; x++) {
-        s += S.get(x) ?? 0;
-        e += E.get(x) ?? 0;
-      }
-      const r = (s + k * all) / (e + k);
-      byDay.set(d, all > 0 ? r / all : 1);
-    }
-    const out = { byDay };
-    this.baselineCache.set(key, out);
-    return out;
-  }
-
-  private readonly baselineCache = new Map<string, { byDay: Map<number, number> }>();
-
   private groupOf(brandId: string): string {
     const b = this.world.clients.find((c) => c.brand.id === brandId)?.brand;
     return String(b?.tactics[this.world.settings.clientGroupTactic] ?? "");
   }
 
-  /** Signature shared by options with the same tactic values (yes/no and lists): they share a prior level. */
-  private signatureOf(option: string): string {
-    const s = this.catalogue.headOf(option);
-    if (!s) return "object";
-    const parts = Object.entries(s.tactics)
-      .filter(([k]) => this.catalogue.tactic(k)?.type.kind !== "number")
-      .map(([k, v]) => `${k}=${String(v)}`)
-      .sort();
-    return `${s.pipeId}|${s.kind}|${parts.join(",")}`;
-  }
-
-  /** How much better than its points' average an option does everywhere it is offered (its overall level). */
-  private liftOf(option: string, day: number): { lift: number; weight: number } {
-    let s = 0;
-    let e = 0;
-    for (const q of this.optionPoints.get(option) ?? []) {
-      const delay = this.delayOf(q);
-      const opts = [...(this.pointOptions.get(q) ?? [])];
-      const all = opts.map((o) => this.counts(q, o, this.brandIds, day, delay));
-      const T = all.reduce((x, c) => x + c.trials, 0);
-      const S = all.reduce((x, c) => x + c.successes, 0);
-      if (T <= 0 || S <= 0) continue;
-      const mine = this.counts(q, option, this.brandIds, day, delay);
-      s += mine.successes;
-      e += (mine.trials * S) / T;
-    }
-    return { lift: (s + 2) / (e + 2), weight: e };
-  }
-
-  /**
-   * The belief about one option at one point for one client, pooled:
-   * the option's level everywhere it is offered (its tactic group's, then its
-   * own) -> this point (the fleet) -> clients sharing the client's tactics ->
-   * the client. A fork starts from its parent's belief at this point.
-   */
-  belief(point: string, option: string, options: readonly string[], brandId: string, day: number): { posterior: BetaPosterior; cost: CostBelief } {
-    const cacheKey = `${point}${SEP}${option}${SEP}${brandId}${SEP}${options.join(",")}`;
-    const hit = this.beliefCache.get(cacheKey);
-    if (hit) return hit;
-    const delay = this.delayOf(point);
-    const fleet = options.map((o) => this.counts(point, o, this.brandIds, day, delay));
-    const T = fleet.reduce((x, c) => x + c.trials, 0);
-    const S = fleet.reduce((x, c) => x + c.successes, 0);
-    const baseline = (S + 0.1) / (T + 2);
-    // The option's overall level, pulled toward its tactic group's.
-    const sig = this.signatureOf(option);
-    const groupOpts = [...this.optionPoints.keys()].filter((o) => this.signatureOf(o) === sig);
-    const g = groupOpts.reduce((acc, o) => {
-      const l = this.liftOf(o, day);
-      return { s: acc.s + l.lift * l.weight, w: acc.w + l.weight };
-    }, { s: 0, w: 0 });
-    const groupLift = (g.s + 2) / (g.w + 2);
-    const own = this.liftOf(option, day);
-    const lift = (own.lift * own.weight + groupLift * 5) / (own.weight + 5);
-    let prior = { rate: Math.min(0.95, baseline * lift), strength: Math.min(Math.max(fitPoolingStrength(fleet), 2), 400) };
-    const parent = this.parentOf(option);
-    if (parent && options.length > 0) {
-      const p = this.belief(point, parent, [...new Set([...options, parent])], brandId, day);
-      prior = { rate: betaMean(p.posterior), strength: Math.min(p.posterior.alpha + p.posterior.beta, 50) };
-    }
-    const mineFleet = this.counts(point, option, this.brandIds, day, delay);
-    const fleetPost = pooledPosterior(mineFleet, prior);
-    // Clients sharing the client's tactics, then the client.
-    const groups = [...new Set(this.brandIds.map((b) => this.groupOf(b)))];
-    const groupCounts = groups.map((gk) => this.counts(point, option, this.brandIds.filter((b) => this.groupOf(b) === gk), day, delay));
-    const myGroup = this.groupOf(brandId);
-    const groupPost = pooledPosterior(groupCounts[groups.indexOf(myGroup)] ?? { successes: 0, trials: 0 }, { rate: betaMean(fleetPost), strength: fitPoolingStrength(groupCounts) });
-    const perBrand = this.brandIds.map((b) => this.counts(point, option, [b], day, delay));
-    const mine = perBrand[this.brandIds.indexOf(brandId)] ?? { successes: 0, trials: 0, cost: 0, n: 0 };
-    const posterior = pooledPosterior(mine, { rate: betaMean(groupPost), strength: Math.max(fitPoolingStrength(perBrand), 10) });
-    // Cost: measured from the decision to the leg's end, for this option, pulled toward the point's average.
-    const allCost = fleet.reduce((x, c) => x + c.cost, 0);
-    const allN = fleet.reduce((x, c) => x + c.n, 0);
-    const head = this.catalogue.headOf(option);
-    const priorCost = allN > 0 ? allCost / allN / 100 : (head?.costCents ?? 10) / 100 + 0.2;
-    const mean = (mineFleet.cost / 100 + 3 * priorCost) / (mineFleet.n + 3);
-    const result = { posterior, cost: { mean, sd: (mean * 0.6) / Math.sqrt(mineFleet.n + 3) } };
-    this.beliefCache.set(cacheKey, result);
-    return result;
+  /** The belief about one option at one point for one client (see EvidenceBook.belief). */
+  belief(point: string, option: string, options: readonly string[], brandId: string, day: number) {
+    return this.evidence.belief(point, option, options, brandId, day);
   }
 
   /** The parent dynasty of a forked option (a script dynasty, or an object dynasty such as a finer ICP). */
@@ -1611,31 +1422,9 @@ export class SimulationSession {
   legEstimates(campaign: Campaign, day = this.dayIndex): CampaignEconomics["legs"] {
     return campaign.line.map((to, k) => {
       const from = k === 0 ? (campaign.entry.kind === "start" ? START : this.triggerEventOutcome(campaign.entry.triggerId)) : campaign.line[k - 1]!;
-      const m = this.legCohorts.get(`${campaign.id}${SEP}${k}`);
       const plays = this.playsFor(campaign, from, to);
       const mean = Math.max(...plays.map((p) => this.legDelayMean(p)), 0);
-      const delay = geometricDelay(mean, Math.max(1, Math.ceil(mean * 5)));
-      const cohorts: Cohort[] = [];
-      let attempts = 0;
-      let reached = 0;
-      let cost = 0;
-      for (const [d, c] of m ?? []) {
-        cohorts.push({ ageDays: day - d, trials: effectiveTrials(c, delayCdfAt(delay, day - d)), successes: c.s });
-        attempts += c.t;
-        reached += c.s;
-        cost += c.c;
-      }
-      const cc = censoredCounts(cohorts, { cdf: [1] });
-      const measured = attempts >= 20 && reached > 0;
-      return {
-        from,
-        to,
-        attempts,
-        reached,
-        yieldRate: cc.trials > 0 ? (cc.successes + 0.5) / (cc.trials + 1) : null,
-        costPerAttempt: attempts > 0 ? cost / 100 / attempts : null,
-        label: measured ? "measured" : "expected",
-      };
+      return { from, to, ...legEstimateOf(this.legCohorts.get(`${campaign.id}${SEP}${k}`), day, mean) };
     });
   }
 
@@ -1743,7 +1532,7 @@ export class SimulationSession {
 
   /** The options ever offered at a point. */
   optionsAt(point: string): string[] {
-    return [...(this.pointOptions.get(point) ?? [])];
+    return [...(this.evidence.pointOptions.get(point) ?? [])];
   }
 
   /** Today's belief of each option at a point, for a campaign: mean rate, its spread, mean cost, mean value per dollar. */
@@ -1752,12 +1541,12 @@ export class SimulationSession {
     if (!campaign) return [];
     const options = this.optionsFor(point, campaign);
     const brandId = campaign.brandId;
-    const delay = this.delayOf(point);
+    const delay = this.evidence.delayOf(point);
     const fake = { campaign, client: this.clientOf(campaignId)!, legIndex: Math.max(0, this.legOfPoint(campaign, point)) } as Attempt;
     const value = this.legValue(fake);
     return options.map((o) => {
       const b = this.belief(point, o, options, brandId, this.dayIndex);
-      const c = this.counts(point, o, [brandId], this.dayIndex, delay);
+      const c = this.evidence.counts(point, o, [brandId], this.dayIndex, delay);
       return { option: o, rate: betaMean(b.posterior), rateSd: Math.sqrt(betaVariance(b.posterior)), cost: b.cost.mean, valuePerDollar: (betaMean(b.posterior) * value) / Math.max(b.cost.mean, 1e-6), decisions: c.n, successes: c.successes };
     });
   }
@@ -1843,7 +1632,7 @@ export class SimulationSession {
       }
     }
     // Splits on scripts: per point, the tactic values of the option chosen.
-    for (const point of this.pointOptions.keys()) {
+    for (const point of this.evidence.pointOptions.keys()) {
       const [consumer, input] = point.split("|") as [string, string];
       const consumerPipe = this.catalogue.pipe(consumer);
       if (!consumerPipe || !input) continue;
@@ -1920,6 +1709,34 @@ export class SimulationSession {
   /** Number of attempts and of distinct people of a campaign. */
   attemptCount(campaignId?: string): number {
     return campaignId ? this.attempts.filter((a) => a.campaign.id === campaignId).length : this.attempts.length;
+  }
+
+  /** The leg cohorts as cells: per campaign leg and day of entry (what a snapshot of this world holds). */
+  legCells(): { campaignId: string; legIndex: number; day: number; t: number; s: number; f: number; c: number }[] {
+    const out: { campaignId: string; legIndex: number; day: number; t: number; s: number; f: number; c: number }[] = [];
+    for (const [k, m] of this.legCohorts) {
+      const [campaignId, leg] = k.split(SEP) as [string, string];
+      for (const [day, c] of m) out.push({ campaignId, legIndex: Number(leg), day, ...c });
+    }
+    return out;
+  }
+
+  /** Every choice point offered so far: its options and the delay from a decision to its leg's end. */
+  pointsOffered(): { point: string; options: string[]; delayMeanDays: number; horizonDays: number }[] {
+    return [...this.evidence.pointOptions].map(([point, opts]) => {
+      const d = this.evidence.pointDelay.get(point) ?? { mean: 0, horizon: 0 };
+      return { point, options: [...opts], delayMeanDays: d.mean, horizonDays: d.horizon };
+    });
+  }
+
+  /** The evidence of every choice as cells: per point, option, client and day of decision. */
+  choiceCells(): { point: string; option: string; brandId: string; day: number; t: number; s: number; f: number; c: number }[] {
+    const out: { point: string; option: string; brandId: string; day: number; t: number; s: number; f: number; c: number }[] = [];
+    for (const [k, m] of this.evidence.cohorts) {
+      const [point, option, brandId] = k.split(SEP) as [string, string, string];
+      for (const [day, c] of m) out.push({ point, option, brandId, day, ...c });
+    }
+    return out;
   }
 
   /** People the world served, in order of first appearance. */
