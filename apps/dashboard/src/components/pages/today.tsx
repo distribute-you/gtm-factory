@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { DayChart, Legend } from "@/components/charts";
+import { FunnelLine } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
 import { BarSpark, EmptyNote, Figure, Page, PageHeader, RoiLabel, SectionTitle, Shimmer, SparkLine, StatTile, TickGauge, TopBar } from "@/components/ui";
-import { cumulative, costPerOutcomeSeries, explainChoice, funnelName, nodeLabel, optionLabel, pipeTitle, scopeFigures, scopedClients, targetState, valueOf, type Model } from "@/lib/model";
+import { costPerOutcomeSeries, cumulative, explainChoice, optionLabel, outcomeLabel, pointInfo, recentChoices, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
 import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -37,28 +38,27 @@ export function PageSkeleton() {
 }
 
 function Today({ model, scope }: { model: Model; scope: string | null }) {
-  const clients = scopedClients(model, scope);
-  const f = useMemo(() => scopeFigures(model, clients), [model, clients]);
-  const running = clients.filter((c) => c.campaign.status === "running").length;
-  const target = clients[0] ? targetState(model, clients[0]) : "paid_client";
-  const targetLabel = model.stateDefs.get(target)?.label ?? "Paid client";
-  const won = f.outcomes[target] ?? 0;
-  const roi = f.roi;
-  const shown = roi && roi > 0 ? roi : f.expectedRoi;
+  const campaigns = scopedCampaigns(model, scope);
+  const f = useMemo(() => scopeFigures(model, campaigns), [model, campaigns]);
+  const r = useMemo(() => scopeReturn(model, campaigns), [model, campaigns]);
+  const running = campaigns.filter((c) => c.status === "running").length;
+  const brand = scope ? model.clients.find((c) => c.brand.id === scope)?.brand.name : null;
+  const paid = model.tracks.flatMap((t) => t.states).sort((a, b) => b.rank - a.rank)[0];
+  const won = paid ? f.outcomes[paid.outcome] ?? 0 : 0;
+  const shown = r.measured && r.measured > 0 ? r.measured : r.expected;
   const gaugeMax = Math.max(3, Math.ceil((shown ?? 0) + 0.5));
-  const brand = scope ? clients[0]?.brand.name : null;
 
   return (
     <>
       <PageHeader
         title={
           <>
-            Day {model.day}: {plural(won, `${targetLabel.toLowerCase()} won`, `${targetLabel.toLowerCase()}s won`)}
+            Day {model.day}: {plural(won, `${(paid?.label ?? "client").toLowerCase()}`, `${(paid?.label ?? "client").toLowerCase()}s`)}
           </>
         }
         sub={
           <>
-            {brand ? `${brand} has` : "Your clients have"} {plural(running, "campaign", "campaigns")} running. They found {plural(f.leads, "lead", "leads")} for {formatCents(f.spendCents)}.
+            {brand ? `${brand} runs` : "Your clients run"} {plural(campaigns.length, "campaign", "campaigns")}. They tried {plural(f.attempts, "lead", "leads")} for {formatCents(f.spendCents)}.
           </>
         }
         right={
@@ -69,42 +69,35 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
         }
       />
 
-      <div className="mb-3 flex items-center justify-between">
-        <span className="k-label">Performance</span>
-        <span className="k-fg3 text-[12px]">Since day 0</span>
-      </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile label={<RoiLabel />} note="Break-even 1×">
           <div className="flex flex-col items-center">
             <div className="relative w-full max-w-[124px]">
               <TickGauge value={shown} max={gaugeMax} marker={1} />
-              <span className={`absolute inset-x-0 bottom-0 text-center text-[18px] font-medium tabular-nums ${roiIsGood(shown) && roi ? "text-[var(--run)]" : roi ? "" : "k-fg3"}`}>
-                {formatRoi(shown)}
-              </span>
+              <span className={`absolute inset-x-0 bottom-0 text-center text-[18px] font-medium tabular-nums ${roiIsGood(shown) ? "text-[var(--run)]" : ""}`}>{formatRoi(shown)}</span>
             </div>
-            <p className="k-fg3 mt-1 truncate text-[11px]">{roi ? `Measured · expected ${formatRoi(f.expectedRoi)}` : "Expected, nothing won yet"}</p>
+            <p className="k-fg3 mt-1 truncate text-[11px]">
+              Measured · expected {formatRoi(r.expected)}
+            </p>
           </div>
         </StatTile>
-        <StatTile label="Value won" note={`${targetLabel}s × lifetime revenue`}>
-          <Figure value={formatUsd(f.value)} />
-          <SparkLine className="mt-auto h-8 pt-2" values={cumulative(f.dailyValue)} color="var(--run)" />
+        <StatTile label="Value won by our runs" note={`+${formatUsd(f.valueOther)} other factories`}>
+          <Figure value={formatUsd(f.valueOurs)} />
+          <SparkLine className="mt-auto h-8 pt-2" values={cumulative(f.dailyValueOurs)} color="var(--run)" />
         </StatTile>
-        <StatTile label="Spent" note="setup included">
+        <StatTile label="Spent by our runs" note="setup included">
           <Figure value={formatCents(f.spendCents)} />
           <BarSpark className="mt-auto pt-2" values={f.dailySpendCents} />
         </StatTile>
-        <StatTile label="Leads found" note="new each day">
-          <Figure value={formatCount(f.leads)} />
-          <BarSpark className="mt-auto pt-2" values={f.dailyLeads} color="var(--data-teal)" />
+        <StatTile label="Leads tried" note={`${formatCount(f.triggerEvents)} trigger events`}>
+          <Figure value={formatCount(f.attempts)} />
+          <BarSpark className="mt-auto pt-2" values={f.dailyAttempts} color="var(--data-teal)" />
         </StatTile>
       </div>
 
       <div className="mt-8">
         <SectionTitle right={<span>A lead moves on each track on its own. Tracks are never added together.</span>}>Outcomes by lead track</SectionTitle>
-        <div
-          className="grid gap-3 lg:[grid-template-columns:var(--cols)]"
-          style={{ "--cols": model.tracks.map((t) => `minmax(0,${Math.max(1.5, t.states.length)}fr)`).join(" ") } as React.CSSProperties}
-        >
+        <div className="grid gap-3 lg:[grid-template-columns:var(--cols)]" style={{ "--cols": model.tracks.map((t) => `minmax(0,${Math.max(1.5, t.states.length)}fr)`).join(" ") } as React.CSSProperties}>
           {model.tracks.map((t) => (
             <div key={t.id} className="k-card p-4">
               <div className="flex items-center gap-2">
@@ -113,14 +106,14 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
               </div>
               <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${t.states.length}, minmax(0, 1fr))` }}>
                 {t.states.map((s) => {
-                  const n = f.outcomes[s.state] ?? 0;
+                  const n = f.outcomes[s.outcome] ?? 0;
                   const cpo = n > 0 ? f.spendCents / 100 / n : null;
                   return (
-                    <Link key={s.state} href={`/leads/?state=${s.state}`} className="k-inset k-hover block rounded-[8px] px-3 py-2.5">
+                    <Link key={s.outcome} href={`/leads/?state=${s.outcome}`} className="k-inset k-hover block rounded-[8px] px-3 py-2.5">
                       <span className="k-label block truncate">{s.label}</span>
                       <span className="mt-1 block text-[20px] font-medium leading-6 tabular-nums">{formatCount(n)}</span>
                       <span className="k-fg3 block text-[12px] tabular-nums">{cpo != null ? `${formatUsd(cpo)} each` : "None yet"}</span>
-                      <SparkLine className="mt-1 h-6" values={cumulative(f.dailyOutcomes[s.state] ?? [])} color="var(--data-teal)" />
+                      <SparkLine className="mt-1 h-6" values={cumulative(f.dailyOutcomes[s.outcome] ?? [])} color="var(--data-teal)" />
                     </Link>
                   );
                 })}
@@ -131,51 +124,54 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CostPerOutcomeCard model={model} f={f} target={target} />
-        <ReturnCard f={f} />
+        <CostPerOutcomeCard model={model} f={f} />
+        <ReturnCard f={f} expected={r.expected} />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <WhyFeed model={model} campaignIds={new Set(clients.map((c) => c.campaign.id))} />
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <WhyFeed model={model} campaignIds={new Set(campaigns.map((c) => c.id))} />
         <section>
-          <SectionTitle count={clients.length}>Campaigns</SectionTitle>
+          <SectionTitle count={campaigns.length}>Campaigns</SectionTitle>
           <div className="k-card divide-y divide-[var(--line-subtle)]">
-            {clients.map((c) => {
-              const plays = model.session.funnelOfCampaign(c.campaign.id) ?? c.campaign.salesFunnel ?? [];
-              const v = valueOf(model, c);
+            {campaigns.map((c) => {
+              const e = model.session.economics(c.id);
+              const brandName = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name;
               return (
-                <Link key={c.campaign.id} href={`/campaigns/view/?id=${encodeURIComponent(c.campaign.id)}`} className="k-hover flex items-center gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
-                  <Mark kind="funnel" id={c.campaign.id} size={32} />
+                <Link key={c.id} href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="k-hover flex items-center gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
+                  {c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={32} /> : <Mark kind="funnel" id={c.id} size={32} />}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{funnelName(model.catalogue, plays)}</span>
+                    <span className="block truncate font-medium">{c.name}</span>
                     <span className="k-fg3 block truncate text-[12px]">
-                      {c.brand.name} · {v ? `${formatUsd(v.amount)} per ${targetLabel.toLowerCase()}${v.label === "expected" ? " (expected)" : ""}` : "—"}
+                      {brandName} · {outcomeLabel(model.catalogue, targetOf(c))} at {formatUsd(e.targetValue)}
+                      {e.valueLabel === "expected" ? " (expected)" : ""}
                     </span>
                   </span>
-                  <span className="k-fg2 text-[12px] tabular-nums">{formatCents(model.session.spentCents(c.campaign.id))}</span>
+                  <span className={`text-[13px] tabular-nums ${roiIsGood(e.expected.value) ? "text-[var(--run)]" : "k-fg2"}`}>{formatRoi(e.expected.value)}</span>
                 </Link>
               );
             })}
-            {clients.length === 0 && <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>}
+            {campaigns.length === 0 && <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>}
           </div>
+          {campaigns[0] && (
+            <div className="k-card mt-3 p-4">
+              <p className="k-label mb-2">The first sales funnel</p>
+              <FunnelLine model={model} campaign={campaigns[0]} />
+            </div>
+          )}
         </section>
       </div>
     </>
   );
 }
 
-export function CostPerOutcomeCard({ model, f, target }: { model: Model; f: ReturnType<typeof scopeFigures>; target: string }) {
-  const states = model.tracks.flatMap((t) => t.states).filter((s) => (f.outcomes[s.state] ?? 0) > 0);
-  const [state, setState] = useState(target);
-  const chosen = states.some((s) => s.state === state) ? state : (states[0]?.state ?? target);
-  const label = model.stateDefs.get(chosen)?.label ?? chosen;
-  const measured = costPerOutcomeSeries(f.dailySpendCents, f.dailyOutcomes[chosen] ?? []);
-  const expectedValue = chosen === target ? f.expectedCostPerTarget : null;
+export function CostPerOutcomeCard({ model, f }: { model: Model; f: ScopeFigures }) {
+  const states = model.tracks.flatMap((t) => t.states).filter((s) => (f.outcomes[s.outcome] ?? 0) > 0);
+  const [state, setState] = useState<string | null>(null);
+  const chosen = state && states.some((s) => s.outcome === state) ? state : (states[0]?.outcome ?? null);
+  const label = chosen ? outcomeLabel(model.catalogue, chosen) : "outcome";
+  const measured = chosen ? costPerOutcomeSeries(f.dailySpendCents, f.dailyOutcomes[chosen] ?? []) : [];
   const last = [...measured].reverse().find((x) => x != null) ?? null;
-  const series = [
-    { key: "m", label: `Measured cost per ${label.toLowerCase()}`, values: measured, color: "var(--accent)" },
-    ...(expectedValue ? [{ key: "e", label: "Expected on today's estimates", values: measured.map(() => expectedValue), color: "var(--fg-4)", dashed: true }] : []),
-  ];
+  const series = [{ key: "m", label: `Cost per ${label.toLowerCase()}`, values: measured, color: "var(--accent)" }];
   return (
     <section>
       <SectionTitle right={<span>Spend to date ÷ outcomes to date</span>}>$ per outcome over time</SectionTitle>
@@ -184,34 +180,33 @@ export function CostPerOutcomeCard({ model, f, target }: { model: Model; f: Retu
           <Figure value={last != null ? formatUsd(last) : "—"} sub={`per ${label.toLowerCase()}`} />
           <div className="flex flex-wrap gap-1">
             {states.map((s) => (
-              <button key={s.state} type="button" onClick={() => setState(s.state)} className={`k-chip ${s.state === chosen ? "k-chip-on" : ""}`} aria-pressed={s.state === chosen}>
+              <button key={s.outcome} type="button" onClick={() => setState(s.outcome)} className={`k-chip ${s.outcome === chosen ? "k-chip-on" : ""}`} aria-pressed={s.outcome === chosen}>
                 {s.label}
               </button>
             ))}
           </div>
         </div>
-        <div className="mt-3">
-          {measured.some((x) => x != null) ? <DayChart series={series} format={formatUsd} /> : <EmptyNote>No outcome yet. Press play.</EmptyNote>}
-        </div>
+        <div className="mt-3">{measured.some((x) => x != null) ? <DayChart series={series} format={formatUsd} /> : <EmptyNote>No outcome yet. Press play.</EmptyNote>}</div>
         <Legend series={series} />
       </div>
     </section>
   );
 }
 
-export function ReturnCard({ f }: { f: ReturnType<typeof scopeFigures> }) {
+export function ReturnCard({ f, expected }: { f: ScopeFigures; expected: number | null }) {
   const spend = cumulative(f.dailySpendCents);
-  const value = cumulative(f.dailyValue);
+  const value = cumulative(f.dailyValueOurs);
   const roi = spend.map((s, i) => (s > 0 ? value[i]! / (s / 100) : null));
   const series = [
-    { key: "m", label: "Measured return", values: roi, color: "var(--run)" },
-    ...(f.expectedRoi ? [{ key: "e", label: "Expected on today's estimates", values: roi.map(() => f.expectedRoi), color: "var(--fg-4)", dashed: true }] : []),
+    { key: "m", label: "Measured return: our value ÷ our spend", values: roi, color: "var(--run)" },
+    ...(expected ? [{ key: "e", label: "Expected: same formula on today's estimates", values: roi.map(() => expected), color: "var(--fg-4)", dashed: true }] : []),
   ];
+  const last = [...roi].reverse().find((x) => x != null) ?? null;
   return (
     <section>
-      <SectionTitle right={<span>Value won ÷ spend, to date</span>}>Return over time</SectionTitle>
+      <SectionTitle right={<span>Value won by our runs ÷ our spend</span>}>Return over time</SectionTitle>
       <div className="k-card px-4 pb-3 pt-3">
-        <Figure value={<span className={roiIsGood(f.roi) ? "text-[var(--run)]" : ""}>{formatRoi(f.roi)}</span>} sub={`expected ${formatRoi(f.expectedRoi)}`} />
+        <Figure value={<span className={roiIsGood(last) ? "text-[var(--run)]" : ""}>{formatRoi(last)}</span>} sub={`expected ${formatRoi(expected)}`} />
         <div className="mt-3">
           <DayChart series={series} format={(v) => formatRoi(v)} reference={{ y: 1, label: "Break-even" }} />
         </div>
@@ -221,35 +216,30 @@ export function ReturnCard({ f }: { f: ReturnType<typeof scopeFigures> }) {
   );
 }
 
-/** The engine's last decisions and why: the choice log, newest first. */
+/** The engine's latest input choices and why: newest first. */
 export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campaignIds: Set<string>; limit?: number }) {
-  const items = [];
-  for (let i = model.result.choices.length - 1; i >= 0 && items.length < limit; i--) {
-    const c = model.result.choices[i]!;
-    if (!campaignIds.has(c.campaignId)) continue;
-    items.push(c);
-  }
+  const items = recentChoices(model, campaignIds, limit);
   return (
     <section>
       <SectionTitle right={<span>Newest first</span>}>Why the engine chose</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
         {items.length === 0 && <EmptyNote>No choice yet. Press play.</EmptyNote>}
         {items.map((c, i) => {
-          const client = model.clients.find((x) => x.campaign.id === c.campaignId);
+          const info = pointInfo(model.catalogue, c.point);
+          const campaign = model.campaigns.find((x) => x.id === c.campaignId);
           return (
-            <div key={i} className="flex gap-3 px-4 py-3">
-              <Mark kind={c.node === "funnel" ? "funnel" : c.node === "workflow" ? "workflow:ai" : c.node === "audience" ? "audience" : c.node === "slot:llm" ? "llm" : "template"} id={c.node} size={28} />
+            <Link key={i} href={`/research/?point=${encodeURIComponent(c.point)}`} className="k-hover flex gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
+              <Mark kind="point" id={c.point} size={28} />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px]">
-                  <span className="k-fg3">{nodeLabel(c.node)}:</span> <span className="font-medium">{optionLabel(model, c.node, c.chosenId)}</span>
+                <p className="truncate text-[13px]">
+                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{optionLabel(model, c.point, c.chosenId, campaign?.brandId)}</span>
                 </p>
                 <p className="k-fg3 truncate text-[12px]">
-                  {client?.brand.name}
-                  {c.pipeId ? ` · ${pipeTitle(model.catalogue, c.pipeId).name}` : ""} · {explainChoice(model, c)}
+                  {campaign?.name} · {explainChoice(model, c)}
                 </p>
               </div>
               <span className="k-mono k-fg3 shrink-0 text-[12px]">Day {c.day}</span>
-            </div>
+            </Link>
           );
         })}
       </div>

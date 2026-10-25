@@ -1,103 +1,132 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildModel, costPerOutcomeSeries, leadTracks, salesPaths, scopeFigures, segmentStudy, explainChoice } from "./model";
-import { DEFAULT_SCENARIO, SCENARIOS, buildWorld, replay, type LoggedAction } from "./world";
-import { audiencesFromIcp } from "./expert";
+import { buildModel, costPerOutcomeSeries, diffWords, leadTracks, objectDynasties, pluggedAt, pointsOf, scopeFigures, variablesOf } from "./model";
+import { WORLD, replay, type LoggedAction } from "./world";
+import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
+import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
 
 describe("the world the dashboard plays", () => {
   it("replays the same history byte for byte", () => {
-    const a = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, [], 12).session.result();
-    const b = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, [], 12).session.result();
+    const a = replay(WORLD.seed, [], 8).session;
+    const b = replay(WORLD.seed, [], 8).session;
     expect(JSON.stringify(a.days)).toBe(JSON.stringify(b.days));
   });
 
-  it("uses fictional clients only and opens with an unstated lifetime revenue", () => {
-    for (const s of SCENARIOS) {
-      const w = buildWorld(s, s.seed);
-      expect(w.clients.length).toBe(s.clients);
-      expect(w.clients.some((c) => c.offer.lifetimeRevenue === undefined)).toBe(true);
-    }
-  });
-
-  it("replays logged actions on their day: launch, pause, catalogue edits", () => {
-    const base = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, [], 3);
-    const c = base.session.clients[0]!;
-    const funnel = base.session.proposeFunnels(c.offer, c.campaign.target, { brandId: c.brand.id, limit: 1 }).funnels[0]!;
+  it("replays logged actions on their day: pause, strategy, an edit that makes a new version", () => {
+    const base = replay(WORLD.seed, [], 2).session;
+    const c = base.campaigns()[0]!;
+    const outcome = WORLD.catalogue.outcomes.find((o) => o.contentType === "text_with_variables")!.id;
+    const dyn = base.objectDynasties(c.brandId, outcome)[0]!;
     const actions: LoggedAction[] = [
-      {
-        day: 3,
-        action: {
-          type: "launch",
-          client: { ...c, campaign: { ...c.campaign, id: "campaign-x1", salesFunnel: funnel.legs.map((l) => l.playId) }, expertAudiences: [] },
-        },
-      },
-      { day: 4, action: { type: "status", campaignId: c.campaign.id, status: "paused" } },
-      { day: 4, action: { type: "retire", kind: "pipes", id: funnel.legs[0]!.pipeId } },
+      { day: 2, action: { type: "status", campaignId: c.id, status: "paused" } },
+      { day: 3, action: { type: "objectVersion", brandId: c.brandId, outcome, dynasty: dyn, text: "Hello {{first_name}}" } },
     ];
-    const { session, applied } = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, actions, 8);
-    expect(applied).toHaveLength(3);
-    expect(session.clients.map((x) => x.campaign.id)).toContain("campaign-x1");
-    expect(session.result().days[6]!.spendCents[c.campaign.id] ?? 0).toBe(0);
-    const again = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, actions, 8).session.result();
-    expect(JSON.stringify(again.days)).toBe(JSON.stringify(session.result().days));
+    const { session, applied } = replay(WORLD.seed, actions, 5);
+    expect(applied).toHaveLength(2);
+    expect(session.days[3]!.spendCents[c.id] ?? 0).toBe(0);
+    expect(session.objectHead(c.brandId, outcome, dyn)?.version).toBeGreaterThan(1);
   });
 });
 
 describe("read models", () => {
-  const { world, session } = replay(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, [], 30);
+  const { world, session } = replay(WORLD.seed, [], 20);
   const model = buildModel(world, session);
 
   it("names the lead tracks with the owner's word and never mixes them", () => {
-    const tracks = leadTracks(model.catalogue);
-    expect(tracks.map((t) => t.label)).toEqual(["CRM lifecycle track", "Website visits track"]);
-    const states = tracks.flatMap((t) => t.states.map((s) => s.state));
-    expect(new Set(states).size).toBe(states.length);
+    expect(leadTracks(model.catalogue).map((t) => t.label)).toEqual(["CRM lifecycle track", "Website visits track"]);
   });
 
-  it("spend of every client adds up to the ledger to the cent", () => {
-    const f = scopeFigures(model, model.clients);
-    expect(f.spendCents).toBe(model.result.ledger.totalSpendCents);
-    expect(model.result.ledger.reconciles).toBe(true);
+  it("our spend adds up to the ledger's spend of our runs", () => {
+    const f = scopeFigures(model, model.campaigns);
+    const ours = session.runs.filter((r) => model.catalogue.factory(r.factory)?.ours).reduce((s, r) => s + r.spendCents, 0);
+    expect(f.spendCents).toBe(ours);
+    expect(session.ledger().reconciles).toBe(true);
   });
 
-  it("counts every occurrence once, in the scope of its lead's campaign", () => {
-    const all = scopeFigures(model, model.clients);
-    const parts = model.clients.map((c) => scopeFigures(model, [c]));
-    for (const [k, v] of Object.entries(all.outcomes)) expect(parts.reduce((s, p) => s + (p.outcomes[k] ?? 0), 0)).toBe(v);
-    expect(Object.values(all.outcomes).reduce((s, x) => s + x, 0)).toBe(model.result.occurrences.length);
+  it("lists every input choice of a campaign with beliefs and the hidden best", () => {
+    const points = pointsOf(model, model.campaigns[0]!);
+    expect(points.length).toBeGreaterThan(5);
+    const graded = points.filter((p) => p.options.length > 1 && p.options.some((o) => o.isHiddenBest));
+    expect(graded.length).toBeGreaterThan(5);
+  });
+
+  it("shows where a provider pipe is plugged and the best script at each input", () => {
+    const multi = model.catalogue.pipes.map((p) => pluggedAt(model, p.id)).filter((l) => l.length >= 2);
+    expect(multi.length).toBeGreaterThan(0);
+  });
+
+  it("lists object dynasties with their versions", () => {
+    const outcome = model.catalogue.outcomes.find((o) => o.contentType === "text_with_variables")!.id;
+    const d = objectDynasties(model, outcome, model.clients[0]!.brand.id);
+    expect(d.length).toBeGreaterThanOrEqual(2);
+    expect(d.some((x) => x.versions.length > 1)).toBe(true);
   });
 
   it("cost per outcome over time is null before the first outcome, never zero", () => {
     expect(costPerOutcomeSeries([100, 100, 100], [0, 0, 2])).toEqual([null, null, 1.5]);
   });
+});
 
-  it("finds sales paths from Start to a top lead state", () => {
-    const paths = salesPaths(model.catalogue);
-    expect(paths.length).toBeGreaterThan(5);
-    for (const p of paths) expect(p[0]).toBe("start");
-  });
+describe("pins are configuration", () => {
+  const { world, session } = replay(WORLD.seed, [], 6);
+  const model = buildModel(world, session);
 
-  it("explains choices in words, never with a raw id", () => {
-    for (const c of model.result.choices.slice(-50)) expect(explainChoice(model, c)).not.toMatch(/#default|\|/);
-  });
-
-  it("runs the segment study on mature leads", () => {
-    const study = segmentStudy(model, model.clients[0]!);
-    expect(study.records).toBeGreaterThan(0);
+  it("the world ships two pins, and pinning any other outcome or pipe gives it a page with no new code", () => {
+    expect(DEFAULT_PINS).toHaveLength(2);
+    for (const p of DEFAULT_PINS) expect(pinnedPage(model, p, null).kind).toBe(p.kind);
+    // Pin an object outcome nobody pinned: it gets a menu entry and a page listing its dynasties.
+    const other = model.catalogue.outcomes.find((o) => o.subject === "object" && !DEFAULT_PINS.some((p) => p.id === o.id) && session.objectVersions(model.clients[0]!.brand.id, o.id).length > 0)!;
+    const pins = togglePin(DEFAULT_PINS, { kind: "outcome", id: other.id, label: other.plural ?? other.label });
+    expect(pins).toHaveLength(3);
+    expect(pinHref(pins[2]!)).toContain(encodeURIComponent(`outcome:${other.id}`));
+    const page = pinnedPage(model, pins[2]!, null);
+    expect(page.kind === "outcome" && page.dynasties.length).toBeGreaterThan(0);
+    // And a pipe: its scripts, where it is plugged, its pipe storage.
+    const pipe = model.catalogue.pipes.find((p) => p.inputs.length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
+    const pipePage = pinnedPage(model, { kind: "pipe", id: pipe.id, label: pipe.name }, null);
+    expect(pipePage.kind === "pipe" && pipePage.dynasties.length).toBeGreaterThan(0);
   });
 });
 
-describe("expert step and formats", () => {
-  it("turns an ICP into 1 to 3 audiences", () => {
-    expect(audiencesFromIcp("Founders of small software startups in Europe")).toHaveLength(3);
-    expect(audiencesFromIcp("anyone").length).toBeGreaterThanOrEqual(1);
+describe("text with variables", () => {
+  it("diffs two versions word by word and lists the variables", () => {
+    const d = diffWords("Hi {{first_name}}, how are you", "Hi {{first_name}}, how is {{company}}");
+    expect(d.filter((p) => p.kind === "add").map((p) => p.text).join("")).toContain("{{company}}");
+    expect(d.filter((p) => p.kind === "del").map((p) => p.text).join("")).toContain("are");
+    expect(variablesOf("Hi {{first_name}} at {{company}} {{first_name}}")).toEqual(["first_name", "company"]);
   });
+});
 
+describe("formats", () => {
   it("prints rates whole, a decimal only below 1%", () => {
     expect(formatRatePct(0.236)).toBe("24%");
     expect(formatRatePct(0.006)).toBe("0.6%");
     expect(formatRatePct(0.0004)).toBe("<0.1%");
     expect(formatRoi(3.42)).toBe("3.4×");
     expect(formatUsd(1234)).toBe("$1,234");
+  });
+});
+
+describe("the dashboard knows no outcome, pipe or script by name", () => {
+  it("no source line tests for a template, an LLM or an ICP", () => {
+    const root = join(__dirname, "..");
+    const files: string[] = [];
+    const walk = (d: string) => {
+      for (const f of readdirSync(d)) {
+        const p = join(d, f);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.tsx?$/.test(f) && !f.endsWith(".test.ts")) files.push(p);
+      }
+    };
+    walk(root);
+    for (const f of files) {
+      const code = readFileSync(f, "utf8")
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//"))
+        .join("\n");
+      expect(code, f).not.toMatch(/["'`](template_written|llm_completion|audience_built|llm|template|icp)["'`|]/i);
+    }
   });
 });

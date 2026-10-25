@@ -1,33 +1,36 @@
 /**
- * Read models over the running world: every figure a page shows is computed here, once per
- * simulated day, from the engine's own outputs (runs, occurrences, leads, choices). Pages divide
- * nothing themselves. Nothing here knows a channel, a pipe or a step by name: everything is read
+ * Read models over the running world: every figure a page shows is computed here from the
+ * engine's own outputs (runs, occurrences, input choices, beliefs). Pages divide nothing
+ * themselves. Nothing here knows an outcome, a pipe or a script by name: everything is read
  * off the catalogue.
  */
 
 import {
   START,
-  chainCostPerTarget,
-  evaluateSplits,
-  targetValue,
-  valueBackward,
+  convergence,
+  hiddenBest,
+  isOnDemand,
+  legConsumer,
+  playPoint,
+  rankFunnels,
+  type Campaign,
   type Catalogue,
   type ChoiceRecord,
-  type LedgerOccurrence,
-  type LedgerRun,
+  type HiddenOption,
+  type Occurrence,
+  type OutcomeId,
+  type Person,
   type Pipe,
-  type SimClient,
-  type SimLead,
-  type SimulationResult,
+  type PointConvergence,
+  type Script,
   type SimulationSession,
-  type SplitResult,
-  type StepKey,
+  type WorldClient,
   type WorldSpec,
 } from "@gtm-factory/engine";
-import { humanize, sentenceCase } from "./format";
+import { humanize } from "./format";
 
 export interface LeadStateDef {
-  state: string;
+  outcome: OutcomeId;
   label: string;
   rank: number;
   trackId: string;
@@ -45,43 +48,32 @@ export interface Model {
   day: number;
   world: WorldSpec;
   session: SimulationSession;
-  result: SimulationResult;
   catalogue: Catalogue;
-  clients: readonly SimClient[];
-  leads: SimLead[];
-  leadById: Map<string, SimLead>;
-  runById: Map<string, LedgerRun>;
-  occurrencesByRun: Map<string, LedgerOccurrence[]>;
+  clients: readonly WorldClient[];
+  campaigns: Campaign[];
   tracks: TrackDef[];
-  stateDefs: Map<string, LeadStateDef>;
+  /** Cached per model (one simulated day): expensive reads computed once, on first use. */
+  memo: Map<string, unknown>;
 }
 
 export function buildModel(world: WorldSpec, session: SimulationSession): Model {
-  const result = session.result();
-  const leads = session.leads();
-  const occurrencesByRun = new Map<string, LedgerOccurrence[]>();
-  for (const o of result.occurrences) {
-    const list = occurrencesByRun.get(o.runId);
-    if (list) list.push(o);
-    else occurrencesByRun.set(o.runId, [o]);
-  }
-  const tracks = leadTracks(world.catalogue);
-  const stateDefs = new Map<string, LeadStateDef>();
-  for (const t of tracks) for (const s of t.states) stateDefs.set(s.state, s);
   return {
     day: session.day,
     world,
     session,
-    result,
     catalogue: world.catalogue,
     clients: session.clients,
-    leads,
-    leadById: new Map(leads.map((l) => [l.id, l])),
-    runById: new Map(result.runs.map((r) => [r.id, r])),
-    occurrencesByRun,
-    tracks,
-    stateDefs,
+    campaigns: session.campaigns(),
+    tracks: leadTracks(world.catalogue),
+    memo: new Map(),
   };
+}
+
+function memo<T>(model: Model, key: string, f: () => T): T {
+  if (model.memo.has(key)) return model.memo.get(key) as T;
+  const v = f();
+  model.memo.set(key, v);
+  return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,209 +84,199 @@ export function buildModel(world: WorldSpec, session: SimulationSession): Model 
 export function leadTracks(catalogue: Catalogue): TrackDef[] {
   return catalogue.leadTracks
     .filter((t) => !t.retired)
-    .map((t) => {
-      const seen = new Map<string, LeadStateDef>();
-      for (const s of catalogue.steps) {
-        const ls = s.leadState;
-        if (!ls || ls.leadTrack !== t.id || s.retired) continue;
-        if (!seen.has(ls.state)) seen.set(ls.state, { state: ls.state, label: humanize(ls.state), rank: ls.rank, trackId: t.id });
-      }
-      return {
-        id: t.id,
-        label: `${t.name} track`,
-        description: t.description,
-        states: [...seen.values()].sort((a, b) => a.rank - b.rank),
-      };
-    })
+    .map((t) => ({
+      id: t.id,
+      label: `${t.name} track`,
+      description: t.description,
+      states: catalogue.outcomes
+        .filter((o) => o.track?.track === t.id && !o.retired)
+        .map((o) => ({ outcome: o.id, label: o.label, rank: o.track!.rank, trackId: t.id }))
+        .sort((a, b) => a.rank - b.rank),
+    }))
     .filter((t) => t.states.length > 0);
 }
 
-export function stepLabel(catalogue: Catalogue, key: StepKey): string {
-  if (key === START) return "Start";
-  return catalogue.step(key)?.label ?? humanize(key);
+export function outcomeLabel(catalogue: Catalogue, id: OutcomeId): string {
+  if (id === START) return "Start";
+  return catalogue.outcome(id)?.label ?? humanize(id);
 }
 
-/** The lead state an outcome key names, or the step it is (object steps). */
-export function outcomeLabel(model: Model, outcome: string): string {
-  return model.stateDefs.get(outcome)?.label ?? stepLabel(model.catalogue, outcome);
+export function outcomePlural(catalogue: Catalogue, id: OutcomeId): string {
+  const o = catalogue.outcome(id);
+  return o?.plural ?? `${outcomeLabel(catalogue, id)}s`;
 }
 
-export function channelName(catalogue: Catalogue, pipe: Pipe | undefined): string {
-  if (!pipe) return "Unknown";
-  return catalogue.channel(pipe.channel)?.name ?? humanize(pipe.channel);
+export function pipeName(catalogue: Catalogue, id: string): string {
+  return catalogue.pipe(id)?.name ?? humanize(id);
 }
 
-/** A pipe's own name (its bird) and what it does. */
-export function pipeTitle(catalogue: Catalogue, pipeId: string): { name: string; line: string } {
-  const p = catalogue.pipe(pipeId);
-  if (!p) return { name: pipeId, line: "" };
-  return { name: p.name ?? pipeId, line: `${stepLabel(catalogue, p.from)} → ${channelName(catalogue, p)} → ${stepLabel(catalogue, p.to)}` };
+export function factoryName(catalogue: Catalogue, id: string): string {
+  return catalogue.factory(id)?.name ?? humanize(id);
 }
 
-export function playPipe(catalogue: Catalogue, playId: string): Pipe | undefined {
-  const play = catalogue.play(playId);
-  return play ? catalogue.pipe(play.pipeId) : undefined;
+/** A pipe in one line: its inputs, then what it makes. */
+export function pipeLine(catalogue: Catalogue, pipe: Pipe): string {
+  const ins = pipe.inputs.length ? pipe.inputs.map((i) => outcomeLabel(catalogue, i)).join(" + ") : "The market";
+  return `${ins} → ${outcomeLabel(catalogue, pipe.output)}`;
 }
 
-/** A sales funnel's plain name: what it starts with and what it brings. */
-export function funnelName(catalogue: Catalogue, playIds: readonly string[]): string {
-  const first = playPipe(catalogue, playIds[0] ?? "");
-  const last = playPipe(catalogue, playIds[playIds.length - 1] ?? "");
-  if (!first || !last) return "Sales funnel";
-  const via = playIds.length > 2 ? ` via ${stepLabel(catalogue, playPipe(catalogue, playIds[0]!)!.to)}` : "";
-  return `${channelName(catalogue, first)}${via} to ${stepLabel(catalogue, last.to)}`;
+/** The script a dynasty runs today. */
+export function headScript(catalogue: Catalogue, dynasty: string): Script | undefined {
+  return catalogue.headOf(dynasty) ?? catalogue.versionsOf(dynasty).pop();
 }
 
-export function workflowLabel(catalogue: Catalogue, id: string): string {
-  const w = catalogue.workflow(id);
-  if (!w) return id;
-  const tail = id.split(":wf:")[1] ?? w.dynasty;
-  const words: Record<string, string> = { rules: "Rules", ai: "AI writer", "ai-research": "AI researcher", human: "Person", scripted: "Person with script" };
-  return words[tail] ?? humanize(tail);
+export type PointKind = "play" | "script" | "occurrence";
+
+export interface PointInfo {
+  key: string;
+  kind: PointKind;
+  /** The consuming pipe, or null for a leg's own choice. */
+  consumer: Pipe | null;
+  /** The input the choice is made at. */
+  input: OutcomeId;
+  /** "Message writer · LLM completion", "Lead interested → Meeting booked". */
+  title: string;
+  /** What the options are: scripts of these pipes, occurrences of an outcome, or plays. */
+  sub: string;
 }
 
-export function slotOptionLabel(catalogue: Catalogue, id: string): string {
-  const o = catalogue.slotOption(id);
-  return o ? humanize(o.name) : id;
+/** What a choice point is, in words, from its key. */
+export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
+  if (key.startsWith("play:")) {
+    const [from, to] = key.slice(5).split(">") as [string, string];
+    return { key, kind: "play", consumer: null, input: to, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which pipe plays the leg" };
+  }
+  const [consumer, input] = key.split("|") as [string, string];
+  const out = catalogue.outcome(input);
+  if (consumer.startsWith("leg:")) {
+    const [from, to] = consumer.slice(4).split(">") as [string, string];
+    return { key, kind: "script", consumer: null, input, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which script performs the leg" };
+  }
+  const pipe = catalogue.pipe(consumer) ?? null;
+  const providers = catalogue.providersOf(input);
+  const kind: PointKind = out?.subject === "object" && !providers.some((p) => isOnDemand(p)) ? "occurrence" : "script";
+  return {
+    key,
+    kind,
+    consumer: pipe,
+    input,
+    title: `${pipe?.name ?? humanize(consumer)} · ${outcomeLabel(catalogue, input)}`,
+    sub: kind === "occurrence" ? `Which ${outcomeLabel(catalogue, input).toLowerCase()} to consume` : `Which script provides it`,
+  };
 }
 
-export function optionLabel(model: Model, node: string, id: string): string {
-  if (node === "workflow") return workflowLabel(model.catalogue, id);
-  if (node.startsWith("slot:")) return slotOptionLabel(model.catalogue, id);
-  if (node === "audience") return sentenceCase(model.result.audiences.find((a) => a.id === id)?.name ?? id);
-  if (node === "funnel") return funnelName(model.catalogue, id.split(" > "));
-  return id;
-}
-
-export function nodeLabel(node: string): string {
-  if (node === "funnel") return "Sales funnel";
-  if (node === "workflow") return "Workflow";
-  if (node === "audience") return "Audience";
-  if (node.startsWith("slot:")) return node.slice(5) === "llm" ? "LLM" : humanize(node.slice(5));
-  return humanize(node);
+/** An option of a choice point in words: a script dynasty, an object dynasty, or a pipe. */
+export function optionLabel(model: Model, point: string, option: string, brandId?: string): string {
+  const s = headScript(model.catalogue, option);
+  if (s) return s.name;
+  const pipe = model.catalogue.pipe(option);
+  if (pipe) return pipe.name;
+  const info = pointInfo(model.catalogue, point);
+  const brands = brandId ? [brandId] : model.clients.map((c) => c.brand.id);
+  for (const b of brands) {
+    const occ = model.session.objectHead(b, info.input, option);
+    if (occ) return occ.name ?? humanize(option);
+  }
+  return humanize(option);
 }
 
 // ---------------------------------------------------------------------------
 // Clients, campaigns, value
 // ---------------------------------------------------------------------------
 
-export function clientOfCampaign(model: Model, campaignId: string): SimClient | undefined {
-  return model.clients.find((c) => c.campaign.id === campaignId);
+export function clientOf(model: Model, campaignId: string): WorldClient | undefined {
+  return model.clients.find((c) => c.campaigns.some((x) => x.id === campaignId));
 }
 
 /** Campaigns in scope: one brand, or every client. */
-export function scopedClients(model: Model, brandId: string | null): SimClient[] {
-  return model.clients.filter((c) => !brandId || c.brand.id === brandId);
+export function scopedCampaigns(model: Model, brandId: string | null): Campaign[] {
+  return model.campaigns.filter((c) => !brandId || c.brandId === brandId);
 }
 
-/** One target outcome's value and whether the client stated it. */
-export function valueOf(model: Model, client: SimClient): { amount: number; label: "stated" | "expected" } | null {
-  return targetValue(client.offer, client.campaign.target, model.clients.map((c) => c.offer), model.catalogue);
+/** Where a campaign's funnel starts: Start, or its trigger's event. */
+export function entryOf(model: Model, campaign: Campaign): OutcomeId {
+  return campaign.entry.kind === "start" ? START : model.catalogue.trigger(campaign.entry.triggerId)?.event ?? START;
 }
 
-export function targetState(model: Model, client: SimClient): string {
-  return model.catalogue.step(client.campaign.target)?.leadState?.state ?? client.campaign.target;
+/** The line of a campaign's sales funnel: entry, then each lead state. */
+export function lineOf(model: Model, campaign: Campaign): OutcomeId[] {
+  return [entryOf(model, campaign), ...campaign.line];
 }
 
-/** Expected return of a campaign's funnel today: value of a target outcome / its cost on today's estimates. */
-export function expectedRoi(model: Model, client: SimClient): number | null {
-  const plays = model.session.funnelOfCampaign(client.campaign.id) ?? client.campaign.salesFunnel ?? null;
-  const value = valueOf(model, client)?.amount ?? null;
-  if (!plays || value == null) return null;
-  const legs = plays.map((p) => model.session.estimateLeg(p, client.brand.id));
-  if (legs.some((l) => !l)) return null;
-  const cost = chainCostPerTarget(legs.map((l) => ({ costPerTrial: l!.costPerTrial, yieldRate: l!.yieldRate })));
-  return Number.isFinite(cost) && cost > 0 ? value / cost : null;
+export function targetOf(campaign: Campaign): OutcomeId {
+  return campaign.line[campaign.line.length - 1]!;
 }
 
-/** Value of one occurrence at each step of the offer, backward from its target (Bellman). */
-export function stepValues(model: Model, client: SimClient): Map<StepKey, number> {
-  const value = valueOf(model, client)?.amount ?? 0;
-  const back = valueBackward(model.catalogue, client.offer, client.campaign.target, value, (play) => model.session.estimateLeg(play.id, client.brand.id));
-  return new Map([...back.values].map(([k, v]) => [k, v.value]));
+export function campaignName(model: Model, campaign: Campaign): string {
+  return campaign.name;
+}
+
+/** The pipe each leg plays most today (its current choice), by leg. */
+export function legPlays(model: Model, campaign: Campaign): { from: OutcomeId; to: OutcomeId; pipeId: string | null; options: string[] }[] {
+  const line = lineOf(model, campaign);
+  return campaign.line.map((to, k) => {
+    const from = line[k]!;
+    const options = model.session.playsFor(campaign, from, to).map((p) => p.id);
+    const series = model.session.pickSeries(playPoint(from, to), campaign.id);
+    let best: string | null = options[0] ?? null;
+    let bestN = -1;
+    for (const [o, arr] of series) {
+      const n = arr.slice(-7).reduce((x, y) => x + y, 0);
+      if (n > bestN) {
+        bestN = n;
+        best = o;
+      }
+    }
+    return { from, to, pipeId: best, options };
+  });
 }
 
 export interface ScopeFigures {
   spendCents: number;
   dailySpendCents: number[];
-  /** Occurrences per outcome (lead state or object step), to date. */
-  outcomes: Record<string, number>;
-  /** Occurrences per outcome per day. */
+  /** Access cost paid to other factories, per day. */
+  dailyOtherCents: number[];
+  /** New lead states per outcome, per day. */
   dailyOutcomes: Record<string, number[]>;
-  /** Value of target outcomes reached, dollars, per day. */
-  dailyValue: number[];
-  value: number;
-  roi: number | null;
-  expectedRoi: number | null;
-  /** Expected cost of one target outcome on today's estimates, dollars. */
-  expectedCostPerTarget: number | null;
-  leads: number;
-  dailyLeads: number[];
+  outcomes: Record<string, number>;
+  dailyValueOurs: number[];
+  dailyValueOther: number[];
+  valueOurs: number;
+  valueOther: number;
+  attempts: number;
+  dailyAttempts: number[];
+  triggerEvents: number;
 }
 
-/** Value of one target outcome across a set of campaigns: what was won per outcome, else the mean stated value. */
-function meanTargetValue(model: Model, clients: readonly SimClient[], value: number, outcomes: Record<string, number>): number {
-  const won = [...new Set(clients.map((c) => targetState(model, c)))].reduce((s, st) => s + (outcomes[st] ?? 0), 0);
-  if (won > 0) return value / won;
-  const vals = clients.map((c) => valueOf(model, c)?.amount ?? 0).filter((v) => v > 0);
-  return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-}
-
-/** Money and outcomes of a set of campaigns, day by day. */
-export function scopeFigures(model: Model, clients: readonly SimClient[]): ScopeFigures {
-  const ids = new Set(clients.map((c) => c.campaign.id));
-  const days = model.day;
-  const dailySpendCents = new Array<number>(days).fill(0);
-  model.result.days.forEach((d) => {
-    for (const [cid, cents] of Object.entries(d.spendCents)) if (ids.has(cid)) dailySpendCents[d.day]! += cents;
-  });
-  const setup = model.result.runs.filter((r) => r.support && clients.some((c) => r.id === `run:setup:${c.brand.id}`));
-  for (const r of setup) if (r.day < days) dailySpendCents[r.day]! += r.spendCents;
-  const outcomes: Record<string, number> = {};
-  const dailyOutcomes: Record<string, number[]> = {};
-  const dailyValue = new Array<number>(days).fill(0);
-  const valueByCampaign = new Map(clients.map((c) => [c.campaign.id, { state: targetState(model, c), value: valueOf(model, c)?.amount ?? 0 }]));
-  for (const o of model.result.occurrences) {
-    const lead = model.leadById.get(o.subject);
-    if (!lead || !ids.has(lead.campaignId)) continue;
-    outcomes[o.outcome] = (outcomes[o.outcome] ?? 0) + 1;
-    const series = (dailyOutcomes[o.outcome] ??= new Array<number>(days).fill(0));
-    if (o.day < days) series[o.day]! += 1;
-    const v = valueByCampaign.get(lead.campaignId);
-    if (v && v.state === o.outcome && o.day < days) dailyValue[o.day]! += v.value;
-  }
-  const dailyLeads = new Array<number>(days).fill(0);
-  let leads = 0;
-  for (const l of model.leads) {
-    if (!ids.has(l.campaignId)) continue;
-    leads++;
-    if (l.createdDay < days) dailyLeads[l.createdDay]! += 1;
-  }
-  const spendCents = dailySpendCents.reduce((s, x) => s + x, 0);
-  const value = dailyValue.reduce((s, x) => s + x, 0);
-  let expWeighted = 0;
-  let expSpend = 0;
-  for (const c of clients) {
-    const e = expectedRoi(model, c);
-    const spent = model.session.spentCents(c.campaign.id) || c.campaign.dailyBudgetCents;
-    if (e != null && e > 0) {
-      expWeighted += e * spent;
-      expSpend += spent;
+/** Money, value and outcomes of a set of campaigns, day by day. */
+export function scopeFigures(model: Model, campaigns: readonly Campaign[]): ScopeFigures {
+  const ids = new Set(campaigns.map((c) => c.id));
+  const n = model.day;
+  const z = () => new Array<number>(n).fill(0);
+  const f: ScopeFigures = { spendCents: 0, dailySpendCents: z(), dailyOtherCents: z(), dailyOutcomes: {}, outcomes: {}, dailyValueOurs: z(), dailyValueOther: z(), valueOurs: 0, valueOther: 0, attempts: 0, dailyAttempts: z(), triggerEvents: 0 };
+  for (const d of model.session.days) {
+    for (const [cid, v] of Object.entries(d.spendCents)) if (ids.has(cid)) f.dailySpendCents[d.day]! += v;
+    for (const [cid, v] of Object.entries(d.otherCents)) if (ids.has(cid)) f.dailyOtherCents[d.day]! += v;
+    for (const [cid, v] of Object.entries(d.valueOurs)) if (ids.has(cid)) f.dailyValueOurs[d.day]! += v;
+    for (const [cid, v] of Object.entries(d.valueOther)) if (ids.has(cid)) f.dailyValueOther[d.day]! += v;
+    for (const [cid, v] of Object.entries(d.attempts)) if (ids.has(cid)) f.dailyAttempts[d.day]! += v;
+    for (const [cid, per] of Object.entries(d.outcomes)) {
+      if (!ids.has(cid)) continue;
+      for (const [o, v] of Object.entries(per)) {
+        (f.dailyOutcomes[o] ??= z())[d.day]! += v;
+        f.outcomes[o] = (f.outcomes[o] ?? 0) + v;
+      }
     }
   }
-  return {
-    spendCents,
-    dailySpendCents,
-    outcomes,
-    dailyOutcomes,
-    dailyValue,
-    value,
-    roi: spendCents > 0 ? value / (spendCents / 100) : null,
-    expectedRoi: expSpend > 0 ? expWeighted / expSpend : null,
-    expectedCostPerTarget: expSpend > 0 && expWeighted > 0 ? meanTargetValue(model, clients, value, outcomes) / (expWeighted / expSpend) : null,
-    leads,
-    dailyLeads,
-  };
+  // Setup and other work billed to the campaigns outside a day's runs (seed occurrences, setup).
+  f.spendCents = campaigns.reduce((s, c) => s + model.session.spentCents(c.id), 0);
+  // Setup of the brands in scope (support work, no outcome): our spend too.
+  for (const r of model.session.runs) if (r.support && r.campaignId && ids.has(r.campaignId)) f.spendCents += r.spendCents;
+  f.valueOurs = f.dailyValueOurs.reduce((s, x) => s + x, 0);
+  f.valueOther = f.dailyValueOther.reduce((s, x) => s + x, 0);
+  f.attempts = f.dailyAttempts.reduce((s, x) => s + x, 0);
+  f.triggerEvents = model.session.triggerEvents.filter((e) => e.campaignIds.some((c) => ids.has(c))).length;
+  return f;
 }
 
 export function cumulative(values: readonly number[]): number[] {
@@ -309,171 +291,382 @@ export function costPerOutcomeSeries(dailySpendCents: readonly number[], dailyOu
   return spend.map((s, i) => (outs[i]! > 0 ? s / 100 / outs[i]! : null));
 }
 
-// ---------------------------------------------------------------------------
-// Pipes and options, from the runs
-// ---------------------------------------------------------------------------
-
-export interface Tally {
-  spendCents: number;
-  inputs: number;
-  outputs: number;
-  runs: number;
-  lastDay: number | null;
-}
-
-export const emptyTally = (): Tally => ({ spendCents: 0, inputs: 0, outputs: 0, runs: 0, lastDay: null });
-
-export function addRun(t: Tally, model: Model, run: LedgerRun): void {
-  t.spendCents += run.spendCents;
-  t.inputs += run.inputs ?? (run.consumed.length || 1);
-  t.outputs += model.occurrencesByRun.get(run.id)?.length ?? 0;
-  t.runs += 1;
-  t.lastDay = Math.max(t.lastDay ?? 0, run.day);
-}
-
-export interface FlashMature {
-  flash: Tally;
-  mature: Tally;
-  /** The pipe's maturity window, days. */
-  windowDays: number;
-  outcomesRequired: number;
-  isMature: boolean;
-}
-
-/** Flash (every run to date) and mature (runs old enough for their outcomes) tallies of a set of runs. */
-export function flashMature(model: Model, pipe: Pipe | undefined, runs: readonly LedgerRun[]): FlashMature {
-  const windowDays = pipe?.maturity.durationDays ?? 0;
-  const outcomesRequired = pipe?.maturity.outcomesRequired ?? 1;
-  const flash = emptyTally();
-  const mature = emptyTally();
-  for (const r of runs) {
-    addRun(flash, model, r);
-    if (model.day - r.day >= windowDays) addRun(mature, model, r);
+/** Return of a set of campaigns: our value over our spend, and the expected one on the same formula, spend-weighted. */
+export function scopeReturn(model: Model, campaigns: readonly Campaign[]): { measured: number | null; expected: number | null; low: number | null; high: number | null } {
+  let spend = 0;
+  let value = 0;
+  let expW = 0;
+  let expS = 0;
+  let lo = 0;
+  let hi = 0;
+  for (const c of campaigns) {
+    const e = model.session.economics(c.id);
+    spend += e.spendCents;
+    value += e.valueOurs;
+    if (e.expected.value !== null && e.spendCents > 0) {
+      expW += e.expected.value * e.spendCents;
+      lo += (e.expected.low ?? e.expected.value) * e.spendCents;
+      hi += (e.expected.high ?? e.expected.value) * e.spendCents;
+      expS += e.spendCents;
+    }
   }
-  return { flash, mature, windowDays, outcomesRequired, isMature: mature.outputs >= outcomesRequired && mature.inputs > 0 };
+  return { measured: spend > 0 ? value / (spend / 100) : null, expected: expS > 0 ? expW / expS : null, low: expS > 0 ? lo / expS : null, high: expS > 0 ? hi / expS : null };
 }
 
-export function rate(t: Tally): number | null {
-  return t.inputs > 0 ? t.outputs / t.inputs : null;
+// ---------------------------------------------------------------------------
+// Choice points: beliefs, picks, hidden truth
+// ---------------------------------------------------------------------------
+
+export interface OptionRow {
+  option: string;
+  label: string;
+  /** Share of this campaign's picks over the last 7 days. */
+  share: number;
+  picks: number;
+  /** The engine's belief today. */
+  rate: number;
+  rateSd: number;
+  cost: number;
+  valuePerDollar: number;
+  decisions: number;
+  successes: number;
+  /** Hidden: true share reaching the leg's end, true cost, true value per dollar. */
+  truth: HiddenOption | null;
+  isHiddenBest: boolean;
+  isBelievedBest: boolean;
 }
 
-export function costPerOutcome(t: Tally): number | null {
-  return t.outputs > 0 ? t.spendCents / 100 / t.outputs : null;
+export interface PointRow {
+  info: PointInfo;
+  campaignId: string;
+  options: OptionRow[];
+  picks: number;
 }
 
-export function runsOf(model: Model, filter: { campaignIds?: Set<string>; pipeId?: string }): LedgerRun[] {
-  return model.result.runs.filter(
-    (r) => r.pipeId && !r.support && (!filter.pipeId || r.pipeId === filter.pipeId) && (!filter.campaignIds || (r.campaignId && filter.campaignIds.has(r.campaignId))),
-  );
+/** The hidden best of every point of a campaign (cached per day). */
+export function hiddenOf(model: Model, campaign: Campaign): Map<string, { best: string; options: HiddenOption[] }> {
+  return memo(model, `hidden:${campaign.id}`, () => hiddenBest(model.session, campaign));
 }
 
-/** The option a run used at a choice node. */
-export function optionOfRun(run: LedgerRun, node: string): string | null {
-  if (node === "workflow") return run.workflowId ?? null;
-  if (node === "audience") return run.audienceId ?? null;
-  if (node.startsWith("slot:")) return run.slotChoice?.[node.slice(5)] ?? null;
-  return null;
+/** Every choice point a campaign used, in the order its decisions are made. */
+export function pointsOf(model: Model, campaign: Campaign): PointRow[] {
+  return memo(model, `points:${campaign.id}`, () => {
+    const hidden = hiddenOf(model, campaign);
+    const keys = model.session.choicePoints().filter((p) => p.campaignId === campaign.id).map((p) => p.point);
+    const ordered = [...hidden.keys(), ...keys.filter((k) => !hidden.has(k))].filter((k) => keys.includes(k));
+    return ordered.map((key) => pointRow(model, campaign, key, hidden.get(key) ?? null));
+  });
 }
 
-/** The latest choice record of a node (for a campaign, or any campaign), with the share of picks. */
-export function latestChoice(model: Model, node: string, pipeId: string | null, campaignId?: string): ChoiceRecord | null {
-  for (let i = model.result.choices.length - 1; i >= 0; i--) {
-    const c = model.result.choices[i]!;
-    if (c.node === node && c.pipeId === pipeId && (!campaignId || c.campaignId === campaignId)) return c;
-  }
-  return null;
-}
-
-/** Share of picks per option over the last `days` days of a node's choice records. */
-export function pickShares(model: Model, node: string, pipeId: string | null, campaignIds: Set<string> | null, days = 7): Map<string, number> {
-  const from = model.day - days;
-  const picks = new Map<string, number>();
+export function pointRow(model: Model, campaign: Campaign, key: string, hidden: { best: string; options: HiddenOption[] } | null): PointRow {
+  const info = pointInfo(model.catalogue, key);
+  const series = model.session.pickSeries(key, campaign.id);
+  const recent = new Map<string, number>();
   let total = 0;
-  for (const c of model.result.choices) {
-    if (c.node !== node || c.pipeId !== pipeId || c.day < from) continue;
-    if (campaignIds && !campaignIds.has(c.campaignId)) continue;
-    for (const o of c.options) {
-      const n = node === "funnel" ? (o.id === c.chosenId ? 1 : 0) : o.picks;
-      picks.set(o.id, (picks.get(o.id) ?? 0) + n);
-      total += n;
-    }
+  let all = 0;
+  for (const [o, arr] of series) {
+    const n = arr.slice(-7).reduce((x, y) => x + y, 0);
+    recent.set(o, n);
+    total += n;
+    all += arr.reduce((x, y) => x + y, 0);
   }
-  if (total > 0) for (const [k, v] of picks) picks.set(k, v / total);
-  return picks;
+  const beliefs = model.session.beliefsAt(key, campaign.id);
+  const bestBelief = [...beliefs].sort((a, b) => b.valuePerDollar - a.valuePerDollar)[0]?.option ?? null;
+  const options: OptionRow[] = beliefs.map((b) => {
+    const truth = hidden?.options.find((h) => h.option === b.option) ?? null;
+    return {
+      option: b.option,
+      label: optionLabel(model, key, b.option, campaign.brandId),
+      share: total > 0 ? (recent.get(b.option) ?? 0) / total : 0,
+      picks: series.get(b.option)?.reduce((x, y) => x + y, 0) ?? 0,
+      rate: b.rate,
+      rateSd: b.rateSd,
+      cost: b.cost,
+      valuePerDollar: b.valuePerDollar,
+      decisions: b.decisions,
+      successes: b.successes,
+      truth,
+      isHiddenBest: hidden?.best === b.option,
+      isBelievedBest: bestBelief === b.option,
+    };
+  });
+  return { info, campaignId: campaign.id, options, picks: all };
 }
 
-/** The hidden true yield of an option on a pipe (base yield x its multiplier), for the Research page. */
-export function trueYield(model: Model, pipeId: string, node: string, optionId: string): number | null {
-  const base = model.world.truth.pipes.find((t) => t.pipeId === pipeId)?.baseYield;
-  if (base == null) return null;
-  if (node === "workflow") return base * (model.world.truth.workflows[optionId] ?? 1);
-  if (node.startsWith("slot:")) return base * (model.world.truth.slotOptions[optionId] ?? 1);
-  return base;
+/** Convergence of every choice point toward its hidden best (cached per day). */
+export function convergenceOf(model: Model): PointConvergence[] {
+  return memo(model, "convergence", () => convergence(model.session));
 }
 
-// ---------------------------------------------------------------------------
-// Segments: the study behind discovered audiences
-// ---------------------------------------------------------------------------
-
-/** Every one-attribute split of a campaign's mature entry trials, with its verdict (noise, signal, conclusion). */
-export function segmentStudy(model: Model, client: SimClient): { splits: SplitResult[]; records: number } {
-  const plays = model.session.funnelOfCampaign(client.campaign.id) ?? [];
-  const entry = playPipe(model.catalogue, plays[0] ?? "");
-  if (!entry) return { splits: [], records: 0 };
-  const matureAge = Math.max(entry.maturity.durationDays, 1);
-  const records = model.leads
-    .filter((l) => l.campaignId === client.campaign.id && l.audienceId && model.day - l.createdDay >= matureAge)
-    .map((l) => ({
-      attributes: l.attributes,
-      success: l.timeline.some((e) => e.kind === "outcome" && e.pipeId === entry.id),
-      stratum: `${l.brandId}|month-${Math.floor(l.createdDay / 30)}`,
-    }));
-  return { splits: evaluateSplits(records), records: records.length };
+/** Share on the hidden best per day (null on a day without picks). */
+export function shareSeries(pc: PointConvergence): (number | null)[] {
+  return pc.daily.map((d) => (d.picks > 0 ? d.onBest / d.picks : null));
 }
 
-/** The furthest lead state a lead reached on a track (null = none yet). */
-export function leadStateOn(model: Model, lead: SimLead, track: TrackDef): LeadStateDef | null {
-  const rank = lead.states[track.id];
-  if (!rank) return null;
-  return track.states.filter((s) => s.rank <= rank).sort((a, b) => b.rank - a.rank)[0] ?? null;
+/** The latest choice records of a set of campaigns, newest first. */
+export function recentChoices(model: Model, campaignIds: Set<string>, limit: number): ChoiceRecord[] {
+  const out: ChoiceRecord[] = [];
+  const all = model.session.choices;
+  for (let i = all.length - 1; i >= 0 && out.length < limit; i--) if (campaignIds.has(all[i]!.campaignId)) out.push(all[i]!);
+  return out;
 }
 
-/** Sales paths of the catalogue: chains of legs (step to step) from Start to a top lead state, any channel. */
-export function salesPaths(catalogue: Catalogue, limit = 120): StepKey[][] {
-  const legs = new Map<StepKey, Set<StepKey>>();
-  for (const p of catalogue.pipes) {
-    if (!catalogue.isPipeLive(p)) continue;
-    const set = legs.get(p.from) ?? new Set<StepKey>();
-    set.add(p.to);
-    legs.set(p.from, set);
-  }
-  const tops = new Set(
-    catalogue.steps
-      .filter((s) => s.leadState && !catalogue.steps.some((x) => x.leadState?.leadTrack === s.leadState!.leadTrack && x.leadState.rank > s.leadState!.rank))
-      .map((s) => s.key),
-  );
-  const out: StepKey[][] = [];
-  const walk = (path: StepKey[]) => {
-    if (out.length >= limit) return;
-    const at = path[path.length - 1]!;
-    if (tops.has(at) && path.length > 1) {
-      out.push(path);
-      return;
-    }
-    if (path.length > 5) return;
-    for (const next of [...(legs.get(at) ?? [])].sort()) if (!path.includes(next)) walk([...path, next]);
-  };
-  walk([START]);
-  return out.sort((a, b) => a.length - b.length || a.join().localeCompare(b.join()));
-}
-
-/** Why a choice went the way it went, in plain words, from its own options (never a raw id). */
+/** Why a choice went the way it did, in plain words. */
 export function explainChoice(model: Model, c: ChoiceRecord): string {
-  const best = [...c.options].sort((a, b) => b.meanScore - a.meanScore || (a.id < b.id ? -1 : 1))[0];
-  const chosen = optionLabel(model, c.node, c.chosenId);
-  const money = (x: number) => (Number.isFinite(x) ? `$${x >= 100 ? Math.round(x).toLocaleString("en-US") : x.toFixed(2)}` : "unbounded");
-  if (!best) return `${chosen} was the only option.`;
-  if (c.options.length === 1) return `${chosen} was the only option: ${money(best.meanScore)} back per $1 expected.`;
-  if (best.id === c.chosenId) return `Highest expected value: ${money(best.meanScore)} back per $1 spent.`;
-  return `Exploring: ${chosen} drew higher this time. Best expected is ${optionLabel(model, c.node, best.id)} at ${money(best.meanScore)} per $1.`;
+  const brandId = model.campaigns.find((x) => x.id === c.campaignId)?.brandId;
+  const chosen = optionLabel(model, c.point, c.chosenId, brandId);
+  const total = c.options.reduce((s, o) => s + o.picks, 0);
+  const share = total > 0 ? Math.round((100 * (c.options.find((o) => o.id === c.chosenId)?.picks ?? 0)) / total) : 0;
+  if (c.chosenId === c.bestId) return `${chosen} took ${share}% of picks: the best expected value per dollar.`;
+  return `${chosen} took ${share}% of picks while ${optionLabel(model, c.point, c.bestId, brandId)} leads on expected value: still exploring.`;
 }
+
+// ---------------------------------------------------------------------------
+// Pipes, scripts and where they are plugged
+// ---------------------------------------------------------------------------
+
+export interface PluggedInput {
+  point: string;
+  info: PointInfo;
+  /** The script with the best expected value per dollar there, over every campaign that chose there. */
+  bestScript: string | null;
+  picks: number;
+}
+
+/** Every input a pipe's scripts are offered at, and the best script at each. */
+export function pluggedAt(model: Model, pipeId: string): PluggedInput[] {
+  return memo(model, `plugged:${pipeId}`, () => {
+    const dynasties = new Set(model.catalogue.scripts.filter((s) => s.pipeId === pipeId).map((s) => s.dynasty));
+    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => model.session.optionsAt(p).some((o) => dynasties.has(o)));
+    return points.map((point) => {
+      const score = new Map<string, number>();
+      let picks = 0;
+      for (const c of model.campaigns) {
+        const series = model.session.pickSeries(point, c.id);
+        if (series.size === 0) continue;
+        for (const b of model.session.beliefsAt(point, c.id)) if (dynasties.has(b.option)) score.set(b.option, (score.get(b.option) ?? 0) + b.valuePerDollar);
+        for (const arr of series.values()) picks += arr.reduce((x, y) => x + y, 0);
+      }
+      const best = [...score].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      return { point, info: pointInfo(model.catalogue, point), bestScript: best, picks };
+    });
+  });
+}
+
+export interface ScriptFigures {
+  runs: number;
+  subjects: number;
+  produced: number;
+  spendCents: number;
+  yieldRate: number | null;
+  costPerRun: number | null;
+}
+
+/** What a script's runs did: subjects processed, outcomes produced, spend (every version of a dynasty pooled). */
+export function scriptFigures(model: Model, dynasty: string): ScriptFigures {
+  const all = memo(model, "scriptFigures", () => {
+    const byScript = new Map<string, ScriptFigures>();
+    const produced = new Map<string, number>();
+    for (const o of model.session.occurrences) produced.set(o.runId, (produced.get(o.runId) ?? 0) + 1);
+    for (const r of model.session.runs) {
+      if (!r.scriptId) continue;
+      const s = model.catalogue.script(r.scriptId);
+      if (!s) continue;
+      const f = byScript.get(s.dynasty) ?? { runs: 0, subjects: 0, produced: 0, spendCents: 0, yieldRate: null, costPerRun: null };
+      f.runs += 1;
+      f.subjects += r.subjects;
+      f.produced += produced.get(r.id) ?? 0;
+      f.spendCents += r.spendCents;
+      byScript.set(s.dynasty, f);
+    }
+    for (const f of byScript.values()) {
+      f.yieldRate = f.subjects > 0 ? f.produced / f.subjects : null;
+      f.costPerRun = f.subjects > 0 ? f.spendCents / 100 / f.subjects : null;
+    }
+    return byScript;
+  });
+  return all.get(dynasty) ?? { runs: 0, subjects: 0, produced: 0, spendCents: 0, yieldRate: null, costPerRun: null };
+}
+
+// ---------------------------------------------------------------------------
+// Object outcomes: dynasties, versions, the brand holding them
+// ---------------------------------------------------------------------------
+
+export interface ObjectDynasty {
+  brandId: string;
+  dynasty: string;
+  name: string;
+  parentDynasty: string | null;
+  versions: Occurrence[];
+  head: Occurrence;
+  /** Picks over every input that consumes it, every campaign of the brand. */
+  picks: number;
+  /** Share of the brand's picks at those inputs over the last 7 days. */
+  share: number;
+}
+
+/** Every dynasty of an object outcome, per brand (scope = one brand or all). */
+export function objectDynasties(model: Model, outcome: OutcomeId, brandId: string | null): ObjectDynasty[] {
+  const consumerPoints = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`));
+  const out: ObjectDynasty[] = [];
+  for (const client of model.clients) {
+    if (brandId && client.brand.id !== brandId) continue;
+    const versions = model.session.objectVersions(client.brand.id, outcome);
+    const dyns = [...new Set(versions.map((v) => v.dynasty!))];
+    const picks = new Map<string, number>();
+    const recent = new Map<string, number>();
+    let recentTotal = 0;
+    for (const c of client.campaigns) {
+      for (const p of consumerPoints) {
+        for (const [o, arr] of model.session.pickSeries(p, c.id)) {
+          picks.set(o, (picks.get(o) ?? 0) + arr.reduce((x, y) => x + y, 0));
+          const r = arr.slice(-7).reduce((x, y) => x + y, 0);
+          recent.set(o, (recent.get(o) ?? 0) + r);
+          recentTotal += r;
+        }
+      }
+    }
+    for (const d of dyns) {
+      const vs = versions.filter((v) => v.dynasty === d).sort((a, b) => (a.version ?? 0) - (b.version ?? 0));
+      const head = vs[vs.length - 1]!;
+      out.push({ brandId: client.brand.id, dynasty: d, name: head.name ?? humanize(d), parentDynasty: vs[0]!.parentDynasty ?? null, versions: vs, head, picks: picks.get(d) ?? 0, share: recentTotal > 0 ? (recent.get(d) ?? 0) / recentTotal : 0 });
+    }
+  }
+  return out;
+}
+
+/** Object outcomes of the catalogue (what a pin on an outcome can list). */
+export function objectOutcomes(catalogue: Catalogue): OutcomeId[] {
+  return catalogue.outcomes.filter((o) => o.subject === "object" && !o.retired).map((o) => o.id);
+}
+
+/** A word diff between two texts: the parts kept, added and removed, in order. */
+export function diffWords(a: string, b: string): { kind: "same" | "add" | "del"; text: string }[] {
+  const x = a.split(/(\s+)/);
+  const y = b.split(/(\s+)/);
+  const n = x.length;
+  const m = y.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) lcs[i]![j] = x[i] === y[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+  const out: { kind: "same" | "add" | "del"; text: string }[] = [];
+  const push = (kind: "same" | "add" | "del", text: string) => {
+    const last = out[out.length - 1];
+    if (last && last.kind === kind) last.text += text;
+    else out.push({ kind, text });
+  };
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (x[i] === y[j]) {
+      push("same", x[i]!);
+      i++;
+      j++;
+    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) push("del", x[i++]!);
+    else push("add", y[j++]!);
+  }
+  while (i < n) push("del", x[i++]!);
+  while (j < m) push("add", y[j++]!);
+  return out;
+}
+
+/** The {{variables}} of a text with variables. */
+export function variablesOf(text: string): string[] {
+  return [...new Set([...text.matchAll(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi)].map((m) => m[1]!))];
+}
+
+// ---------------------------------------------------------------------------
+// Leads and companies
+// ---------------------------------------------------------------------------
+
+export interface LeadRow {
+  person: Person;
+  /** Highest state reached per track. */
+  states: Record<string, LeadStateDef | null>;
+  /** The factory that brought the lead in. */
+  root: string;
+  firstDay: number;
+  campaignIds: string[];
+}
+
+/** Every person the factory served, with the furthest state per track. */
+export function leadRows(model: Model, brandId: string | null): LeadRow[] {
+  return memo(model, `leads:${brandId ?? "all"}`, () => {
+    const rows: LeadRow[] = [];
+    for (const p of model.session.people()) {
+      if (brandId && p.brandId !== brandId) continue;
+      const reached = model.session.reachedBy(p.id);
+      const states: Record<string, LeadStateDef | null> = {};
+      let first = Number.POSITIVE_INFINITY;
+      for (const d of reached.values()) first = Math.min(first, d);
+      for (const t of model.tracks) {
+        let best: LeadStateDef | null = null;
+        for (const s of t.states) if (reached.has(s.outcome) && (!best || s.rank > best.rank)) best = s;
+        states[t.id] = best;
+      }
+      rows.push({ person: p, states, root: model.session.rootOf(p.id) ?? "", firstDay: Number.isFinite(first) ? first : 0, campaignIds: model.session.campaignsOfSubject(p.id) });
+    }
+    return rows;
+  });
+}
+
+/** Everything that happened to one person (and to its company): occurrences, newest last. */
+export function timelineOf(model: Model, personId: string): Occurrence[] {
+  const p = model.session.person(personId);
+  const company = p?.companyId;
+  return model.session.occurrences.filter((o) => o.subject === personId || (company && o.subject === company)).sort((a, b) => a.day - b.day || (a.id < b.id ? -1 : 1));
+}
+
+/** A fictional name for a person, drawn from its id (the same on every reload). */
+export function personName(id: string): string {
+  const FIRST = ["Ava", "Liam", "Noor", "Mateo", "Ines", "Owen", "Sofia", "Ravi", "Lena", "Hugo", "Maya", "Felix", "Zoe", "Arjun", "Clara", "Theo", "Amara", "Jonas", "Elif", "Marco", "Nadia", "Oscar", "Priya", "Leo", "Iris", "Samir", "Hana", "Pablo", "Freya", "Malik"];
+  const LAST = ["Moreau", "Becker", "Okafor", "Lindqvist", "Rossi", "Tanaka", "Novak", "Haddad", "Silva", "Kowalski", "Dubois", "Meyer", "Nguyen", "Fischer", "Costa", "Larsen", "Varga", "Ahmed", "Keller", "Romero", "Brennan", "Sato", "Petrov", "Laine", "Duarte"];
+  const h = hash(id);
+  return `${FIRST[h % FIRST.length]} ${LAST[Math.floor(h / 31) % LAST.length]}`;
+}
+
+export function companyName(companyId: string): string {
+  const A = ["Blue", "North", "Silver", "Bright", "Clear", "Oak", "Swift", "Stone", "Maple", "Iron", "Coral", "Amber", "Cedar", "Lark", "Pine", "Sun", "River", "Fern", "Echo", "Atlas"];
+  const B = ["field", "gate", "line", "works", "path", "point", "bridge", "craft", "loop", "yard", "forge", "harbor", "nest", "grid", "wave", "stack"];
+  const C = ["Systems", "Labs", "Group", "Partners", "Studio", "Logistics", "Health", "Software", "Foods", "Capital", "Clinics", "Freight"];
+  const h = hash(companyId);
+  return `${A[h % A.length]}${B[Math.floor(h / 23) % B.length]} ${C[Math.floor(h / 389) % C.length]}`;
+}
+
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+export function initials(name: string): string {
+  return (
+    name
+      .split(/[\s&.-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// New campaign: funnels proposed by value per dollar
+// ---------------------------------------------------------------------------
+
+/** The best funnels from an entry to a target for an offer, priced on the fleet's measured legs. */
+export function proposeFunnels(model: Model, offerOutcomes: OutcomeId[], target: OutcomeId, value: number, entry: OutcomeId = START) {
+  return rankFunnels(
+    model.catalogue,
+    offerOutcomes,
+    target,
+    (edge) => model.session.fleetLegEstimate(edge.from, edge.to) ?? { costPerAttempt: 1, yieldRate: 0.1, label: "expected" },
+    value,
+    6,
+    entry,
+  );
+}
+
+export { legConsumer, playPoint };

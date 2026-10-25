@@ -1,34 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CalendarCheckIcon, LightningIcon, PlusIcon } from "@phosphor-icons/react";
-import { START, type Pipe, type Trigger, type Workflow } from "@gtm-factory/engine";
-import { FunnelLine, StepChip } from "@/components/funnel-line";
-import { Mark, type MarkKind } from "@/components/mark";
-import { CardTable, Drawer, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TD, TDN, TH, Tabs, ToneDot, TopBar } from "@/components/ui";
+import { PushPinIcon, PushPinSlashIcon } from "@phosphor-icons/react";
+import { defaultStrategyId, describeCondition, describeTacticType, isOnDemand, type Pipe, type Script } from "@gtm-factory/engine";
+import { ProviderLogo, ScriptCard, tacticValueText } from "@/components/catalogue-bits";
+import { Mark } from "@/components/mark";
+import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { channelName, funnelName, salesPaths, scopedClients, stepLabel, targetState, workflowLabel, type Model } from "@/lib/model";
-import { formatCents, formatCount, formatRoi, formatUsd, humanize, roiIsGood } from "@/lib/format";
+import { factoryName, headScript, optionLabel, outcomeLabel, pipeLine, pipeName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
+import { factoryFigures } from "@/lib/engine-pages";
+import { formatCents, formatCount, formatRatePct } from "@/lib/format";
+import { pinKey, togglePin, type Pin } from "@/lib/pins";
 import { useSim } from "@/lib/sim";
-import type { CatalogueKind, SimAction } from "@/lib/world";
 
-type Tab = "steps" | "tracks" | "triggers" | "channels" | "pipes" | "paths" | "plays" | "tactics" | "strategies" | "workflows" | "templates" | "llms";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "steps", label: "Steps" },
-  { id: "tracks", label: "Lead tracks" },
-  { id: "triggers", label: "Triggers" },
-  { id: "channels", label: "Channels" },
-  { id: "pipes", label: "Pipes" },
-  { id: "paths", label: "Sales paths" },
-  { id: "plays", label: "Plays" },
-  { id: "tactics", label: "Tactics" },
-  { id: "strategies", label: "Strategies" },
-  { id: "workflows", label: "Workflows" },
-  { id: "templates", label: "Templates" },
-  { id: "llms", label: "LLMs" },
-];
+const TABS = ["outcomes", "pipes", "scripts", "triggers", "tactics", "strategies", "factories"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABEL: Record<Tab, string> = { outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", triggers: "Triggers", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
 
 export function CataloguePage() {
   const { model } = useSim();
@@ -40,142 +29,375 @@ export function CataloguePage() {
   );
 }
 
-type Detail = { kind: CatalogueKind | "paths" | "tracks"; id: string } | { add: "pipe" | "workflow" | "trigger" | "play" };
-
 function Catalogue({ model }: { model: Model }) {
   const search = useSearchParams();
   const router = useRouter();
   const asked = search.get("tab") as Tab | null;
-  const tab: Tab = TABS.some((t) => t.id === asked) ? asked! : "pipes";
+  const tab: Tab = asked && TABS.includes(asked) ? asked : "outcomes";
   const setTab = (t: Tab) => router.replace(`/catalogue/?tab=${t}`, { scroll: false });
-  const [detail, setDetail] = useState<Detail | null>(null);
   const c = model.catalogue;
-  const paths = useMemo(() => salesPaths(c), [c, model]);
   const counts: Record<Tab, number> = {
-    steps: c.steps.filter((x) => !x.retired).length,
-    tracks: c.leadTracks.filter((x) => !x.retired).length,
-    triggers: c.triggers.filter((x) => !x.retired).length,
-    channels: c.channels.filter((x) => !x.retired).length,
+    outcomes: c.outcomes.filter((x) => !x.retired).length,
     pipes: c.pipes.filter((p) => c.isPipeLive(p)).length,
-    paths: paths.length,
-    plays: c.plays.filter((p) => !p.retired).length,
+    scripts: new Set(c.scripts.filter((s) => s.status === "active").map((s) => s.dynasty)).size,
+    triggers: c.triggers.filter((t) => !t.retired).length,
     tactics: c.tactics.filter((t) => !t.retired).length,
     strategies: c.strategies.filter((s) => !s.retired).length,
-    workflows: c.workflows.filter((w) => w.status === "active").length,
-    templates: c.slotOptions.filter((o) => o.slot === "template" && o.status === "active").length,
-    llms: c.slotOptions.filter((o) => o.slot === "llm" && o.status === "active").length,
+    factories: c.factories.length,
   };
-  const addFor: Partial<Record<Tab, "pipe" | "workflow" | "trigger" | "play">> = { pipes: "pipe", workflows: "workflow", triggers: "trigger", plays: "play" };
-  const add = addFor[tab];
   return (
     <>
       <PageHeader
-        title={`${formatCount(counts.pipes)} pipes, ${formatCount(counts.workflows)} workflows, all as data`}
-        sub="distribute.you's public catalogue. Add, retire or edit a pipe, a workflow or a trigger while the world runs: the funnels and the choices move on the next decision."
-        right={
-          add ? (
-            <button type="button" className="k-btn-strong" onClick={() => setDetail({ add })}>
-              <PlusIcon size={13} weight="bold" />
-              Add {add}
-            </button>
-          ) : undefined
+        title={
+          <>
+            {counts.pipes} pipes, {counts.scripts} scripts competing
+          </>
         }
+        sub="Everything is data: outcomes, pipes, triggers and scripts. Add, upgrade, fork or retire while the factory runs."
       />
-      <LiveFunnels model={model} />
-      <Tabs tabs={TABS.map((t) => ({ id: t.id, label: t.label, count: counts[t.id] }))} value={tab} onChange={setTab} />
-      {tab === "steps" && <StepsTable model={model} />}
-      {tab === "tracks" && <TracksTable model={model} />}
-      {tab === "triggers" && <TriggersTable model={model} open={(id) => setDetail({ kind: "triggers", id })} />}
-      {tab === "channels" && <ChannelsTable model={model} open={(id) => setDetail({ kind: "channels", id })} />}
-      {tab === "pipes" && <PipesTable model={model} open={(id) => setDetail({ kind: "pipes", id })} />}
-      {tab === "paths" && <PathsTable model={model} paths={paths} />}
-      {tab === "plays" && <PlaysTable model={model} open={(id) => setDetail({ kind: "plays", id })} />}
-      {tab === "tactics" && <TacticsTable model={model} />}
-      {tab === "strategies" && <StrategiesTable model={model} open={(id) => setDetail({ kind: "strategies", id })} />}
-      {tab === "workflows" && <WorkflowsTable model={model} open={(id) => setDetail({ kind: "workflows", id })} />}
-      {tab === "templates" && <SlotTable model={model} slot="template" open={(id) => setDetail({ kind: "slotOptions", id })} />}
-      {tab === "llms" && <SlotTable model={model} slot="llm" open={(id) => setDetail({ kind: "slotOptions", id })} />}
-      {detail && <DetailDrawer model={model} detail={detail} onClose={() => setDetail(null)} />}
+      <Tabs tabs={TABS.map((t) => ({ id: t, label: TAB_LABEL[t], count: counts[t] }))} value={tab} onChange={setTab} />
+      {tab === "outcomes" && <Outcomes model={model} />}
+      {tab === "pipes" && <Pipes model={model} />}
+      {tab === "scripts" && <Scripts model={model} />}
+      {tab === "triggers" && <Triggers model={model} />}
+      {tab === "tactics" && <Tactics model={model} />}
+      {tab === "strategies" && <Strategies model={model} />}
+      {tab === "factories" && <Factories model={model} />}
     </>
   );
 }
 
-/** The best funnels of the first client, read live: edit the catalogue and watch them move. */
-function LiveFunnels({ model }: { model: Model }) {
-  const { scope } = useSim();
-  const client = scopedClients(model, scope)[0];
-  if (!client) return null;
-  const proposal = model.session.proposeFunnels(client.offer, client.campaign.target, { brandId: client.brand.id, limit: 3 });
+function PinButton({ pin }: { pin: Pin }) {
+  const { pins, setPins } = useSim();
+  const on = pins.some((p) => pinKey(p) === pinKey(pin));
   return (
-    <section className="mb-6">
-      <SectionTitle right={<span>Updates the moment the catalogue changes</span>}>Best funnels for {client.brand.name} right now</SectionTitle>
-      <div className="k-card divide-y divide-[var(--line-subtle)]">
-        {proposal.funnels.map((f) => (
-          <div key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-            <Mark kind="funnel" id={f.id} size={24} />
-            <div className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium">{funnelName(model.catalogue, f.legs.map((l) => l.playId))}</span>
-              <FunnelLine catalogue={model.catalogue} plays={f.legs.map((l) => l.playId)} />
-            </div>
-            <span className="text-right text-[12px] tabular-nums">
-              <span className="k-label block">
-                <RoiLabel />
-              </span>
-              <span className={roiIsGood(f.valuePerDollar) ? "text-[var(--run)]" : ""}>{formatRoi(f.valuePerDollar)}</span>
-            </span>
-            <span className="w-20 text-right text-[12px] tabular-nums">
-              <span className="k-label block">$ / {model.stateDefs.get(targetState(model, client))?.label.toLowerCase()}</span>
-              {formatUsd(f.costPerTarget)}
-            </span>
-          </div>
-        ))}
-        {proposal.funnels.length === 0 && <EmptyNote>No funnel reaches the target with this catalogue.</EmptyNote>}
-      </div>
-    </section>
+    <button type="button" className="k-btn" onClick={() => setPins(togglePin(pins, pin))} title={on ? "Remove from the sidebar" : "Add a page for it in the sidebar"}>
+      {on ? <PushPinSlashIcon size={13} /> : <PushPinIcon size={13} />}
+      {on ? "Unpin" : "Pin"}
+    </button>
   );
 }
 
-function Status({ active }: { active: boolean }) {
-  return <ToneDot tone={active ? "run" : "muted"}>{active ? "Active" : "Retired"}</ToneDot>;
-}
+const SUBJECT: Record<string, string> = { lead: "A lead", company: "A company", object: "An object", event: "A trigger event" };
+const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", list: "A list", record: "A record", image: "An image" };
 
-function NameCell({ kind, id, icon, name, line }: { kind: MarkKind; id: string; icon?: string | null; name: React.ReactNode; line?: React.ReactNode }) {
-  return (
-    <span className="flex min-w-0 items-center gap-2.5">
-      <Mark kind={kind} id={id} icon={icon} size={line ? 32 : 22} />
-      <span className="min-w-0">
-        <span className="block truncate font-medium">{name}</span>
-        {line && <span className="k-fg3 block truncate text-[12px]">{line}</span>}
-      </span>
-    </span>
-  );
-}
-
-function StepsTable({ model }: { model: Model }) {
+function Outcomes({ model }: { model: Model }) {
   const c = model.catalogue;
+  const produced = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of model.session.occurrences) m.set(o.outcome, (m.get(o.outcome) ?? 0) + 1);
+    return m;
+  }, [model]);
   return (
-    <CardTable>
+    <CardTable footer="An outcome is something reached for a subject. Lead states sit on a lead track; tracks are never added together.">
       <thead>
         <tr className="k-line-subtle border-b">
-          <th className={TH}>Step</th>
+          <th className={TH}>Outcome</th>
           <th className={TH}>About</th>
-          <th className={TH}>Lead state</th>
           <th className={TH}>Lead track</th>
-          <th className={`${TH} text-right`}>Pipes in</th>
-          <th className={`${TH} text-right`}>Pipes out</th>
+          <th className={TH}>Holds</th>
+          <th className={TH}>Made by</th>
+          <th className={`${TH} text-right`}>Occurrences</th>
+          <th className={TH} />
         </tr>
       </thead>
       <tbody>
-        {c.steps.map((s) => (
-          <tr key={s.key} className="k-row">
+        {c.outcomes
+          .filter((o) => !o.retired)
+          .map((o) => {
+            const track = o.track ? c.leadTracks.find((t) => t.id === o.track!.track) : null;
+            const providers = c.providersOf(o.id);
+            return (
+              <tr key={o.id} className="k-row k-line-subtle border-b last:border-0">
+                <td className={TD}>
+                  <span className="flex items-center gap-2">
+                    <Mark kind="outcome" id={o.id} icon={o.icon} size={22} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{o.label}</span>
+                      {o.description && <span className="k-fg3 block max-w-[360px] truncate text-[12px]">{o.description}</span>}
+                    </span>
+                  </span>
+                </td>
+                <td className={TD}>{SUBJECT[o.subject] ?? o.subject}</td>
+                <td className={TD}>{track ? `${track.name} · rank ${o.track!.rank}` : <span className="k-fg4">—</span>}</td>
+                <td className={TD}>{o.contentType ? CONTENT[o.contentType] : <span className="k-fg4">—</span>}</td>
+                <td className={TD}>
+                  <span className="k-fg2 block max-w-[280px] truncate text-[12px]">
+                    {providers.map((p) => p.name).join(", ") || "A trigger"}
+                    {o.referencePipe ? ` · reference: ${pipeName(c, o.referencePipe)}` : ""}
+                  </span>
+                </td>
+                <td className={TDN}>{formatCount(produced.get(o.id) ?? 0)}</td>
+                <td className={`${TD} text-right`}>{o.subject === "object" && <PinButton pin={{ kind: "outcome", id: o.id, label: o.plural ?? o.label, ...(o.icon ? { icon: o.icon } : {}) }} />}</td>
+              </tr>
+            );
+          })}
+      </tbody>
+    </CardTable>
+  );
+}
+
+function Pipes({ model }: { model: Model }) {
+  const c = model.catalogue;
+  const [open, setOpen] = useState<string | null>(null);
+  const pipe = open ? c.pipe(open) : undefined;
+  return (
+    <>
+      <CardTable footer="A pipe turns its inputs into one outcome. Its scripts share its pipe storage; nobody else reads it.">
+        <thead>
+          <tr className="k-line-subtle border-b">
+            <th className={TH}>Pipe</th>
+            <th className={TH}>Inputs → output</th>
+            <th className={TH}>Factory</th>
+            <th className={TH}>Runs on</th>
+            <th className={`${TH} text-right`}>Scripts</th>
+            <th className={`${TH} text-right`}>Plugged at</th>
+            <th className={`${TH} text-right`}>Storage rows</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.pipes.map((p) => {
+            const rows = model.session.storageReport(p.id).tables.reduce((s, t) => s + t.rows, 0);
+            const trigger = p.triggerId ? c.trigger(p.triggerId) : null;
+            return (
+              <tr key={p.id} className={`k-row k-line-subtle cursor-pointer border-b last:border-0 ${p.retired ? "k-fg3" : ""}`} onClick={() => setOpen(p.id)}>
+                <td className={TD}>
+                  <span className="flex items-center gap-2">
+                    <Mark kind="pipe" id={p.id} icon={p.icon} size={22} />
+                    <span className="font-medium">{p.name}</span>
+                    {p.retired && <span className="k-chip">Retired</span>}
+                  </span>
+                </td>
+                <td className={TD}>
+                  <span className="k-fg2 block max-w-[380px] truncate text-[12px]">{pipeLine(c, p)}</span>
+                </td>
+                <td className={TD}>{c.isOurs(p) ? "Ours" : factoryName(c, p.factory)}</td>
+                <td className={TD}>{trigger ? (isOnDemand(p) ? "On demand" : trigger.label) : p.reports ? "Its own schedule" : c.createsSubjects(p) ? "The budget" : "Its inputs"}</td>
+                <td className={TDN}>{c.dynastiesOf(p.id).length}</td>
+                <td className={TDN}>{pluggedAt(model, p.id).length || <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{rows ? formatCount(rows) : <span className="k-fg4">—</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </CardTable>
+      {pipe && <PipeDrawer model={model} pipe={pipe} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClose: () => void }) {
+  const { dispatch } = useSim();
+  const c = model.catalogue;
+  const plugged = pluggedAt(model, pipe.id);
+  const storage = model.session.storageReport(pipe.id);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Drawer title="Pipe" onClose={onClose} width={520}>
+      <div className="flex items-start gap-3">
+        <Mark kind="pipe" id={pipe.id} icon={pipe.icon} size={40} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[18px] font-medium">{pipe.name}</h2>
+          <p className="k-fg2 text-[13px]">{pipeLine(c, pipe)}</p>
+          {pipe.description && <p className="k-fg3 mt-1 text-[12px]">{pipe.description}</p>}
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <PinButton pin={{ kind: "pipe", id: pipe.id, label: pipe.name, ...(pipe.icon ? { icon: pipe.icon } : {}) }} />
+        <button
+          type="button"
+          className="k-btn"
+          onClick={() => setError(dispatch({ type: pipe.retired ? "restore" : "retire", kind: "pipes", id: pipe.id }))}
+        >
+          {pipe.retired ? "Restore" : "Retire"}
+        </button>
+        {error && <span className="text-[12px] text-[var(--data-rose)]">{error}</span>}
+      </div>
+      <dl className="mt-4 grid grid-cols-[120px_minmax(0,1fr)] gap-y-2 text-[13px]">
+        <dt className="k-label pt-0.5">Factory</dt>
+        <dd>{c.isOurs(pipe) ? "Ours" : `${factoryName(c, pipe.factory)} (another factory)`}</dd>
+        <dt className="k-label pt-0.5">Inputs</dt>
+        <dd>{pipe.inputs.length ? pipe.inputs.map((i) => outcomeLabel(c, i)).join(", ") : "The market"}</dd>
+        <dt className="k-label pt-0.5">Output</dt>
+        <dd>{outcomeLabel(c, pipe.output)}</dd>
+        <dt className="k-label pt-0.5">Delay</dt>
+        <dd>{pipe.maturity.delayMeanDays ? `${pipe.maturity.delayMeanDays} days on average, up to ${pipe.maturity.horizonDays}` : "Same day"}</dd>
+      </dl>
+
+      <p className="k-label mb-1.5 mt-5">Where it is plugged</p>
+      {plugged.length === 0 ? (
+        <EmptyNote>Not chosen at any input yet.</EmptyNote>
+      ) : (
+        <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]">
+          {plugged.map((p) => (
+            <Link key={p.point} href={`/research/?point=${encodeURIComponent(p.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
+              <span className="min-w-0 flex-1 truncate">{p.info.title}</span>
+              <span className="k-fg3 text-[12px]">best</span>
+              <span className="font-medium">{p.bestScript ? optionLabel(model, p.point, p.bestScript) : "—"}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <p className="k-label mb-1.5 mt-5">Scripts</p>
+      <div className="space-y-1.5">
+        {c.dynastiesOf(pipe.id).map((s) => (
+          <ScriptLine key={s.dynasty} model={model} script={s} />
+        ))}
+      </div>
+
+      <p className="k-label mb-1.5 mt-5">Pipe storage</p>
+      <p className="k-fg3 mb-2 text-[12px]">Private to this pipe's scripts. Other pipes get its data only through the occurrences it produces.</p>
+      {storage.tables.length === 0 ? (
+        <EmptyNote>Nothing stored yet.</EmptyNote>
+      ) : (
+        <div className="space-y-2">
+          {storage.tables.map((t) => (
+            <div key={t.name} className="k-inset rounded-[8px] px-3 py-2">
+              <p className="flex justify-between text-[13px]">
+                <span className="font-medium">{t.name}</span>
+                <span className="k-fg3 tabular-nums">{formatCount(t.rows)} rows</span>
+              </p>
+              {t.sample.map((r) => (
+                <p key={r.key} className="k-mono k-fg3 truncate text-[11px]">
+                  {r.key}: {JSON.stringify(r.value)}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
+function ScriptLine({ model, script }: { model: Model; script: Script }) {
+  const f = scriptFigures(model, script.dynasty);
+  return (
+    <div className="k-inset flex items-center gap-2 rounded-[8px] px-3 py-2 text-[13px]">
+      <ProviderLogo script={script} size={22} />
+      <span className="min-w-0 flex-1 truncate font-medium">{script.name}</span>
+      <span className="k-fg3 text-[12px] tabular-nums">v{script.version}</span>
+      <span className="k-fg2 w-14 text-right text-[12px] tabular-nums">{formatRatePct(f.yieldRate)}</span>
+      <span className="k-fg2 w-16 text-right text-[12px] tabular-nums">{f.costPerRun != null ? formatCents(Math.round(f.costPerRun * 100)) : formatCents(script.costCents)}</span>
+    </div>
+  );
+}
+
+function Scripts({ model }: { model: Model }) {
+  const c = model.catalogue;
+  const [open, setOpen] = useState<string | null>(null);
+  const groups = c.pipes
+    .map((p) => ({ pipe: p, dynasties: [...new Set(c.scripts.filter((s) => s.pipeId === p.id).map((s) => s.dynasty))] }))
+    .filter((g) => g.dynasties.length > 0);
+  return (
+    <>
+      <div className="space-y-8">
+        {groups.map((g) => (
+          <section key={g.pipe.id}>
+            <SectionTitle count={g.dynasties.length} right={<span>{pipeLine(c, g.pipe)}</span>}>
+              {g.pipe.name}
+            </SectionTitle>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {g.dynasties.map((d) => (
+                <ScriptCard key={d} model={model} dynasty={d} onClick={() => setOpen(d)} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      {open && <ScriptDrawer model={model} dynasty={open} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+function ScriptDrawer({ model, dynasty, onClose }: { model: Model; dynasty: string; onClose: () => void }) {
+  const { dispatch } = useSim();
+  const c = model.catalogue;
+  const head = headScript(c, dynasty)!;
+  const versions = c.versionsOf(dynasty);
+  const [error, setError] = useState<string | null>(null);
+  const next = (versions[versions.length - 1]?.version ?? 1) + 1;
+  const upgrade = () => setError(dispatch({ type: "upgradeScript", dynasty, id: `${dynasty}-v${next}-d${model.day}`, name: `${head.name} v${next}` }));
+  const fork = () => {
+    const id = `${dynasty}-fork-d${model.day}`;
+    setError(dispatch({ type: "forkScript", parentDynasty: dynasty, script: { id, dynasty: id, name: `${head.name}, fork`, kind: head.kind, tactics: { ...head.tactics }, costCents: head.costCents } }));
+  };
+  return (
+    <Drawer title="Script" onClose={onClose} width={480}>
+      <ScriptCard model={model} dynasty={dynasty} />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="k-btn" onClick={upgrade} title="A new version of this dynasty: it runs from now on and keeps the dynasty's stats">
+          Upgrade
+        </button>
+        <button type="button" className="k-btn" onClick={fork} title="A new dynasty that starts from this one's belief">
+          Fork
+        </button>
+        <button type="button" className="k-btn" onClick={() => setError(dispatch({ type: head.status === "active" ? "retire" : "restore", kind: "scripts", id: head.id }))}>
+          {head.status === "active" ? "Retire" : "Restore"}
+        </button>
+        {error && <span className="text-[12px] text-[var(--data-rose)]">{error}</span>}
+      </div>
+      <p className="k-label mb-1.5 mt-5">Versions of the dynasty</p>
+      <div className="space-y-1.5">
+        {versions.map((v) => (
+          <div key={v.id} className="k-inset flex items-center gap-2 rounded-[8px] px-3 py-2 text-[13px]">
+            <span className="font-medium">v{v.version}</span>
+            <span className="min-w-0 flex-1 truncate">{v.name}</span>
+            <span className="k-fg3 text-[12px]">{v.status === "active" ? "Active" : "Retired"}</span>
+          </div>
+        ))}
+      </div>
+      <p className="k-fg3 mt-3 text-[12px]">Stats pool across the versions of a dynasty. A fork starts from its parent's belief.</p>
+      <p className="k-label mb-1.5 mt-5">Where it is offered</p>
+      <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]">
+        {pluggedAt(model, head.pipeId).map((p) => (
+          <Link key={p.point} href={`/research/?point=${encodeURIComponent(p.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
+            <span className="min-w-0 flex-1 truncate">{p.info.title}</span>
+            {p.bestScript === dynasty && <span className="k-chip text-[var(--run)]">Best here</span>}
+          </Link>
+        ))}
+      </div>
+    </Drawer>
+  );
+}
+
+function Triggers({ model }: { model: Model }) {
+  const c = model.catalogue;
+  const fired = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of model.session.triggerEvents) m.set(e.triggerId, (m.get(e.triggerId) ?? 0) + 1);
+    return m;
+  }, [model]);
+  return (
+    <CardTable footer="One generic trigger: when an outcome is reached, after a delay, unless another is reached meanwhile. Each event is an occurrence.">
+      <thead>
+        <tr className="k-line-subtle border-b">
+          <th className={TH}>Trigger</th>
+          <th className={TH}>When</th>
+          <th className={TH}>After</th>
+          <th className={TH}>Unless</th>
+          <th className={TH}>Event</th>
+          <th className={`${TH} text-right`}>Fired</th>
+        </tr>
+      </thead>
+      <tbody>
+        {c.triggers.map((t) => (
+          <tr key={t.id} className="k-row k-line-subtle border-b last:border-0">
             <td className={TD}>
-              <NameCell kind="step" id={s.key} icon={s.icon} name={s.label} line={s.description} />
+              <span className="flex items-center gap-2">
+                <Mark kind="trigger" id={t.id} size={22} />
+                <span className="min-w-0">
+                  <span className="block font-medium">{t.label}</span>
+                  {t.description && <span className="k-fg3 block max-w-[320px] truncate text-[12px]">{t.description}</span>}
+                </span>
+              </span>
             </td>
-            <td className={`${TD} k-fg2`}>{s.subjectKind === "lead" ? "A lead" : s.subjectKind === "object" ? "An object made" : "Nothing yet"}</td>
-            <td className={TD}>{s.leadState ? humanize(s.leadState.state) : <span className="k-fg4">—</span>}</td>
-            <td className={`${TD} k-fg2`}>{s.leadState ? `${c.leadTrack(s.leadState.leadTrack)?.name ?? s.leadState.leadTrack} track` : <span className="k-fg4">—</span>}</td>
-            <td className={TDN}>{c.pipesInto(s.key).length}</td>
-            <td className={TDN}>{c.pipesFrom(s.key).length}</td>
+            <td className={TD}>{t.when.length ? t.when.map((o) => outcomeLabel(c, o)).join(" or ") : t.reported ? "Reported" : "—"}</td>
+            <td className={TD}>{t.delayDays ? `${t.delayDays} days` : "At once"}</td>
+            <td className={TD}>{t.unless.length ? t.unless.map((o) => outcomeLabel(c, o)).join(" or ") : <span className="k-fg4">—</span>}</td>
+            <td className={TD}>{t.event ? outcomeLabel(c, t.event) : <span className="k-fg3">A consuming script's call</span>}</td>
+            <td className={TDN}>{t.event ? formatCount(fired.get(t.id) ?? 0) : <span className="k-fg4">—</span>}</td>
           </tr>
         ))}
       </tbody>
@@ -183,808 +405,152 @@ function StepsTable({ model }: { model: Model }) {
   );
 }
 
-function TracksTable({ model }: { model: Model }) {
+const DESCRIBES: Record<string, string> = { script: "Scripts", lead: "Leads", company: "Companies", brand: "Clients" };
+
+function Tactics({ model }: { model: Model }) {
+  const c = model.catalogue;
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {model.tracks.map((t) => (
-        <div key={t.id} className="k-card p-4">
-          <NameCell kind="leadTrack" id={t.id} name={t.label} line={t.description} />
-          <ol className="mt-3 space-y-1.5">
-            {t.states.map((s) => (
-              <li key={s.state} className="flex items-center gap-2 text-[13px]">
-                <span className="k-kbd">{s.rank}</span>
-                <Mark kind="step" id={s.state} size={16} />
-                {s.label}
-                <span className="k-fg3 text-[12px]">
-                  {model.catalogue.steps
-                    .filter((x) => x.leadState?.state === s.state)
-                    .map((x) => x.label)
-                    .join(", ")}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
+    <CardTable footer="A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts and leads.">
+      <thead>
+        <tr className="k-line-subtle border-b">
+          <th className={TH}>Tactic</th>
+          <th className={TH}>Type and values</th>
+          <th className={TH}>Describes</th>
+          <th className={TH}>Read from</th>
+          <th className={TH}>Scripts carrying it</th>
+        </tr>
+      </thead>
+      <tbody>
+        {c.tactics
+          .filter((t) => !t.retired)
+          .map((t) => {
+            const carriers = c.scripts.filter((s) => s.tactics[t.id] !== undefined && s.status === "active");
+            return (
+              <tr key={t.id} className="k-row k-line-subtle border-b last:border-0">
+                <td className={TD}>
+                  <span className="flex items-center gap-2">
+                    <Mark kind="tactic" id={t.id} size={22} />
+                    <span className="font-medium">{t.name}</span>
+                  </span>
+                </td>
+                <td className={TD}>{describeTacticType(t)}</td>
+                <td className={TD}>{t.describes.map((d) => DESCRIBES[d] ?? d).join(", ")}</td>
+                <td className={TD}>{t.source === "judged" ? "Judged by an AI" : "Data"}</td>
+                <td className={TD}>
+                  <span className="flex flex-wrap gap-1">
+                    {carriers.slice(0, 4).map((s) => (
+                      <span key={s.id} className="k-chip">
+                        {s.name}: {tacticValueText(c, t.id, s.tactics[t.id]).split(": ").slice(1).join(": ") || String(s.tactics[t.id])}
+                      </span>
+                    ))}
+                    {carriers.length > 4 && <span className="k-fg3 text-[12px]">+{carriers.length - 4} more</span>}
+                    {carriers.length === 0 && <span className="k-fg4">—</span>}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+      </tbody>
+    </CardTable>
+  );
+}
+
+function Strategies({ model }: { model: Model }) {
+  const c = model.catalogue;
+  const users = (id: string) => model.campaigns.filter((x) => Object.values(x.strategies).includes(id));
+  const byPipe = c.pipes
+    .map((p) => ({ pipe: p, strategies: c.strategiesOf(p.id) }))
+    .filter((g) => g.strategies.some((s) => s.id !== defaultStrategyId(g.pipe.id)));
+  return (
+    <div className="space-y-6">
+      <p className="k-fg2 text-[13px]">A strategy is a set of conditions on tactics, for one pipe. Its rules attach to the pipe's inputs. A campaign chooses one per pipe; a pipe it leaves out plays its default.</p>
+      {byPipe.map(({ pipe, strategies }) => (
+        <section key={pipe.id}>
+          <SectionTitle count={strategies.length}>{pipe.name}</SectionTitle>
+          <div className="k-card divide-y divide-[var(--line-subtle)]">
+            {strategies.map((s) => {
+              const isDefault = s.id === defaultStrategyId(pipe.id);
+              const used = users(s.id);
+              return (
+                <div key={s.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
+                  <Mark kind="strategy" id={s.id} size={24} />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium">
+                      {s.name}
+                      {isDefault && <span className="k-chip">Default</span>}
+                      {s.proposed && <span className="k-chip text-[var(--accent)]">Proposed day {s.proposed.day}</span>}
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {s.rules.map((r, i) => (
+                        <p key={i} className="flex flex-wrap items-center gap-1 text-[12px]">
+                          <span className="k-fg3">{r.input ? `At its ${outcomeLabel(c, r.input).toLowerCase()} input:` : "Its own scripts:"}</span>
+                          {r.conditions.map((cond, j) => (
+                            <span key={j} className="k-chip">
+                              {describeCondition(cond, c)}
+                            </span>
+                          ))}
+                        </p>
+                      ))}
+                      {(s.subject ?? []).length > 0 && (
+                        <p className="flex flex-wrap items-center gap-1 text-[12px]">
+                          <span className="k-fg3">Serves:</span>
+                          {s.subject!.map((cond, j) => (
+                            <span key={j} className="k-chip">
+                              {describeCondition(cond, c)}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                      {isDefault && <p className="k-fg3 text-[12px]">No condition: every script at every input.</p>}
+                      {s.proposed && <p className="k-fg3 text-[12px]">{s.proposed.reason}</p>}
+                    </div>
+                  </div>
+                  <span className="k-fg3 text-[12px]">{used.length ? `Chosen by ${used.map((x) => x.name).join(", ")}` : isDefault ? "Every other campaign" : "Not chosen yet"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       ))}
     </div>
   );
 }
 
-function TriggersTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
+function Factories({ model }: { model: Model }) {
+  const rows = useMemo(() => factoryFigures(model), [model]);
   return (
-    <CardTable>
+    <CardTable footer="Every occurrence names its producer: one of our runs, or another factory at its access cost. Our return values only what our runs produced.">
       <thead>
         <tr className="k-line-subtle border-b">
-          <th className={TH}>Trigger</th>
-          <th className={TH}>Kind</th>
-          <th className={TH}>Fires on</th>
-          <th className={`${TH} text-right`}>Pipes it wakes</th>
-          <th className={TH}>Status</th>
+          <th className={TH}>Factory</th>
+          <th className={TH}>Pipes</th>
+          <th className={`${TH} text-right`}>Runs</th>
+          <th className={`${TH} text-right`}>Occurrences</th>
+          <th className={`${TH} text-right`}>Spent</th>
         </tr>
       </thead>
       <tbody>
-        {c.triggers.map((t) => (
-          <tr key={t.id} className="k-row cursor-pointer" onClick={() => open(t.id)}>
+        {rows.map((f) => (
+          <tr key={f.id} className="k-row k-line-subtle border-b last:border-0">
             <td className={TD}>
-              <NameCell kind="trigger" id={t.id} name={t.label} line={t.description} />
+              <span className="flex items-center gap-2">
+                <Mark kind="factory" id={f.id} size={22} />
+                <span className="font-medium">{f.name}</span>
+                <span className="k-chip">{f.ours ? "Ours" : "Other factory"}</span>
+              </span>
             </td>
-            <td className={`${TD} k-fg2`}>{t.kind === "outcome" ? "An outcome reached" : "A condition about a lead"}</td>
-            <td className={TD}>{t.outcomeStep ? <StepChip catalogue={c} step={t.outcomeStep} /> : <span className="k-fg4">—</span>}</td>
-            <td className={TDN}>{c.pipes.filter((p) => p.triggerId === t.id).length}</td>
             <td className={TD}>
-              <Status active={!t.retired} />
+              <span className="k-fg2 block max-w-[420px] truncate text-[12px]">{f.pipes.map((p) => pipeName(model.catalogue, p)).join(", ") || "—"}</span>
+            </td>
+            <td className={TDN}>{formatCount(f.runs)}</td>
+            <td className={TDN}>{formatCount(f.occurrences)}</td>
+            <td className={TDN}>
+              {formatCents(f.spendCents)}
+              <span className="k-fg3 ml-1 text-[12px]">{f.ours ? "our spend" : "access cost"}</span>
             </td>
           </tr>
         ))}
       </tbody>
     </CardTable>
-  );
-}
-
-function ChannelsTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
-  return (
-    <CardTable>
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Channel</th>
-          <th className={TH}>Group</th>
-          <th className={TH}>Run by</th>
-          <th className={TH}>Done by</th>
-          <th className={`${TH} text-right`}>Pipes</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {c.channels.map((ch) => (
-          <tr key={ch.slug} className="k-row cursor-pointer" onClick={() => open(ch.slug)}>
-            <td className={`${TD} max-w-[420px]`}>
-              <NameCell kind="channel" id={ch.slug} icon={ch.icon} name={ch.name} line={ch.description} />
-            </td>
-            <td className={`${TD} k-fg2`}>{ch.group ? humanize(ch.group) : "—"}</td>
-            <td className={`${TD} k-fg2`}>{ch.operatedBy === "customer" ? "Your team" : "The platform"}</td>
-            <td className={`${TD} k-fg2`}>{ch.performedBy === "person" ? "A person" : "Software"}</td>
-            <td className={TDN}>{c.pipes.filter((p) => p.channel === ch.slug).length}</td>
-            <td className={TD}>
-              <Status active={!ch.retired} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function PipesTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
-  const [limit, setLimit] = useState(40);
-  const spend = new Map<string, number>();
-  for (const r of model.result.runs) if (r.pipeId) spend.set(r.pipeId, (spend.get(r.pipeId) ?? 0) + r.spendCents);
-  return (
-    <CardTable
-      footer={
-        <span className="flex items-center justify-between">
-          <span>
-            {formatCount(Math.min(limit, c.pipes.length))} of {formatCount(c.pipes.length)} · click a pipe to edit it or retire it
-          </span>
-          {c.pipes.length > limit && (
-            <button type="button" className="k-btn-ghost" onClick={() => setLimit((n) => n + 40)}>
-              Show 40 more
-            </button>
-          )}
-        </span>
-      }
-    >
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Pipe</th>
-          <th className={TH}>Leg</th>
-          <th className={TH}>Type</th>
-          <th className={`${TH} text-right`}>Workflows</th>
-          <th className={`${TH} text-right`}>Mature after</th>
-          <th className={`${TH} text-right`}>$ spent</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {[...c.pipes]
-          .sort((a, b) => (spend.get(b.id) ?? 0) - (spend.get(a.id) ?? 0))
-          .slice(0, limit)
-          .map((p) => {
-          const trigger = p.triggerId ? c.trigger(p.triggerId) : null;
-          return (
-            <tr key={p.id} className="k-row cursor-pointer" onClick={() => open(p.id)}>
-              <td className={TD}>
-                <NameCell kind="channel" id={p.channel} icon={c.channel(p.channel)?.icon} name={p.name ?? p.id} line={channelName(c, p)} />
-              </td>
-              <td className={TD}>
-                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]">
-                  <StepChip catalogue={c} step={p.from} />
-                  <span className="k-fg4">→</span>
-                  <StepChip catalogue={c} step={p.to} />
-                </span>
-              </td>
-              <td className={TD}>
-                <span className="k-fg2 inline-flex items-center gap-1 whitespace-nowrap text-[12px]">
-                  {trigger ? <LightningIcon size={13} /> : <CalendarCheckIcon size={13} />}
-                  {trigger ? trigger.label : "Daily"}
-                </span>
-              </td>
-              <td className={TDN}>{c.workflows.filter((w) => w.pipeId === p.id && w.status === "active").length}</td>
-              <td className={TDN}>{p.maturity.durationDays} days</td>
-              <td className={TDN}>{spend.get(p.id) ? formatCents(spend.get(p.id)!) : <span className="k-fg4">—</span>}</td>
-              <td className={TD}>
-                <Status active={c.isPipeLive(p)} />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function PathsTable({ model, paths }: { model: Model; paths: string[][] }) {
-  const c = model.catalogue;
-  const count = (from: string, to: string) => c.pipes.filter((p) => c.isPipeLive(p) && p.from === from && p.to === to).length;
-  return (
-    <CardTable footer="A sales path is a chain of legs. A sales funnel is one channel picked on each leg.">
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Sales path</th>
-          <th className={`${TH} text-right`}>Legs</th>
-          <th className={`${TH} text-right`}>Funnels on it</th>
-        </tr>
-      </thead>
-      <tbody>
-        {paths.map((path) => {
-          let funnels = 1;
-          for (let i = 1; i < path.length; i++) funnels *= count(path[i - 1]!, path[i]!);
-          return (
-            <tr key={path.join(">")} className="k-row">
-              <td className={TD}>
-                <span className="flex items-center gap-2">
-                  <Mark kind="salesPath" id={path.join(">")} size={22} />
-                  <span className="inline-flex flex-wrap items-center gap-1.5 text-[12px]">
-                    {path.map((s, i) => (
-                      <span key={s} className="inline-flex items-center gap-1.5">
-                        {i > 0 && <span className="k-fg4">→</span>}
-                        <StepChip catalogue={c} step={s} />
-                      </span>
-                    ))}
-                  </span>
-                </span>
-              </td>
-              <td className={TDN}>{path.length - 1}</td>
-              <td className={TDN}>{formatCount(funnels)}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function PlaysTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
-  const [limit, setLimit] = useState(40);
-  const plays = [...c.plays].sort((a, b) => Number(!!b.strategyId) - Number(!!a.strategyId));
-  return (
-    <CardTable
-      footer={
-        <span className="flex items-center justify-between">
-          <span>A play is a pipe with a strategy. Every pipe has its default play.</span>
-          {plays.length > limit && (
-            <button type="button" className="k-btn-ghost" onClick={() => setLimit((n) => n + 40)}>
-              Show 40 more
-            </button>
-          )}
-        </span>
-      }
-    >
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Play</th>
-          <th className={TH}>Strategy</th>
-          <th className={`${TH} text-right`}>Workflows that fit</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {plays.slice(0, limit).map((pl) => {
-          const pipe = c.pipe(pl.pipeId);
-          return (
-            <tr key={pl.id} className="k-row cursor-pointer" onClick={() => open(pl.id)}>
-              <td className={TD}>
-                <NameCell kind="play" id={pl.id} name={pipe?.name ?? pl.pipeId} line={pipe ? `${channelName(c, pipe)}: ${stepLabel(c, pipe.from)} → ${stepLabel(c, pipe.to)}` : undefined} />
-              </td>
-              <td className={TD}>{pl.strategyId ? c.strategy(pl.strategyId)?.name : <span className="k-fg2">Default play</span>}</td>
-              <td className={TDN}>{c.workflowsFor(pl).length}</td>
-              <td className={TD}>
-                <Status active={!pl.retired} />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function TacticsTable({ model }: { model: Model }) {
-  const c = model.catalogue;
-  return (
-    <CardTable>
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Tactic</th>
-          <th className={TH}>Tags</th>
-          <th className={`${TH} text-right`}>Tagged</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {c.tactics.map((t) => (
-          <tr key={t.id} className="k-row">
-            <td className={TD}>
-              <NameCell kind="tactic" id={t.id} name={t.name} line={t.description} />
-            </td>
-            <td className={`${TD} k-fg2`}>{t.appliesTo === "workflow" ? "Workflows" : "Templates and LLMs"}</td>
-            <td className={TDN}>{t.appliesTo === "workflow" ? c.workflows.filter((w) => w.tactics.includes(t.id)).length : c.slotOptions.filter((o) => o.tactics.includes(t.id)).length}</td>
-            <td className={TD}>
-              <Status active={!t.retired} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function StrategiesTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
-  const name = (id: string) => c.tactics.find((t) => t.id === id)?.name ?? id;
-  return (
-    <CardTable footer="Add a play to put a strategy on a pipe.">
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Strategy</th>
-          <th className={TH}>Requires</th>
-          <th className={TH}>Leaves out</th>
-          <th className={`${TH} text-right`}>Plays</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {c.strategies.map((s) => (
-          <tr key={s.id} className="k-row cursor-pointer" onClick={() => open(s.id)}>
-            <td className={TD}>
-              <NameCell kind="strategy" id={s.id} name={s.name} />
-            </td>
-            <td className={TD}>{s.required.length ? s.required.map((t) => <span key={t} className="k-chip mr-1">{name(t)}</span>) : <span className="k-fg4">—</span>}</td>
-            <td className={TD}>{s.excluded.length ? s.excluded.map((t) => <span key={t} className="k-chip mr-1">{name(t)}</span>) : <span className="k-fg4">—</span>}</td>
-            <td className={TDN}>{c.plays.filter((p) => p.strategyId === s.id).length}</td>
-            <td className={TD}>
-              <Status active={!s.retired} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function WorkflowsTable({ model, open }: { model: Model; open: (id: string) => void }) {
-  const c = model.catalogue;
-  const [limit, setLimit] = useState(40);
-  const spend = new Map<string, number>();
-  for (const r of model.result.runs) if (r.workflowId) spend.set(r.workflowId, (spend.get(r.workflowId) ?? 0) + r.spendCents);
-  const list = [...c.workflows].sort((a, b) => (spend.get(b.id) ?? 0) - (spend.get(a.id) ?? 0));
-  return (
-    <CardTable
-      footer={
-        <span className="flex items-center justify-between">
-          <span>
-            {formatCount(Math.min(limit, list.length))} of {formatCount(list.length)} · most spent first
-          </span>
-          {list.length > limit && (
-            <button type="button" className="k-btn-ghost" onClick={() => setLimit((n) => n + 40)}>
-              Show 40 more
-            </button>
-          )}
-        </span>
-      }
-    >
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Workflow</th>
-          <th className={TH}>Done by</th>
-          <th className={TH}>Slots</th>
-          <th className={TH}>Tactics</th>
-          <th className={`${TH} text-right`}>$ per input</th>
-          <th className={`${TH} text-right`}>$ spent</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {list.slice(0, limit).map((w) => {
-          const pipe = c.pipe(w.pipeId);
-          return (
-            <tr key={w.id} className="k-row cursor-pointer" onClick={() => open(w.id)}>
-              <td className={TD}>
-                <NameCell kind={`workflow:${w.kind}` as MarkKind} id={w.id} name={workflowLabel(c, w.id)} line={pipe ? `${pipe.name} · ${channelName(c, pipe)}` : w.pipeId} />
-              </td>
-              <td className={`${TD} k-fg2`}>{w.kind === "rules" ? "Rules" : w.kind === "ai" ? "AI" : "A person"}</td>
-              <td className={TD}>{w.slots.length ? w.slots.map((s) => <span key={s} className="k-chip mr-1">{s === "llm" ? "LLM" : humanize(s)}</span>) : <span className="k-fg4">—</span>}</td>
-              <td className={TD}>{w.tactics.length ? w.tactics.map((t) => <span key={t} className="k-chip mr-1">{c.tactics.find((x) => x.id === t)?.name ?? t}</span>) : <span className="k-fg4">—</span>}</td>
-              <td className={TDN}>{formatCents(w.costPerTrialCents)}</td>
-              <td className={TDN}>{spend.get(w.id) ? formatCents(spend.get(w.id)!) : <span className="k-fg4">—</span>}</td>
-              <td className={TD}>
-                <Status active={w.status === "active"} />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </CardTable>
-  );
-}
-
-function SlotTable({ model, slot, open }: { model: Model; slot: string; open: (id: string) => void }) {
-  const c = model.catalogue;
-  const [limit, setLimit] = useState(40);
-  const uses = new Map<string, number>();
-  for (const r of model.result.runs) {
-    const id = r.slotChoice?.[slot];
-    if (id) uses.set(id, (uses.get(id) ?? 0) + (r.inputs ?? 0));
-  }
-  const list = c.slotOptions.filter((o) => o.slot === slot).sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0));
-  return (
-    <CardTable
-      footer={
-        <span className="flex items-center justify-between">
-          <span>Each is a dynasty: improved over versions, chosen on its own effect.</span>
-          {list.length > limit && (
-            <button type="button" className="k-btn-ghost" onClick={() => setLimit((n) => n + 40)}>
-              Show 40 more
-            </button>
-          )}
-        </span>
-      }
-    >
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>{slot === "llm" ? "LLM" : "Template"}</th>
-          <th className={TH}>Used on</th>
-          <th className={TH}>Tactics</th>
-          <th className={`${TH} text-right`}>Extra $ per input</th>
-          <th className={`${TH} text-right`}>Inputs written</th>
-          <th className={TH}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {list.slice(0, limit).map((o) => (
-          <tr key={o.id} className="k-row cursor-pointer" onClick={() => open(o.id)}>
-            <td className={TD}>
-              <NameCell kind={slot === "llm" ? "llm" : "template"} id={o.id} name={humanize(o.name)} />
-            </td>
-            <td className={`${TD} k-fg2`}>{o.pipeId ? (c.pipe(o.pipeId)?.name ?? o.pipeId) : "Every pipe"}</td>
-            <td className={TD}>{o.tactics.length ? o.tactics.map((t) => <span key={t} className="k-chip mr-1">{c.tactics.find((x) => x.id === t)?.name ?? t}</span>) : <span className="k-fg4">—</span>}</td>
-            <td className={TDN}>{formatCents(o.costPerTrialCents)}</td>
-            <td className={TDN}>{formatCount(uses.get(o.id) ?? 0)}</td>
-            <td className={TD}>
-              <Status active={o.status === "active"} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </CardTable>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Detail, edit, add
-// ---------------------------------------------------------------------------
-
-function DetailDrawer({ model, detail, onClose }: { model: Model; detail: Detail; onClose: () => void }) {
-  const { dispatch } = useSim();
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const run = (action: SimAction, message: string) => {
-    const err = dispatch(action);
-    setError(err);
-    setDone(err ? null : message);
-  };
-  if ("add" in detail) {
-    return (
-      <Drawer title={`Add a ${detail.add}`} onClose={onClose}>
-        <AddForm model={model} what={detail.add} onDone={(a, m) => run(a, m)} />
-        {error && <p className="mt-3 text-[12px] text-[var(--data-rose)]">{error}</p>}
-        {done && <p className="mt-3 text-[12px] text-[var(--run)]">{done}</p>}
-      </Drawer>
-    );
-  }
-  const c = model.catalogue;
-  const kind = detail.kind as CatalogueKind;
-  const item = findItem(model, kind, detail.id);
-  if (!item) return null;
-  const active = isActive(model, kind, detail.id);
-  const retirable: CatalogueKind[] = ["pipes", "workflows", "triggers", "channels", "slotOptions", "plays", "strategies"];
-  return (
-    <Drawer title={humanize(kind === "slotOptions" ? "option" : kind.replace(/s$/, ""))} onClose={onClose}>
-      <h3 className="text-[16px] font-medium">{item.name}</h3>
-      {item.line && <p className="k-fg3 text-[12px]">{item.line}</p>}
-      <div className="mt-2">
-        <Status active={active} />
-      </div>
-      {kind === "pipes" && <PipeEdit model={model} pipe={c.pipe(detail.id)!} run={run} />}
-      {kind === "workflows" && <WorkflowEdit workflow={c.workflow(detail.id)!} run={run} />}
-      {kind === "triggers" && <TriggerEdit trigger={c.trigger(detail.id)!} run={run} />}
-      {retirable.includes(kind) && (
-        <div className="k-line-subtle mt-5 border-t pt-4">
-          <p className="k-fg2 mb-2 text-[13px]">
-            {active ? "Retire it: it leaves every choice at once. Its history stays readable." : "Bring it back: it competes again from the next decision."}
-          </p>
-          <button type="button" className="k-btn" onClick={() => run({ type: active ? "retire" : "restore", kind, id: detail.id }, active ? "Retired. The next decision runs without it." : "Back in the catalogue.")}>
-            {active ? "Retire" : "Restore"}
-          </button>
-        </div>
-      )}
-      {error && <p className="mt-3 text-[12px] text-[var(--data-rose)]">{error}</p>}
-      {done && <p className="mt-3 text-[12px] text-[var(--run)]">{done}</p>}
-    </Drawer>
-  );
-}
-
-function findItem(model: Model, kind: CatalogueKind, id: string): { name: string; line?: string } | null {
-  const c = model.catalogue;
-  switch (kind) {
-    case "pipes": {
-      const p = c.pipe(id);
-      return p ? { name: p.name ?? p.id, line: `${stepLabel(c, p.from)} → ${channelName(c, p)} → ${stepLabel(c, p.to)}` } : null;
-    }
-    case "workflows": {
-      const w = c.workflow(id);
-      return w ? { name: workflowLabel(c, id), line: c.pipe(w.pipeId)?.name } : null;
-    }
-    case "triggers": {
-      const t = c.trigger(id);
-      return t ? { name: t.label, ...(t.description ? { line: t.description } : {}) } : null;
-    }
-    case "channels": {
-      const ch = c.channel(id);
-      return ch ? { name: ch.name, ...(ch.description ? { line: ch.description } : {}) } : null;
-    }
-    case "slotOptions": {
-      const o = c.slotOption(id);
-      return o ? { name: humanize(o.name), line: o.pipeId ? c.pipe(o.pipeId)?.name : "Every pipe" } : null;
-    }
-    case "plays": {
-      const p = c.play(id);
-      return p ? { name: c.pipe(p.pipeId)?.name ?? p.pipeId, line: p.strategyId ? c.strategy(p.strategyId)?.name : "Default play" } : null;
-    }
-    case "strategies": {
-      const s = c.strategy(id);
-      return s ? { name: s.name } : null;
-    }
-    default:
-      return null;
-  }
-}
-
-function isActive(model: Model, kind: CatalogueKind, id: string): boolean {
-  const c = model.catalogue;
-  if (kind === "workflows") return c.workflow(id)?.status === "active";
-  if (kind === "slotOptions") return c.slotOption(id)?.status === "active";
-  if (kind === "pipes") return !c.pipe(id)?.retired;
-  if (kind === "triggers") return !c.trigger(id)?.retired;
-  if (kind === "channels") return !c.channel(id)?.retired;
-  if (kind === "plays") return !c.play(id)?.retired;
-  if (kind === "strategies") return !c.strategy(id)?.retired;
-  return true;
-}
-
-type Run = (a: SimAction, message: string) => void;
-
-function PipeEdit({ model, pipe, run }: { model: Model; pipe: Pipe; run: Run }) {
-  const [name, setName] = useState(pipe.name ?? "");
-  const [days, setDays] = useState(String(pipe.maturity.durationDays));
-  const wfs = model.catalogue.workflows.filter((w) => w.pipeId === pipe.id);
-  return (
-    <div className="mt-4 space-y-3">
-      <Field label="Name">
-        <input className="k-input w-full px-2" style={{ font: "inherit" }} value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field label="Days before a cohort is mature">
-        <input className="k-input w-full px-2" style={{ font: "inherit" }} value={days} onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ""))} />
-      </Field>
-      <button type="button" className="k-btn-strong" onClick={() => run({ type: "editPipe", id: pipe.id, name, maturityDays: Number(days) || 0 }, "Saved. Choices read it from the next decision.")}>
-        Save
-      </button>
-      <div>
-        <span className="k-label">Workflows</span>
-        <ul className="mt-1 space-y-1">
-          {wfs.map((w) => (
-            <li key={w.id} className="flex items-center gap-2 text-[13px]">
-              <Mark kind={`workflow:${w.kind}` as MarkKind} id={w.id} size={16} />
-              {workflowLabel(model.catalogue, w.id)}
-              <span className="k-fg3 ml-auto text-[12px] tabular-nums">{formatCents(w.costPerTrialCents)} per input</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function WorkflowEdit({ workflow, run }: { workflow: Workflow; run: Run }) {
-  const [cost, setCost] = useState(String(workflow.costPerTrialCents / 100));
-  return (
-    <div className="mt-4 space-y-3">
-      <Field label="Cost per input">
-        <span className="k-input flex items-center gap-1 px-2">
-          <span className="k-fg3">$</span>
-          <input className="w-full bg-transparent outline-none" style={{ font: "inherit" }} value={cost} onChange={(e) => setCost(e.target.value.replace(/[^0-9.]/g, ""))} />
-        </span>
-      </Field>
-      <button type="button" className="k-btn-strong" onClick={() => run({ type: "editWorkflow", id: workflow.id, costPerTrialCents: Math.round(Number(cost) * 100) }, "Saved. The prioritizer reads the new cost from the next pick.")}>
-        Save
-      </button>
-    </div>
-  );
-}
-
-function TriggerEdit({ trigger, run }: { trigger: Trigger; run: Run }) {
-  const [label, setLabel] = useState(trigger.label);
-  return (
-    <div className="mt-4 space-y-3">
-      <Field label="Label">
-        <input className="k-input w-full px-2" style={{ font: "inherit" }} value={label} onChange={(e) => setLabel(e.target.value)} />
-      </Field>
-      <button type="button" className="k-btn-strong" onClick={() => run({ type: "editTrigger", id: trigger.id, label }, "Saved.")}>
-        Save
-      </button>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="k-label mb-1 block">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function slug(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "");
-}
-
-function AddForm({ model, what, onDone }: { model: Model; what: "pipe" | "workflow" | "trigger" | "play"; onDone: Run }) {
-  const c = model.catalogue;
-  const channels = c.channels.filter((x) => !x.retired);
-  const steps = c.steps.filter((s) => !s.retired);
-  const triggers = c.triggers.filter((t) => !t.retired);
-  const livePipes = c.pipes.filter((p) => c.isPipeLive(p));
-  const [channel, setChannel] = useState(channels[0]?.slug ?? "");
-  const [from, setFrom] = useState<string>(START);
-  const [to, setTo] = useState(steps.find((s) => s.leadState)?.key ?? "");
-  const [mode, setMode] = useState<"proactive" | "reactive">("proactive");
-  const [trigger, setTrigger] = useState(triggers[0]?.id ?? "");
-  const [name, setName] = useState("");
-  const [pipeId, setPipeId] = useState(livePipes[0]?.id ?? "");
-  const [kind, setKind] = useState<"rules" | "ai" | "human">("ai");
-  const [cost, setCost] = useState("0.80");
-  const [label, setLabel] = useState("");
-  const [strategy, setStrategy] = useState(c.strategies[0]?.id ?? "");
-  const select = "k-input w-full px-1.5";
-  if (what === "pipe") {
-    const id = `${channel}|${from}_to_${to}`;
-    const exists = !!c.pipe(id);
-    return (
-      <div className="space-y-3">
-        <p className="k-fg2 text-[13px]">A pipe is a channel on one leg. Once added, every funnel that can use it considers it, from its own prior.</p>
-        <Field label="Channel">
-          <select className={select} value={channel} onChange={(e) => setChannel(e.target.value)} style={{ font: "inherit" }}>
-            {channels.map((ch) => (
-              <option key={ch.slug} value={ch.slug}>
-                {ch.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="From">
-            <select className={select} value={from} onChange={(e) => setFrom(e.target.value)} style={{ font: "inherit" }}>
-              <option value={START}>Start</option>
-              {steps.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="To">
-            <select className={select} value={to} onChange={(e) => setTo(e.target.value)} style={{ font: "inherit" }}>
-              {steps.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <Field label="Runs">
-          <select className={select} value={mode} onChange={(e) => setMode(e.target.value as "proactive" | "reactive")} style={{ font: "inherit" }}>
-            <option value="proactive">Every day, on its own budget</option>
-            <option value="reactive">When a trigger fires</option>
-          </select>
-        </Field>
-        {mode === "reactive" && (
-          <Field label="Trigger">
-            <select className={select} value={trigger} onChange={(e) => setTrigger(e.target.value)} style={{ font: "inherit" }}>
-              {triggers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-        <Field label="Name">
-          <input className="k-input w-full px-2" style={{ font: "inherit" }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Kestrel" />
-        </Field>
-        <button
-          type="button"
-          className="k-btn-strong"
-          disabled={exists || from === to || !to}
-          onClick={() =>
-            onDone(
-              {
-                type: "addPipe",
-                pipe: {
-                  id,
-                  channel,
-                  from,
-                  to,
-                  mode,
-                  triggerId: mode === "reactive" ? trigger : null,
-                  name: name || "New pipe",
-                  maturity: { durationDays: 7, outcomesRequired: 10, delayMeanDays: 2 },
-                },
-              },
-              "Added with its workflows and templates. Funnels consider it from the next decision.",
-            )
-          }
-        >
-          Add pipe
-        </button>
-        {exists && <p className="k-fg3 text-[12px]">This pipe already exists.</p>}
-      </div>
-    );
-  }
-  if (what === "workflow") {
-    const n = c.workflows.filter((w) => w.pipeId === pipeId && w.id.includes(":wf:custom")).length + 1;
-    return (
-      <div className="space-y-3">
-        <p className="k-fg2 text-[13px]">A workflow is how a pipe is performed. A new one starts wide open: the prioritizer tries it, then keeps it only if it pays.</p>
-        <Field label="Pipe">
-          <select className={select} value={pipeId} onChange={(e) => setPipeId(e.target.value)} style={{ font: "inherit" }}>
-            {livePipes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}: {channelName(c, p)}, {stepLabel(c, p.from)} to {stepLabel(c, p.to)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Done by">
-          <select className={select} value={kind} onChange={(e) => setKind(e.target.value as "rules" | "ai" | "human")} style={{ font: "inherit" }}>
-            <option value="rules">Rules</option>
-            <option value="ai">AI</option>
-            <option value="human">A person</option>
-          </select>
-        </Field>
-        <Field label="Cost per input">
-          <span className="k-input flex items-center gap-1 px-2">
-            <span className="k-fg3">$</span>
-            <input className="w-full bg-transparent outline-none" style={{ font: "inherit" }} value={cost} onChange={(e) => setCost(e.target.value.replace(/[^0-9.]/g, ""))} />
-          </span>
-        </Field>
-        <button
-          type="button"
-          className="k-btn-strong"
-          onClick={() =>
-            onDone(
-              {
-                type: "addWorkflow",
-                workflow: {
-                  id: `${pipeId}:wf:custom-${n}`,
-                  dynasty: `${pipeId}:custom-${n}`,
-                  pipeId,
-                  kind,
-                  slots: kind === "ai" ? ["template", "llm"] : ["template"],
-                  tactics: [],
-                  costPerTrialCents: Math.max(1, Math.round(Number(cost) * 100)),
-                  status: "active",
-                },
-              },
-              "Added. It competes from the next pick.",
-            )
-          }
-        >
-          Add workflow
-        </button>
-      </div>
-    );
-  }
-  if (what === "trigger") {
-    return (
-      <div className="space-y-3">
-        <p className="k-fg2 text-[13px]">A trigger wakes a reactive pipe: a condition about a lead. Add it, then give a pipe this trigger.</p>
-        <Field label="Label">
-          <input className="k-input w-full px-2" style={{ font: "inherit" }} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Opened the pricing page twice" />
-        </Field>
-        <button
-          type="button"
-          className="k-btn-strong"
-          disabled={!label.trim() || !!c.trigger(slug(label))}
-          onClick={() => onDone({ type: "addTrigger", trigger: { id: slug(label), label: label.trim(), kind: "condition", outcomeStep: null, fromStep: null } }, "Added. Pick it when you add a reactive pipe.")}
-        >
-          Add trigger
-        </button>
-      </div>
-    );
-  }
-  const playId = `${pipeId}#${strategy}`;
-  return (
-    <div className="space-y-3">
-      <p className="k-fg2 text-[13px]">A play puts a strategy on a pipe. Funnels can then pick the pipe with only the workflows the strategy allows.</p>
-      <Field label="Pipe">
-        <select className={select} value={pipeId} onChange={(e) => setPipeId(e.target.value)} style={{ font: "inherit" }}>
-          {livePipes.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}: {channelName(c, p)}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Strategy">
-        <select className={select} value={strategy} onChange={(e) => setStrategy(e.target.value)} style={{ font: "inherit" }}>
-          {c.strategies.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <button type="button" className="k-btn-strong" disabled={!!c.play(playId)} onClick={() => onDone({ type: "addPlay", play: { id: playId, pipeId, strategyId: strategy } }, "Added. It competes in the funnels from the next decision.")}>
-        Add play
-      </button>
-    </div>
   );
 }

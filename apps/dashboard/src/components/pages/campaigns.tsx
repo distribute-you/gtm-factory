@@ -2,153 +2,149 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { CaretDownIcon, CaretRightIcon, LightningIcon, CalendarCheckIcon } from "@phosphor-icons/react";
-import type { SimClient } from "@gtm-factory/engine";
-import { FunnelLine } from "@/components/funnel-line";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { CaretDownIcon, CheckIcon, LightningIcon } from "@phosphor-icons/react";
+import { defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
+import { FunnelLine, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
-import { CardTable, Drawer, EmptyNote, Meter, Page, PageHeader, RoiLabel, RoiValue, SectionTitle, StateDot, TD, TDN, TH, Tabs, TopBar } from "@/components/ui";
-import { CostPerOutcomeCard, PageSkeleton, ReturnCard, WhyFeed } from "./today";
-import {
-  costPerOutcome,
-  explainChoice,
-  expectedRoi,
-  flashMature,
-  funnelName,
-  latestChoice,
-  nodeLabel,
-  optionLabel,
-  optionOfRun,
-  pickShares,
-  playPipe,
-  rate,
-  runsOf,
-  scopeFigures,
-  scopedClients,
-  stepLabel,
-  stepValues,
-  targetState,
-  valueOf,
-  type Model,
-  type Tally,
-} from "@/lib/model";
-import { formatCents, formatCount, formatRatePct, formatRoi, formatUsd, plural } from "@/lib/format";
+import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
+import { PageSkeleton, WhyFeed } from "./today";
+import { campaignLegs, legEndOfPoints, playedPipes } from "@/lib/campaigns";
+import { outcomeLabel, pipeLine, pointsOf, scopedCampaigns, targetOf, type Model, type PointRow } from "@/lib/model";
+import { formatCents, formatCount, formatRatePct, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
-export function campaignHref(id: string): string {
-  return `/campaigns/view/?id=${encodeURIComponent(id)}`;
-}
-
-function plays(model: Model, c: SimClient): string[] {
-  return model.session.funnelOfCampaign(c.campaign.id) ?? c.campaign.salesFunnel ?? [];
-}
-
-/** How a campaign's budget reads: the amount in the period it was stated in. */
-export function budgetWords(c: SimClient): string {
-  const day = `$${Math.round(c.campaign.dailyBudgetCents / 100).toLocaleString("en-US")}`;
-  return c.campaign.maxVolume != null ? `${formatCount(c.campaign.maxVolume)} new leads, up to ${day}/day` : `${day}/day`;
-}
+export const campaignHref = (id: string) => `/campaigns/view/?id=${encodeURIComponent(id)}`;
 
 // ---------------------------------------------------------------------------
-// Overview
+// The list
 // ---------------------------------------------------------------------------
 
 export function CampaignsPage() {
   const { model, scope } = useSim();
   return (
     <>
-      <TopBar crumbs={[{ label: "Campaigns" }]} actions={<Link href="/campaigns/new/" className="k-btn">New campaign</Link>} />
-      <Page>{model ? <CampaignsOverview model={model} scope={scope} /> : <PageSkeleton />}</Page>
+      <TopBar crumbs={[{ label: "Campaigns" }]} />
+      <Page>{model ? <CampaignList model={model} scope={scope} /> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-function CampaignsOverview({ model, scope }: { model: Model; scope: string | null }) {
-  const clients = scopedClients(model, scope);
-  const running = clients.filter((c) => c.campaign.status === "running").length;
-  const rows = clients.map((c) => {
-    const f = scopeFigures(model, [c]);
-    const target = targetState(model, c);
-    const won = f.outcomes[target] ?? 0;
-    return { c, f, won, target };
-  });
+function CampaignList({ model, scope }: { model: Model; scope: string | null }) {
+  const campaigns = scopedCampaigns(model, scope);
+  const running = campaigns.filter((c) => c.status === "running").length;
+  const reactive = campaigns.filter((c) => c.entry.kind === "trigger").length;
   return (
     <>
       <PageHeader
-        title={`${running} of ${clients.length} campaigns running`}
-        sub="Each campaign is one sales funnel, run on a budget. The engine reviews the funnel every week."
+        title={`${running} of ${plural(campaigns.length, "campaign", "campaigns")} running`}
+        sub={`Each one is a sales funnel: a straight line of lead states, one play per leg. ${plural(reactive, "campaign starts", "campaigns start")} on a trigger instead of the market.`}
         right={
-          <span className="flex items-center gap-1.5">
-            <span className="k-dot-pulse h-1.5 w-1.5 rounded-full bg-[var(--run)] text-[var(--run)]" />
-            {running} running now
-          </span>
+          <Link href="/campaigns/new/" className="k-btn-strong">
+            New campaign
+          </Link>
         }
       />
-      <CardTable footer={`${plural(clients.length, "campaign", "campaigns")} · Day ${model.day}`}>
+      <CardTable footer={<>Expected return uses the same formula as the measured one, on today&apos;s estimates. Measured counts subjects old enough for their outcomes to land.</>}>
         <thead>
           <tr className="k-line-subtle border-b">
             <th className={TH}>Campaign</th>
             <th className={TH}>Type</th>
             <th className={`${TH} text-right`}>
-              <RoiLabel />
+              <RoiLabel>Expected ROI</RoiLabel>
             </th>
-            <th className={`${TH} text-right`}>$ / outcome</th>
-            <th className={`${TH} text-right`}>% conversion</th>
-            <th className={`${TH} text-right`}># outcomes</th>
-            <th className={`${TH} text-right`}>$ spent</th>
+            <th className={`${TH} text-right`}>
+              <RoiLabel>Measured ROI</RoiLabel>
+            </th>
+            <th className={`${TH} text-right`}>$ Spent</th>
+            <th className={`${TH} text-right`}>Value: our runs</th>
+            <th className={`${TH} text-right`}>Other factories</th>
             <th className={TH}>Status</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ c, f, won, target }) => {
-            const p = plays(model, c);
-            const first = playPipe(model.catalogue, p[0] ?? "");
-            const trigger = first?.mode === "reactive" && first.triggerId ? model.catalogue.trigger(first.triggerId) : null;
-            const cpo = won > 0 ? f.spendCents / 100 / won : null;
-            return (
-              <tr key={c.campaign.id} className="k-row">
-                <td className={`${TD} max-w-[460px]`}>
-                  <Link href={campaignHref(c.campaign.id)} className="flex min-w-0 items-start gap-2.5">
-                    <Mark kind="funnel" id={c.campaign.id} size={36} />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium">{funnelName(model.catalogue, p)}</span>
-                      <span className="k-fg3 truncate text-[12px]">{c.brand.name}</span>
-                      <FunnelLine catalogue={model.catalogue} plays={p} />
-                    </span>
-                  </Link>
-                </td>
-                <td className={TD}>
-                  <span className="k-fg2 inline-flex items-center gap-1 whitespace-nowrap text-[12px]">
-                    {trigger ? <LightningIcon size={13} /> : <CalendarCheckIcon size={13} />}
-                    {trigger ? trigger.label : "Daily"}
-                  </span>
-                </td>
-                <td className={TDN}>
-                  <RoiValue measured={f.roi} expected={f.expectedRoi} />
-                </td>
-                <td className={TDN}>{cpo != null ? formatUsd(cpo) : <span className="k-fg4">—</span>}</td>
-                <td className={TDN}>{f.leads > 0 ? formatRatePct(won / f.leads) : <span className="k-fg4">—</span>}</td>
-                <td className={TDN}>
-                  {formatCount(won)} <span className="k-fg3 text-[12px]">{model.stateDefs.get(target)?.label.toLowerCase()}</span>
-                </td>
-                <td className={TDN}>{formatCents(f.spendCents)}</td>
-                <td className={TD}>
-                  {c.campaign.status === "running" ? (
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-[var(--run)]">
-                      <span className="k-dot-pulse h-1.5 w-1.5 rounded-full bg-[var(--run)] text-[var(--run)]" />
-                      {budgetWords(c)}
-                    </span>
-                  ) : (
-                    <StateDot running={false} label="Off" />
-                  )}
-                </td>
-              </tr>
-            );
-          })}
+          {campaigns.map((c) => (
+            <CampaignRow key={c.id} model={model} campaign={c} />
+          ))}
+          {campaigns.length === 0 && (
+            <tr>
+              <td colSpan={8}>
+                <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>
+              </td>
+            </tr>
+          )}
         </tbody>
       </CardTable>
-      {clients.length === 0 && <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>}
     </>
+  );
+}
+
+function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const e = model.session.economics(campaign.id);
+  const brand = model.clients.find((x) => x.brand.id === campaign.brandId)?.brand.name;
+  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
+  return (
+    <tr className="k-row k-line-subtle border-b last:border-b-0">
+      <td className={`${TD} max-w-[460px]`}>
+        <Link href={campaignHref(campaign.id)} className="flex min-w-0 items-start gap-2.5">
+          {trigger ? <Mark kind="trigger" id={trigger.id} size={34} /> : <Mark kind="funnel" id={campaign.id} size={34} />}
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{campaign.name}</span>
+            <span className="k-fg3 block truncate text-[12px]">{brand}</span>
+            <span className="mt-0.5 block">
+              <FunnelLine model={model} campaign={campaign} />
+            </span>
+          </span>
+        </Link>
+      </td>
+      <td className={TD}>
+        {trigger ? (
+          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px]">
+            <LightningIcon size={13} weight="fill" className="text-[var(--data-amber)]" />
+            {trigger.label}
+          </span>
+        ) : (
+          <span className="k-fg2 text-[12px]">Daily</span>
+        )}
+      </td>
+      <td className={TDN}>
+        <RoiWithRange value={e.expected.value} low={e.expected.low} high={e.expected.high} />
+      </td>
+      <td className={TDN}>
+        {e.measured.value != null ? (
+          <span className="whitespace-nowrap">
+            <span className={roiIsGood(e.measured.value) ? "text-[var(--run)]" : ""}>{formatRoi(e.measured.value)}</span>
+            <span className="k-fg3 ml-1 text-[11px]">{plural(e.measured.targets, "outcome", "outcomes")}</span>
+          </span>
+        ) : (
+          <span className="k-fg3 text-[12px]">Not mature yet</span>
+        )}
+      </td>
+      <td className={TDN}>{formatCents(e.spendCents)}</td>
+      <td className={TDN}>{formatUsd(e.valueOurs)}</td>
+      <td className={`${TDN} k-fg2`}>{e.valueOther > 0 ? formatUsd(e.valueOther) : <span className="k-fg4">—</span>}</td>
+      <td className={TD}>
+        <span className="flex flex-col gap-0.5">
+          <StateDot running={campaign.status === "running"} />
+          <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{campaign.entry.kind === "trigger" ? "Up to " : ""}{formatCents(campaign.dailyBudgetCents)}/day</span>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+function RoiWithRange({ value, low, high }: { value: number | null; low: number | null; high: number | null }) {
+  if (value == null) return <span className="k-fg4">—</span>;
+  return (
+    <span className="whitespace-nowrap">
+      <span className={roiIsGood(value) ? "text-[var(--run)]" : ""}>{formatRoi(value)}</span>
+      {low != null && high != null && (
+        <span className="k-fg3 ml-1 text-[11px]">
+          {formatRoi(low)} to {formatRoi(high)}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -157,195 +153,134 @@ function CampaignsOverview({ model, scope }: { model: Model; scope: string | nul
 // ---------------------------------------------------------------------------
 
 export function CampaignPage() {
-  const { model, dispatch } = useSim();
+  const { model } = useSim();
   const id = useSearchParams().get("id") ?? "";
-  const client = model?.clients.find((c) => c.campaign.id === id);
-  const name = model && client ? funnelName(model.catalogue, plays(model, client)) : "Campaign";
+  const campaign = model?.campaigns.find((c) => c.id === id) ?? null;
   return (
     <>
-      <TopBar
-        crumbs={[{ label: "Campaigns", href: "/campaigns/" }, { label: name }]}
-        actions={model && client ? <CampaignControls client={client} dispatch={dispatch} /> : null}
-      />
-      <Page>
-        {!model ? (
-          <PageSkeleton />
-        ) : !client ? (
+      <TopBar crumbs={[{ label: "Campaigns", href: "/campaigns/" }, { label: campaign?.name ?? "Campaign" }]} />
+      <Page>{model ? campaign ? <CampaignView model={model} campaign={campaign} /> : <EmptyNote>This campaign does not exist in this world. Pick one in the sidebar.</EmptyNote> : <PageSkeleton />}</Page>
+    </>
+  );
+}
+
+function CampaignView({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const e = model.session.economics(campaign.id);
+  const legs = campaignLegs(model, campaign);
+  const points = pointsOf(model, campaign);
+  const brand = model.clients.find((x) => x.brand.id === campaign.brandId)?.brand.name;
+  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
+  const target = targetOf(campaign);
+  return (
+    <>
+      <div className="mb-6 flex flex-wrap items-start gap-3">
+        {trigger ? <Mark kind="trigger" id={trigger.id} size={40} /> : <Mark kind="funnel" id={campaign.id} size={40} />}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[24px] font-medium leading-8 tracking-[-0.02em]">{campaign.name}</h1>
+          <p className="k-fg2 text-[13px]">
+            {brand} · {outcomeLabel(model.catalogue, target)} worth {formatUsd(e.targetValue)}
+            {e.valueLabel === "expected" ? " (fleet median, the client stated none)" : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusControl model={model} campaign={campaign} />
+          <BudgetControl campaign={campaign} />
+        </div>
+      </div>
+
+      <div className="k-card mb-6 px-4 py-3">
+        <p className="k-label mb-1.5">Sales funnel</p>
+        <FunnelLine model={model} campaign={campaign} size="md" />
+      </div>
+
+      <div className="k-card mb-6 grid grid-cols-2 divide-x divide-[var(--line-subtle)] md:grid-cols-4">
+        <Kpi label={<RoiLabel>Expected ROI</RoiLabel>}>
+          <RoiWithRange value={e.expected.value} low={e.expected.low} high={e.expected.high} />
+        </Kpi>
+        <Kpi label={<RoiLabel>Measured ROI</RoiLabel>}>
+          {e.measured.value != null ? (
+            <span>
+              <RoiWithRange value={e.measured.value} low={e.measured.low} high={e.measured.high} />
+            </span>
+          ) : (
+            <span className="k-fg3 text-[13px]">Not mature yet</span>
+          )}
+        </Kpi>
+        <Kpi label="Spent by our runs">
+          <span>{formatCents(e.spendCents)}</span>
+        </Kpi>
+        <Kpi label="Value won">
+          <span>
+            {formatUsd(e.valueOurs)}
+            {e.valueOther > 0 && <span className="k-fg3 ml-1 text-[12px]">+{formatUsd(e.valueOther)} other factories</span>}
+          </span>
+        </Kpi>
+      </div>
+      <p className="k-fg3 -mt-4 mb-6 text-[12px]">
+        Both returns use one formula: value of a {outcomeLabel(model.catalogue, target).toLowerCase()} over the cost per {outcomeLabel(model.catalogue, target).toLowerCase()}. Measured reads subjects that entered before day {Math.max(0, e.measured.cutoffDay)} ({plural(e.measured.targets, "outcome", "outcomes")}); expected reads every leg on today&apos;s estimates.
+      </p>
+
+      <section className="mb-8">
+        <SectionTitle count={legs.length}>Legs</SectionTitle>
+        <CardTable>
+          <thead>
+            <tr className="k-line-subtle border-b">
+              <th className={TH}>Leg</th>
+              <th className={`${TH} text-right`}>$/outcome</th>
+              <th className={`${TH} text-right`}>% conversion</th>
+              <th className={`${TH} text-right`}># outcomes</th>
+              <th className={`${TH} text-right`}>Attempts</th>
+              <th className={`${TH} text-right`}>$ per attempt</th>
+              <th className={`${TH} text-right`}>Leads needed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {legs.map((l) => (
+              <tr key={`${l.from}>${l.to}`} className="k-row k-line-subtle border-b last:border-b-0">
+                <td className={TD}>
+                  <span className="inline-flex items-center gap-1.5 text-[12px]">
+                    <OutcomeChip model={model} outcome={l.from} />
+                    <span className="k-fg4">→</span>
+                    <OutcomeChip model={model} outcome={l.to} />
+                    {l.label === "expected" && <span className="k-chip ml-1">Learning</span>}
+                  </span>
+                </td>
+                <td className={TDN}>{l.costPerAttempt != null && l.yieldRate ? formatUsd(l.costPerAttempt / l.yieldRate) : <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{formatRatePct(l.yieldRate)}</td>
+                <td className={TDN}>{formatCount(l.reached)}</td>
+                <td className={TDN}>{formatCount(l.attempts)}</td>
+                <td className={TDN}>{l.costPerAttempt != null ? formatUsd(l.costPerAttempt) : <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{l.leadsNeeded != null && Number.isFinite(l.leadsNeeded) ? formatCount(l.leadsNeeded) : <span className="k-fg4">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </CardTable>
+        <p className="k-fg3 mt-2 text-[12px]">Conversion is corrected for outcomes still on their way. Leads needed: attempts this leg makes per {outcomeLabel(model.catalogue, target).toLowerCase()}.</p>
+      </section>
+
+      <Plays model={model} campaign={campaign} />
+
+      <section className="mb-8">
+        <SectionTitle count={points.length} right={<span>In the order the engine decides them for each subject</span>}>
+          Input choices
+        </SectionTitle>
+        {points.length === 0 ? (
           <div className="k-card">
-            <EmptyNote>
-              This campaign does not exist in this world. <Link href="/campaigns/" className="k-accent">See every campaign</Link>.
-            </EmptyNote>
+            <EmptyNote>No choice yet. Press play.</EmptyNote>
           </div>
         ) : (
-          <Campaign model={model} client={client} />
-        )}
-      </Page>
-    </>
-  );
-}
-
-/** Status as a dot + word in a button with a chevron, and the budget as the same button opening a modal. */
-function CampaignControls({ client, dispatch }: { client: SimClient; dispatch: ReturnType<typeof useSim>["dispatch"] }) {
-  const [menu, setMenu] = useState(false);
-  const [budget, setBudget] = useState(false);
-  const running = client.campaign.status === "running";
-  return (
-    <>
-      <div className="relative">
-        <button type="button" className="k-btn" onClick={() => setMenu((v) => !v)} aria-expanded={menu}>
-          <StateDot running={running} label={running ? "Running" : "Paused"} />
-          <CaretDownIcon size={12} className="k-fg3" />
-        </button>
-        {menu && (
-          <div className="k-popover absolute right-0 top-9 z-30 w-36 p-1" onMouseLeave={() => setMenu(false)}>
-            <button
-              type="button"
-              className="flex h-8 w-full items-center rounded-[6px] px-2 text-left text-[13px] hover:bg-[var(--bg-hover)]"
-              onClick={() => {
-                dispatch({ type: "status", campaignId: client.campaign.id, status: running ? "paused" : "running" });
-                setMenu(false);
-              }}
-            >
-              <StateDot running={!running} label={running ? "Paused" : "Running"} />
-            </button>
+          <div className="space-y-3">
+            {points.map((p) => (
+              <PointCard key={p.info.key} model={model} campaign={campaign} point={p} />
+            ))}
           </div>
         )}
-      </div>
-      <button type="button" className="k-btn tabular-nums" onClick={() => setBudget(true)}>
-        {budgetWords(client)}
-        <CaretDownIcon size={12} className="k-fg3" />
-      </button>
-      {budget && <BudgetModal client={client} onClose={() => setBudget(false)} dispatch={dispatch} />}
-    </>
-  );
-}
+      </section>
 
-function BudgetModal({ client, onClose, dispatch }: { client: SimClient; onClose: () => void; dispatch: ReturnType<typeof useSim>["dispatch"] }) {
-  const [perDay, setPerDay] = useState(String(Math.round(client.campaign.dailyBudgetCents / 100)));
-  const [mode, setMode] = useState<"day" | "volume">(client.campaign.maxVolume != null ? "volume" : "day");
-  const [volume, setVolume] = useState(String(client.campaign.maxVolume ?? 500));
-  const [error, setError] = useState<string | null>(null);
-  const save = () => {
-    const cents = Math.round(Number(perDay) * 100);
-    if (!(cents > 0)) return setError("Set a daily amount above $0.");
-    const err = dispatch({ type: "budget", campaignId: client.campaign.id, dailyBudgetCents: cents, ...(mode === "volume" ? { maxVolume: Math.max(1, Math.round(Number(volume) || 0)) } : {}) });
-    if (err) return setError(err);
-    onClose();
-  };
-  return (
-    <Drawer title="Budget" onClose={onClose} width={380}>
-      <p className="k-fg2 text-[13px]">How much this campaign may spend. The engine spends it on the choices worth the most per dollar.</p>
-      <div className="mt-4 flex gap-1.5">
-        <button type="button" className={`k-card px-3 py-2 text-left text-[13px] ${mode === "day" ? "k-card-on" : ""}`} onClick={() => setMode("day")}>
-          Per day
-        </button>
-        <button type="button" className={`k-card px-3 py-2 text-left text-[13px] ${mode === "volume" ? "k-card-on" : ""}`} onClick={() => setMode("volume")}>
-          A volume of leads
-        </button>
-      </div>
-      <label className="k-label mt-4 block" htmlFor="per-day">
-        Up to, per day
-      </label>
-      <span className="k-input mt-1 flex items-center gap-1 px-2">
-        <span className="k-fg3">$</span>
-        <input id="per-day" value={perDay} onChange={(e) => setPerDay(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-transparent outline-none" style={{ font: "inherit" }} />
-      </span>
-      {mode === "volume" && (
-        <>
-          <label className="k-label mt-3 block" htmlFor="volume">
-            New leads in total
-          </label>
-          <input id="volume" value={volume} onChange={(e) => setVolume(e.target.value.replace(/[^0-9]/g, ""))} className="k-input mt-1 w-full px-2" style={{ font: "inherit" }} />
-        </>
-      )}
-      {error && <p className="mt-3 text-[12px] text-[var(--data-rose)]">{error}</p>}
-      <button type="button" className="k-btn-strong mt-5" onClick={save}>
-        Save
-      </button>
-    </Drawer>
-  );
-}
-
-function Campaign({ model, client }: { model: Model; client: SimClient }) {
-  const f = useMemo(() => scopeFigures(model, [client]), [model, client]);
-  const p = plays(model, client);
-  const target = targetState(model, client);
-  const targetLabel = model.stateDefs.get(target)?.label ?? stepLabel(model.catalogue, client.campaign.target);
-  const won = f.outcomes[target] ?? 0;
-  const v = valueOf(model, client);
-  const todaySpend = model.result.days[model.day - 1]?.spendCents[client.campaign.id] ?? 0;
-  const running = client.campaign.status === "running";
-  const [view, setView] = useState<"flash" | "mature">("flash");
-  const values = useMemo(() => stepValues(model, client), [model, client]);
-  const ids = new Set([client.campaign.id]);
-  return (
-    <>
-      <div className="mb-6 flex items-start gap-3">
-        <Mark kind="funnel" id={client.campaign.id} size={40} />
-        <div className="min-w-0">
-          <h1 className="text-[24px] font-medium leading-[30px] tracking-[-0.02em]">{funnelName(model.catalogue, p)}</h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <StateDot running={running} />
-            <span className="k-chip">{client.brand.name}</span>
-            <span className="k-chip">Aims at {targetLabel}</span>
-            <span className="k-chip">{client.campaign.salesFunnel ? "Funnel picked by the client" : "Funnel picked by the engine"}</span>
-            {v && (
-              <span className="k-chip">
-                {formatUsd(v.amount)} per {targetLabel.toLowerCase()} {v.label === "expected" ? "(fleet median, expected)" : "(stated)"}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="k-card grid grid-cols-2 divide-[var(--line-subtle)] md:grid-cols-6 md:divide-x">
-        <Kpi label={<RoiLabel />}>
-          <RoiValue measured={f.roi} expected={expectedRoi(model, client)} />
-        </Kpi>
-        <Kpi label={`${targetLabel}s`}>{formatCount(won)}</Kpi>
-        <Kpi label={`$ / ${targetLabel.toLowerCase()}`}>{won > 0 ? formatUsd(f.spendCents / 100 / won) : "—"}</Kpi>
-        <Kpi label="Leads found">{formatCount(f.leads)}</Kpi>
-        <Kpi label="Spent">{formatCents(f.spendCents)}</Kpi>
-        <div className="px-4 py-3">
-          <span className="k-label">Spent today</span>
-          <div className="mt-1 text-[22px] font-medium leading-7 tabular-nums">{formatCents(todaySpend)}</div>
-          <Meter className="mt-1.5" value={todaySpend} max={client.campaign.dailyBudgetCents} color={running ? "var(--run)" : "var(--fg-4)"} />
-          <p className="k-fg3 mt-1 text-[12px]">of {formatCents(client.campaign.dailyBudgetCents)} a day</p>
-        </div>
-      </div>
+      {trigger && <TriggerFeed model={model} campaign={campaign} />}
 
       <div className="mt-8">
-        <SectionTitle
-          right={
-            <span className="flex items-center gap-1">
-              {(["flash", "mature"] as const).map((x) => (
-                <button key={x} type="button" className={`k-chip ${view === x ? "k-chip-on" : ""}`} onClick={() => setView(x)} aria-pressed={view === x}>
-                  {x === "flash" ? "Flash: everything to date" : "Mature: old enough to judge"}
-                </button>
-              ))}
-            </span>
-          }
-        >
-          The funnel, pipe by pipe
-        </SectionTitle>
-        <div className="k-card px-4 py-3">
-          <FunnelLine catalogue={model.catalogue} plays={p} size="md" scroll={false} />
-        </div>
-        <div className="mt-3 space-y-3">
-          {p.map((playId, i) => (
-            <PipeBlock key={playId} model={model} client={client} playId={playId} index={i} view={view} stepValue={values.get(playPipe(model.catalogue, playId)?.to ?? "") ?? 0} />
-          ))}
-        </div>
-      </div>
-
-      {!client.campaign.salesFunnel && <FunnelChoice model={model} client={client} />}
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CostPerOutcomeCard model={model} f={f} target={target} />
-        <ReturnCard f={f} />
-      </div>
-      <div className="mt-8">
-        <WhyFeed model={model} campaignIds={ids} limit={10} />
+        <WhyFeed model={model} campaignIds={new Set([campaign.id])} limit={10} />
       </div>
     </>
   );
@@ -353,215 +288,308 @@ function Campaign({ model, client }: { model: Model; client: SimClient }) {
 
 function Kpi({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="px-4 py-3">
-      <span className="k-label">{label}</span>
+    <div className="min-w-0 px-4 py-3">
+      <p className="k-label">{label}</p>
       <div className="mt-1 text-[22px] font-medium leading-7 tracking-[-0.02em] tabular-nums">{children}</div>
     </div>
   );
 }
 
-const NODES_ORDER = ["workflow", "slot:template", "slot:llm", "audience"];
-
-function PipeBlock({ model, client, playId, index, view, stepValue }: { model: Model; client: SimClient; playId: string; index: number; view: "flash" | "mature"; stepValue: number }) {
-  const pipe = playPipe(model.catalogue, playId);
-  const [open, setOpen] = useState(index === 0);
-  if (!pipe) return null;
-  const ids = new Set([client.campaign.id]);
-  const runs = runsOf(model, { campaignIds: ids, pipeId: pipe.id });
-  const fm = flashMature(model, pipe, runs);
-  const t: Tally = fm[view];
-  const est = model.session.estimateLeg(playId, client.brand.id);
-  const valuePerDollar = est && est.costPerTrial > 0 ? (est.yieldRate * stepValue) / est.costPerTrial : null;
-  const ch = model.catalogue.channel(pipe.channel);
-  const trigger = pipe.triggerId ? model.catalogue.trigger(pipe.triggerId) : null;
-  const nodes = NODES_ORDER.filter((n) => latestChoice(model, n, pipe.id, client.campaign.id));
+/** The changeable status: dot + word in a button, a menu with the other state. */
+function StatusControl({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const { dispatch } = useSim();
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const running = campaign.status === "running";
+  void model;
   return (
-    <div className="k-card">
-      <button type="button" className="flex w-full items-start gap-3 px-4 py-3 text-left" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <Mark kind="channel" id={pipe.channel} icon={ch?.icon} size={36} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="font-medium">{ch?.name}</span>
-            <span className="k-chip">
-              <Mark kind="pipe" id={pipe.id} size={14} />
-              {pipe.name}
-            </span>
-            <span className="k-chip">{trigger ? `Wakes on ${trigger.label}` : "Daily budget"}</span>
-            {!fm.isMature && <span className="k-chip">Learning</span>}
-          </span>
-          <span className="k-fg3 block text-[12px]">
-            {stepLabel(model.catalogue, pipe.from)} → {ch?.name} → {stepLabel(model.catalogue, pipe.to)}
-          </span>
-        </span>
-        <span className="hidden gap-6 text-right md:flex">
-          <Mini label="In" value={formatCount(t.inputs)} />
-          <Mini label="Out" value={formatCount(t.outputs)} />
-          <Mini label="% conversion" value={formatRatePct(rate(t))} />
-          <Mini label="$ / outcome" value={formatUsd(costPerOutcome(t))} />
-          <Mini label="Value per $1" value={valuePerDollar != null ? formatRoi(valuePerDollar) : "—"} good={valuePerDollar != null && valuePerDollar >= 1} />
-        </span>
-        <CaretRightIcon size={14} className={`k-fg3 mt-1 transition-transform ${open ? "rotate-90" : ""}`} />
+    <>
+      <button ref={btn} type="button" className="k-btn" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <StateDot running={running} />
+        <CaretDownIcon size={11} className="k-fg3" />
       </button>
       {open && (
-        <div className="k-line-subtle border-t px-4 pb-4 pt-3">
-          <p className="k-fg3 text-[12px]">
-            {view === "mature"
-              ? `Mature view: runs older than ${fm.windowDays} days only (${formatCount(fm.mature.inputs)} of ${formatCount(fm.flash.inputs)} inputs). ${fm.isMature ? "Enough outcomes to read on its own." : `Needs ${fm.outcomesRequired} outcomes to be read on its own.`}`
-              : `Flash view: every run to date. One more ${stepLabel(model.catalogue, pipe.to).toLowerCase()} is worth ${formatUsd(stepValue)} to this campaign.`}
-          </p>
-          {nodes.length === 0 ? (
-            <EmptyNote>This pipe has not run yet.</EmptyNote>
-          ) : (
-            <div className="mt-3 grid gap-3 lg:grid-cols-2">
-              {nodes.map((node) => (
-                <ChoiceCard key={node} model={model} node={node} pipeId={pipe.id} campaignId={client.campaign.id} runs={runs} view={view} />
-              ))}
-            </div>
-          )}
-        </div>
+        <FixedMenu anchor={btn.current} onClose={() => setOpen(false)}>
+          <button
+            type="button"
+            className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] hover:bg-[var(--bg-hover)]"
+            onClick={() => {
+              dispatch({ type: "status", campaignId: campaign.id, status: running ? "paused" : "running" });
+              setOpen(false);
+            }}
+          >
+            <StateDot running={!running} />
+          </button>
+        </FixedMenu>
       )}
-    </div>
+    </>
   );
 }
 
-function Mini({ label, value, good }: { label: string; value: string; good?: boolean }) {
+/** The budget: "$30/day" in a button, a modal to change it. */
+function BudgetControl({ campaign }: { campaign: Campaign }) {
+  const { dispatch } = useSim();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(String(campaign.dailyBudgetCents / 100));
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setText(String(campaign.dailyBudgetCents / 100)), [campaign.dailyBudgetCents]);
   return (
-    <span className="flex flex-col items-end">
-      <span className="k-label">{label}</span>
-      <span className={`text-[14px] font-medium tabular-nums ${good ? "text-[var(--run)]" : ""}`}>{value}</span>
-    </span>
+    <>
+      <button type="button" className="k-btn tabular-nums" onClick={() => setOpen(true)}>
+        {campaign.entry.kind === "trigger" ? "Up to " : ""}
+        {formatCents(campaign.dailyBudgetCents)}/day
+        <CaretDownIcon size={11} className="k-fg3" />
+      </button>
+      {open && (
+        <Modal title="Daily budget" onClose={() => setOpen(false)}>
+          <p className="k-fg2 mb-3 text-[13px]">What this campaign may spend per day on our runs.</p>
+          <label className="k-input flex items-center gap-1 px-2">
+            <span className="k-fg3">$</span>
+            <input aria-label="Dollars per day" value={text} onChange={(e) => setText(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} />
+            <span className="k-fg3">/day</span>
+          </label>
+          {error && <p className="mt-2 text-[12px] text-[var(--data-rose)]">{error}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" className="k-btn-ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="k-btn-strong"
+              onClick={() => {
+                const err = dispatch({ type: "budget", campaignId: campaign.id, dailyBudgetCents: Math.round(Number(text || 0) * 100) });
+                setError(err);
+                if (!err) setOpen(false);
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
-/** One choice node inside a pipe: its options, the share of picks this week, what each is expected to return, why. */
-export function ChoiceCard({ model, node, pipeId, campaignId, runs, view }: { model: Model; node: string; pipeId: string; campaignId: string; runs: ReturnType<typeof runsOf>; view: "flash" | "mature" }) {
-  const last = latestChoice(model, node, pipeId, campaignId)!;
-  const shares = pickShares(model, node, pipeId, new Set([campaignId]));
-  const pipe = model.catalogue.pipe(pipeId);
-  const byOption = new Map<string, typeof runs>();
-  for (const r of runs) {
-    const o = optionOfRun(r, node);
-    if (!o) continue;
-    byOption.set(o, [...(byOption.get(o) ?? []), r]);
-  }
-  const options = [...last.options].sort((a, b) => b.meanScore - a.meanScore);
-  return (
-    <div className="k-inset rounded-[10px] p-3">
-      <div className="flex items-center justify-between">
-        <span className="k-label">{nodeLabel(node)}</span>
-        <span className="k-fg3 text-[12px]">Share of picks, last 7 days</span>
+function FixedMenu({ anchor, onClose, children }: { anchor: HTMLElement | null; onClose: () => void; children: React.ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setHost(document.getElementById("portal"));
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!host || !anchor) return null;
+  const r = anchor.getBoundingClientRect();
+  return createPortal(
+    <div className="v2-root fixed inset-0 z-50" onClick={onClose}>
+      <div className="k-popover fixed w-[180px] p-1" style={{ top: r.bottom + 4, left: Math.max(8, r.right - 180) }} onClick={(e) => e.stopPropagation()}>
+        {children}
       </div>
-      <table className="mt-2 w-full text-[12px]">
-        <thead>
-          <tr>
-            <th className="k-label py-1 text-left font-medium">Option</th>
-            <th className="k-label py-1 text-right font-medium">Picks</th>
-            <th className="k-label py-1 text-right font-medium">$ per $1</th>
-            <th className="k-label py-1 text-right font-medium">% conv.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {options.map((o) => {
-            const share = shares.get(o.id) ?? 0;
-            const t = flashMature(model, pipe, byOption.get(o.id) ?? [])[view];
-            return (
-              <tr key={o.id}>
-                <td className="py-1 pr-2">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <Mark kind={markKindOf(model, node, o.id)} id={o.id} size={16} />
-                    <span className={`truncate ${o.id === last.chosenId ? "font-medium" : "k-fg2"}`}>{optionLabel(model, node, o.id)}</span>
-                  </span>
-                </td>
-                <td className="w-[110px] py-1 pl-2">
-                  <span className="flex items-center justify-end gap-1.5">
-                    <span className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--data-track)]">
-                      <span className="k-fill block h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.round(share * 100)}%` }} />
-                    </span>
-                    <span className="w-8 text-right tabular-nums">{formatRatePct(share)}</span>
-                  </span>
-                </td>
-                <td className="py-1 text-right tabular-nums">{formatUsd(o.meanScore)}</td>
-                <td className="py-1 text-right tabular-nums">{formatRatePct(rate(t))}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <p className="k-fg3 mt-2 text-[12px]">{explainChoice(model, last)}</p>
+    </div>,
+    host,
+  );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setHost(document.getElementById("portal"));
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!host) return null;
+  return createPortal(
+    <div className="v2-root fixed inset-0 z-50 flex items-center justify-center" style={{ background: "#10101224" }} onClick={onClose}>
+      <div className="k-popover w-[min(380px,calc(100vw-16px))] p-4" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <p className="k-label mb-3">{title}</p>
+        {children}
+      </div>
+    </div>,
+    host,
+  );
+}
+
+/** The pipes a campaign plays and the strategy it chose on each (its default otherwise). */
+function Plays({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const pipes = playedPipes(model, campaign);
+  return (
+    <section className="mb-8">
+      <SectionTitle count={pipes.length} right={<span>A play is a pipe with a strategy. A strategy states conditions per input.</span>}>
+        Plays
+      </SectionTitle>
+      <div className="grid gap-3 md:grid-cols-2">
+        {pipes.map((p) => (
+          <PlayCard key={p.id} model={model} campaign={campaign} pipe={p} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign; pipe: Pipe }) {
+  const { dispatch } = useSim();
+  const strategies = model.catalogue.strategiesOf(pipe.id);
+  const chosen = model.session.strategyOf(campaign, pipe.id);
+  const [error, setError] = useState<string | null>(null);
+  const isDefault = !chosen || chosen.id === defaultStrategyId(pipe.id);
+  return (
+    <div className="k-card p-4">
+      <div className="flex items-start gap-2.5">
+        <Mark kind="pipe" id={pipe.id} icon={pipe.icon} size={32} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-medium">{pipe.name}</p>
+          <p className="k-fg3 truncate text-[12px]">{pipeLine(model.catalogue, pipe)}</p>
+        </div>
+        {!isDefault && <span className="k-chip">Chosen</span>}
+      </div>
+      <label className="mt-3 flex items-center gap-2">
+        <span className="k-label shrink-0">Strategy</span>
+        <select
+          className="k-input min-w-0 flex-1 px-1.5"
+          style={{ font: "inherit" }}
+          value={chosen?.id ?? defaultStrategyId(pipe.id)}
+          onChange={(e) => setError(dispatch({ type: "strategy", campaignId: campaign.id, pipeId: pipe.id, strategyId: e.target.value }))}
+        >
+          {strategies.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.id === defaultStrategyId(pipe.id) ? "Default: every script" : s.name}
+              {s.proposed ? " (proposed by a split)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {error && <p className="mt-1 text-[12px] text-[var(--data-rose)]">{error}</p>}
+      <div className="mt-2 space-y-1">
+        {chosen && (chosen.rules.length > 0 || (chosen.subject?.length ?? 0) > 0) ? (
+          <>
+            {chosen.rules.map((r, i) => (
+              <p key={i} className="text-[12px]">
+                <span className="k-fg3">{r.input ? `At ${outcomeLabel(model.catalogue, r.input).toLowerCase()}: ` : "Its own scripts: "}</span>
+                {r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}
+              </p>
+            ))}
+            {(chosen.subject ?? []).length > 0 && (
+              <p className="text-[12px]">
+                <span className="k-fg3">Serves: </span>
+                {chosen.subject!.map((c) => describeCondition(c, model.catalogue)).join(", ")}
+              </p>
+            )}
+            {chosen.proposed && <p className="k-fg3 text-[12px]">Proposed by a split on day {chosen.proposed.day}: {chosen.proposed.reason}.</p>}
+          </>
+        ) : (
+          <p className="k-fg3 text-[12px]">No condition: every script competes at every input.</p>
+        )}
+      </div>
     </div>
   );
 }
 
-export function markKindOf(model: Model, node: string, id: string): Parameters<typeof Mark>[0]["kind"] {
-  if (node === "workflow") return `workflow:${model.catalogue.workflow(id)?.kind ?? "ai"}` as "workflow:ai";
-  if (node === "slot:llm") return "llm";
-  if (node.startsWith("slot:")) return "template";
-  if (node === "audience") return "audience";
-  return "funnel";
-}
-
-/** The weekly funnel choice of a campaign the engine runs: the candidates, what each is expected to return, the pick. */
-function FunnelChoice({ model, client }: { model: Model; client: SimClient }) {
-  const last = latestChoice(model, "funnel", null, client.campaign.id);
-  const [tab, setTab] = useState<"now" | "history">("now");
-  if (!last) return null;
-  const history = model.result.choices.filter((c) => c.node === "funnel" && c.campaignId === client.campaign.id);
+/** One choice point: its options, their share of picks, the engine's belief, the hidden best. */
+function PointCard({ model, campaign, point }: { model: Model; campaign: Campaign; point: PointRow }) {
+  const legEnd = legEndOfPoints(model, campaign).get(point.info.key) ?? targetOf(campaign);
+  const sorted = useMemo(() => [...point.options].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.options]);
   return (
-    <div className="mt-8">
-      <SectionTitle right={<span>Reviewed every 7 days. Next on day {last.day + 7}.</span>}>Which funnel, and why</SectionTitle>
-      <Tabs
-        tabs={[
-          { id: "now", label: "Last review" },
-          { id: "history", label: "Every review", count: history.length },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-      {tab === "now" ? (
-        <CardTable footer={explainChoice(model, last)}>
+    <div className="k-card overflow-hidden">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Mark kind="point" id={point.info.key} size={22} />
+          <Link href={`/research/?point=${encodeURIComponent(point.info.key)}`} className="truncate text-[14px] font-medium hover:underline">
+            {point.info.title}
+          </Link>
+          <span className="k-fg3 truncate text-[12px]">{point.info.sub}</span>
+        </div>
+        <span className="k-fg3 text-[12px]">
+          {plural(point.picks, "pick", "picks")} · scored on {outcomeLabel(model.catalogue, legEnd).toLowerCase()}, through traceability
+        </span>
+      </div>
+      <div className="k-scroll overflow-x-auto">
+        <table className="mt-2 w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Sales funnel</th>
-              <th className={`${TH} text-right`}>Expected $ per $1</th>
-              <th className={TH}>Pick</th>
+              <th className={TH}>Option</th>
+              <th className={`${TH} text-right`}>Share, 7 days</th>
+              <th className={`${TH} text-right`}>Value per $1</th>
+              <th className={`${TH} text-right`}>$ from here</th>
+              <th className={`${TH} text-right`}>% reach the end</th>
+              <th className={TH}>Hidden truth</th>
             </tr>
           </thead>
           <tbody>
-            {[...last.options]
-              .sort((a, b) => b.meanScore - a.meanScore)
-              .map((o) => (
-                <tr key={o.id} className="k-row">
-                  <td className={`${TD} max-w-[640px]`}>
-                    <span className="block font-medium">{funnelName(model.catalogue, o.id.split(" > "))}</span>
-                    <FunnelLine catalogue={model.catalogue} plays={o.id.split(" > ")} />
-                  </td>
-                  <td className={TDN}>{formatUsd(o.meanScore)}</td>
-                  <td className={TD}>{o.id === last.chosenId ? <StateDot running label="Running" /> : <span className="k-fg4">—</span>}</td>
-                </tr>
-              ))}
-          </tbody>
-        </CardTable>
-      ) : (
-        <CardTable>
-          <thead>
-            <tr className="k-line-subtle border-b">
-              <th className={TH}>Day</th>
-              <th className={TH}>Funnel picked</th>
-              <th className={TH}>Why</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...history].reverse().map((c, i) => (
-              <tr key={i} className="k-row">
-                <td className={`${TD} k-mono k-fg2 text-[12px]`}>Day {c.day}</td>
-                <td className={TD}>{funnelName(model.catalogue, c.chosenId.split(" > "))}</td>
-                <td className={`${TD} k-fg2 text-[12px]`}>{explainChoice(model, c)}</td>
+            {sorted.map((o) => (
+              <tr key={o.option} className="k-row k-line-subtle border-b last:border-b-0">
+                <td className={TD}>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">{o.label}</span>
+                    {o.isBelievedBest && <span className="k-chip">Best expected</span>}
+                  </span>
+                </td>
+                <td className={TDN}>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-[var(--data-track)]">
+                      <span className="block h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.round(o.share * 100)}%` }} />
+                    </span>
+                    {formatRatePct(o.share)}
+                  </span>
+                </td>
+                <td className={TDN}>{formatUsd(o.valuePerDollar)}</td>
+                <td className={TDN}>{formatUsd(o.cost)}</td>
+                <td className={TDN}>
+                  {formatRatePct(o.rate)}
+                  <span className="k-fg3 ml-1 text-[11px]">± {formatRatePct(o.rateSd)}</span>
+                </td>
+                <td className={TD}>
+                  {o.isHiddenBest ? (
+                    <span className="inline-flex items-center gap-1 text-[12px] text-[var(--run)]">
+                      <CheckIcon size={12} weight="bold" />
+                      Hidden best
+                    </span>
+                  ) : o.truth ? (
+                    <span className="k-fg3 text-[12px] tabular-nums">{formatRatePct(o.truth.rate)} true rate</span>
+                  ) : (
+                    <span className="k-fg4">—</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
-        </CardTable>
-      )}
+        </table>
+      </div>
     </div>
+  );
+}
+
+/** The trigger events that opened attempts of a reactive campaign. */
+function TriggerFeed({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const events = model.session.triggerEvents.filter((e) => e.campaignIds.includes(campaign.id));
+  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
+  const recent = events.slice(-8).reverse();
+  return (
+    <section className="mb-8">
+      <SectionTitle count={events.length}>Trigger events</SectionTitle>
+      <div className="k-card p-4">
+        {trigger && (
+          <p className="k-fg2 mb-3 text-[13px]">
+            When {trigger.when.map((w) => outcomeLabel(model.catalogue, w).toLowerCase()).join(" or ")} is reached, after {plural(trigger.delayDays, "day", "days")}
+            {trigger.unless.length ? `, unless ${trigger.unless.map((u) => outcomeLabel(model.catalogue, u).toLowerCase()).join(" or ")} came meanwhile` : ""}: an event, then this campaign runs its funnel on that lead.
+          </p>
+        )}
+        {recent.length === 0 ? (
+          <p className="k-fg3 text-[13px]">No event yet. Press play.</p>
+        ) : (
+          <div className="divide-y divide-[var(--line-subtle)]">
+            {recent.map((ev) => (
+              <Link key={ev.occurrenceId} href={`/leads/view/?id=${encodeURIComponent(ev.subject)}`} className="k-hover flex items-center gap-3 py-2">
+                <Mark kind="trigger" id={ev.triggerId} size={20} />
+                <span className="min-w-0 flex-1 truncate text-[13px]">{ev.subject}</span>
+                <span className="k-mono k-fg3 text-[12px]">Day {ev.day}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

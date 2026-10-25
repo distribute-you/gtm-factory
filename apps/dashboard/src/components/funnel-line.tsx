@@ -1,20 +1,18 @@
 "use client";
 
-import { START, type Catalogue } from "@gtm-factory/engine";
+import { START, type Campaign } from "@gtm-factory/engine";
 import { Mark } from "./mark";
 import { HoverScroll } from "./ui";
-import { channelName, playPipe, stepLabel } from "@/lib/model";
+import { legPlays, outcomeLabel, pipeName, type Model } from "@/lib/model";
 
 /**
- * A sales funnel drawn as its straight line: Start (or the trigger that wakes its first pipe),
- * then a channel between every two steps, up to the target. Read off the catalogue only.
+ * A sales funnel drawn as its straight line: Start (or the trigger whose events open it),
+ * then the pipe playing each leg today, then the lead state it reaches, up to the target.
  */
-export function FunnelLine({ catalogue, plays, size = "sm", scroll = true }: { catalogue: Catalogue; plays: readonly string[]; size?: "sm" | "md"; scroll?: boolean }) {
-  const pipes = plays.map((p) => playPipe(catalogue, p)).filter((p): p is NonNullable<typeof p> => !!p);
-  if (pipes.length === 0) return <span className="k-fg4">—</span>;
-  const first = pipes[0]!;
-  const trigger = first.mode === "reactive" && first.triggerId ? catalogue.trigger(first.triggerId) : null;
+export function FunnelLine({ model, campaign, size = "sm", scroll = true }: { model: Model; campaign: Campaign; size?: "sm" | "md"; scroll?: boolean }) {
+  const legs = legPlays(model, campaign);
   const icon = size === "md" ? 18 : 14;
+  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
   const line = (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${size === "md" ? "text-[13px]" : "text-[12px]"}`}>
       {trigger ? (
@@ -23,33 +21,34 @@ export function FunnelLine({ catalogue, plays, size = "sm", scroll = true }: { c
           <span className="k-fg2">{trigger.label}</span>
         </span>
       ) : (
-        <StepChip catalogue={catalogue} step={first.from} size={icon} />
+        <OutcomeChip model={model} outcome={START} size={icon} />
       )}
-      {pipes.map((p) => {
-        const ch = catalogue.channel(p.channel);
-        return (
-          <span key={p.id} className="inline-flex items-center gap-1.5">
-            <Arrow />
-            <span className="inline-flex items-center gap-1 rounded-[6px] px-1 py-px" title={`${p.name ?? p.id}: ${channelName(catalogue, p)}`}>
-              <Mark kind="channel" id={p.channel} icon={ch?.icon} size={icon} />
-              <span className="k-fg">{channelName(catalogue, p)}</span>
-            </span>
-            <Arrow />
-            <StepChip catalogue={catalogue} step={p.to} size={icon} />
-          </span>
-        );
-      })}
+      {legs.map((l) => (
+        <span key={`${l.from}>${l.to}`} className="inline-flex items-center gap-1.5">
+          <Arrow />
+          {l.pipeId && (
+            <>
+              <span className="inline-flex items-center gap-1 rounded-[6px] px-1 py-px" title={l.options.length > 1 ? `${l.options.length} pipes compete on this leg` : undefined}>
+                <Mark kind="pipe" id={l.pipeId} icon={model.catalogue.pipe(l.pipeId)?.icon} size={icon} />
+                <span className="k-fg">{pipeName(model.catalogue, l.pipeId)}</span>
+              </span>
+              <Arrow />
+            </>
+          )}
+          <OutcomeChip model={model} outcome={l.to} size={icon} />
+        </span>
+      ))}
     </span>
   );
   return scroll ? <HoverScroll>{line}</HoverScroll> : line;
 }
 
-export function StepChip({ catalogue, step, size = 14 }: { catalogue: Catalogue; step: string; size?: number }) {
-  const s = catalogue.step(step);
+export function OutcomeChip({ model, outcome, size = 14 }: { model: Model; outcome: string; size?: number }) {
+  const o = model.catalogue.outcome(outcome);
   return (
     <span className="inline-flex items-center gap-1">
-      {step === START ? <Mark kind="start" id="start" size={size} quiet /> : <Mark kind="step" id={step} icon={s?.icon} size={size} />}
-      <span className="k-fg2">{stepLabel(catalogue, step)}</span>
+      {outcome === START ? <Mark kind="start" id="start" size={size} quiet /> : <Mark kind="outcome" id={outcome} icon={o?.icon} size={size} />}
+      <span className="k-fg2">{outcomeLabel(model.catalogue, outcome)}</span>
     </span>
   );
 }

@@ -25,9 +25,9 @@ import {
 import { NavContext } from "./nav-context";
 import { Mark } from "./mark";
 import { useSim, SPEEDS, type Speed } from "@/lib/sim";
-import { SCENARIOS } from "@/lib/world";
-import { funnelName } from "@/lib/model";
+import { leadRows } from "@/lib/model";
 import { formatCount } from "@/lib/format";
+import { pinHref, pinKey } from "@/lib/pins";
 
 export const REPO_URL = "https://github.com/distribute-you/gtm-factory";
 
@@ -92,11 +92,13 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
-  const { model, scope } = useSim();
+  const { model, scope, pins } = useSim();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
-  const clients = model ? model.clients.filter((c) => !scope || c.brand.id === scope) : [];
+  const campaigns = model ? model.campaigns.filter((c) => !scope || c.brandId === scope) : [];
   const campaignId = search.get("id");
-  const leadsInScope = model ? model.leads.filter((l) => !scope || l.brandId === scope).length : null;
+  const pinned = search.get("pin");
+  const leadsInScope = model ? leadRows(model, scope).length : null;
+  const audience = model?.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired);
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
@@ -113,18 +115,18 @@ function Sidebar() {
         <Group title="Campaigns">
           <NavItem href="/campaigns/" label="Overview" icon={<SquaresFourIcon size={15} />} active={at("/campaigns")} />
           {model &&
-            clients.map((c) => {
-              const plays = model.session.funnelOfCampaign(c.campaign.id) ?? c.campaign.salesFunnel ?? [];
-              const active = pathname.startsWith("/campaigns/view") && campaignId === c.campaign.id;
+            campaigns.map((c) => {
+              const active = pathname.startsWith("/campaigns/view") && campaignId === c.id;
+              const brand = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name ?? "";
               return (
                 <NavItem
-                  key={c.campaign.id}
-                  href={`/campaigns/view/?id=${encodeURIComponent(c.campaign.id)}`}
-                  label={scope ? funnelName(model.catalogue, plays) : c.brand.name}
-                  icon={<Mark kind="funnel" id={c.campaign.id} size={16} />}
+                  key={c.id}
+                  href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
+                  label={scope ? c.name : `${brand}: ${c.name}`}
+                  icon={c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={16} /> : <Mark kind="funnel" id={c.id} size={16} />}
                   active={active}
                   trailing={
-                    c.campaign.status === "running" ? (
+                    c.status === "running" ? (
                       <span className="k-dot-pulse ml-auto mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--run)] text-[var(--run)]" aria-label="Running" />
                     ) : (
                       <span className="ml-auto mr-1 h-2 w-2 shrink-0 rounded-full border-[1.5px] border-[var(--fg-3)]" aria-label="Paused" />
@@ -137,8 +139,21 @@ function Sidebar() {
         <Group title="Records">
           <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} trailing={<Count n={leadsInScope} />} />
           <NavItem href="/companies/" label="Companies" icon={<BuildingsIcon size={15} />} active={at("/companies")} />
-          <NavItem href="/audiences/" label="Audiences" icon={<UsersThreeIcon size={15} />} active={at("/audiences")} />
+          {audience && <NavItem href="/audiences/" label={audience.plural ?? audience.label} icon={<UsersThreeIcon size={15} />} active={at("/audiences")} />}
         </Group>
+        {pins.length > 0 && (
+          <Group title="Pinned">
+            {pins.map((p) => (
+              <NavItem
+                key={pinKey(p)}
+                href={pinHref(p)}
+                label={p.label}
+                icon={p.kind === "pipe" ? <Mark kind="pipe" id={p.id} icon={p.icon} size={16} /> : <Mark kind="object" id={p.id} icon={p.icon} size={16} />}
+                active={pathname.startsWith("/pinned") && pinned === pinKey(p)}
+              />
+            ))}
+          </Group>
+        )}
         <Group title="Engine">
           <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
           <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
@@ -170,7 +185,7 @@ function ScopeSwitcher() {
   const { model, scope, setScope } = useSim();
   const [open, setOpen] = useState(false);
   const current = model?.clients.find((c) => c.brand.id === scope);
-  const brands = model ? [...new Map(model.clients.map((c) => [c.brand.id, c.brand])).values()] : [];
+  const brands = model ? model.clients.map((c) => c.brand) : [];
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex h-9 w-full items-center gap-2 rounded-[8px] px-2 text-left hover:bg-[var(--bg-hover)]" aria-expanded={open}>
@@ -205,11 +220,9 @@ function ScopeSwitcher() {
 
 /** The simulator, always in reach above every page: the day, play / pause / one day / speed, the scenario, reset on a seed. */
 function SimBar() {
-  const { model, playing, play, pause, stepDay, speed, setSpeed, reset, scenario, seed } = useSim();
+  const { model, playing, play, pause, stepDay, speed, setSpeed, reset, seed } = useSim();
   const [seedText, setSeedText] = useState(String(seed));
-  const [scenarioId, setScenarioId] = useState(scenario.id);
   useEffect(() => setSeedText(String(seed)), [seed]);
-  useEffect(() => setScenarioId(scenario.id), [scenario.id]);
   const nextSpeed = (): Speed => SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!;
   return (
     <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-2 lg:pl-0" role="toolbar" aria-label="Simulator">
@@ -232,16 +245,6 @@ function SimBar() {
         {speed} days/s
       </button>
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
-      <label className="sr-only" htmlFor="scenario">
-        Scenario
-      </label>
-      <select id="scenario" value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="k-input shrink-0 px-1.5" style={{ font: "inherit" }}>
-        {SCENARIOS.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
       <span className="k-input flex w-[104px] shrink-0 items-center gap-1 px-2">
         <span className="k-fg3 text-[12px]">Seed</span>
         <input
@@ -255,7 +258,7 @@ function SimBar() {
       <button type="button" className="k-btn shrink-0" title="Random seed" aria-label="Random seed" onClick={() => setSeedText(String(1 + Math.floor(Math.random() * 99_999)))}>
         <DiceFiveIcon size={13} />
       </button>
-      <button type="button" className="k-btn shrink-0" title="Start this scenario again from day 0" onClick={() => reset(scenarioId, Number(seedText) || 1)}>
+      <button type="button" className="k-btn shrink-0" title="Start the world again from day 0 on this seed" onClick={() => reset(Number(seedText) || 1)}>
         <ArrowCounterClockwiseIcon size={13} />
         Reset
       </button>

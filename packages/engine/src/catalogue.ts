@@ -1,22 +1,55 @@
 /**
- * The catalogue: every object of a GTM factory as data. Steps (outcomes),
- * triggers, channels, pipes (channel x leg), tactics, strategies, plays,
- * workflows and the options their slots take (template dynasties, LLM
- * dynasties, any other slot). Anything can be added, removed or retired while
- * the factory runs; nothing in the engine is keyed on a particular slug.
+ * The catalogue: every object of a GTM factory as data. Four objects carry a
+ * status of their own: outcomes, pipes, triggers and scripts. Tactics and
+ * strategies describe them. Nothing in the engine is keyed on a particular id:
+ * add an outcome, a pipe or a script and it competes like the others.
  */
 
-/** The step every sales path starts from. */
+import type { Condition, TacticValue } from "./tactics";
+
+/** The root every sales funnel can start from: the market. */
 export const START = "start";
 
-export type StepKey = string;
+export type OutcomeId = string;
 
 /**
- * A lead track: an ordered ladder of lead states a lead moves forward on
- * (e.g. "CRM lifecycle": interested, meeting booked, meeting attended, paid
- * client; "Website visits": visited). A lead moves on each track separately;
- * tracks are never added together. Declared as data like any other object.
+ * What an occurrence of an outcome is about: a lead (a person), a company, an
+ * object (an ICP, a template, an LLM completion), or a trigger event.
  */
+export type SubjectKind = "lead" | "company" | "object" | "event";
+
+/** A lead state on a lead track. Tracks are never added together. */
+export interface TrackPlace {
+  track: string;
+  rank: number;
+}
+
+/**
+ * What an occurrence of an object outcome holds, as data: a reader shows it
+ * with one renderer per content type, whatever the outcome is.
+ *  - text_with_variables: a text with {{variables}}, versioned in its dynasty;
+ *  - text: plain text;
+ *  - audience: a sentence describing who, with the conditions a judge reads from it;
+ *  - list, record, image: other shapes.
+ */
+export type ContentType = "text_with_variables" | "text" | "audience" | "list" | "record" | "image";
+
+export interface Outcome {
+  id: OutcomeId;
+  label: string;
+  plural?: string;
+  subject: SubjectKind;
+  /** The lead state this outcome is, when it is one. */
+  track?: TrackPlace;
+  /** For an object outcome: what its occurrences hold. */
+  contentType?: ContentType;
+  /** The pipe whose output other producers of this outcome are measured against. */
+  referencePipe?: string;
+  description?: string;
+  icon?: string;
+  retired?: boolean;
+}
+
 export interface LeadTrack {
   id: string;
   name: string;
@@ -24,144 +57,151 @@ export interface LeadTrack {
   retired?: boolean;
 }
 
-/** A lead state: reached once per lead x brand, at a rank on one lead track. */
-export interface LeadState {
-  state: string;
-  leadTrack: string;
-  rank: number;
-}
-
-export interface Step {
-  key: StepKey;
-  label: string;
-  pluralLabel?: string;
-  description?: string;
-  icon?: string;
-  /** What an occurrence of this step is about: a lead, an object (a post, an audience), or nothing yet. */
-  subjectKind: "lead" | "object" | "none";
-  /** The lead state this step is evidence of, if any. */
-  leadState: LeadState | null;
-  retired?: boolean;
-}
-
-/** Fires a reactive pipe: an outcome reached, or a condition about a lead (a "Lead event"). */
-export interface Trigger {
+/**
+ * Who performs a pipe: our own factory, or another one (the client's team,
+ * their CRM, the organic market) at a named access cost per run (0 allowed).
+ */
+export interface Factory {
   id: string;
-  label: string;
-  kind: "outcome" | "condition";
-  /** For an outcome trigger: the step whose occurrence fires it. */
-  outcomeStep: StepKey | null;
-  /** The step the trigger's subject is at, when it has one. */
-  fromStep: StepKey | null;
-  description?: string;
-  retired?: boolean;
-}
-
-export interface Channel {
-  slug: string;
   name: string;
+  ours: boolean;
   description?: string;
-  icon?: string;
-  /** Free grouping label for display (outbound, paid reach...). */
-  group?: string;
-  /** Who operates it: the platform, or the customer's own team. */
-  operatedBy: "platform" | "customer";
-  /** Who performs the work: software or a person. */
-  performedBy: "software" | "person";
-  retired?: boolean;
 }
 
 export interface Maturity {
-  /** Days after a trial before its cohort is read as mature. */
+  /** Days after a decision before its cohort is read as mature. */
   durationDays: number;
   /** Outcomes the mature view needs before it is read on its own. */
   outcomesRequired: number;
-  /** Expected mean delay between a trial and its outcome, in days. */
+  /** Expected mean delay between a run and its outcome, days. */
   delayMeanDays: number;
+  /** Longest delay, days. */
+  horizonDays: number;
 }
 
-/** A pipe = channel x leg (from step -> to step). */
+/**
+ * A pipe transforms input outcomes into one output outcome. It may need
+ * several inputs (the message writer needs a verified email, the company
+ * research, a template, a brand context and an LLM completion). Each input is
+ * an outcome: produced ahead (an ICP, a template) or on demand (an LLM
+ * completion). A pipe with no lead input creates its subjects: it turns the
+ * market into leads.
+ */
 export interface Pipe {
   id: string;
-  channel: string;
-  from: StepKey;
-  to: StepKey;
-  /** Proactive pipes spend their own budget; reactive pipes wait on ONE trigger. */
-  mode: "proactive" | "reactive";
-  triggerId: string | null;
-  name?: string;
+  name: string;
+  inputs: OutcomeId[];
+  output: OutcomeId;
+  factory: string;
+  /**
+   * A reactive pipe waits on one trigger. On the "On demand" trigger it runs
+   * when a consuming script asks the engine for its output (an LLM completion,
+   * a brand context): one run, one occurrence, at the consumer's input.
+   */
+  triggerId?: string | null;
   maturity: Maturity;
+  /** A pipe of another factory that runs on its own schedule and reports what it produced (a CRM import, the organic market). */
+  reports?: boolean;
+  description?: string;
+  icon?: string;
   retired?: boolean;
 }
 
-export type TacticSubject = "workflow" | "slot_option";
+export type ScriptKind = "rules" | "ai" | "human";
 
-/** A yes/no tag on a workflow or on a slot option (a template, an LLM). */
-export interface Tactic {
+/**
+ * What performs a pipe. Several scripts compete on each pipe. A script is a
+ * version of a dynasty; the dynasty is what competes, its active head is what
+ * runs. A fork starts a new dynasty from a parent's.
+ */
+export interface Script {
   id: string;
+  pipeId: string;
+  dynasty: string;
+  version: number;
   name: string;
-  appliesTo: TacticSubject;
+  /** The dynasty this one was forked from (its prior starts from the parent's). */
+  parentDynasty?: string | null;
+  kind: ScriptKind;
+  /** Tactic values describing the script (typed: yes/no, a value from a list, a number). */
+  tactics: Record<string, TacticValue>;
+  /** Expected cost of one run on one subject, cents (the prior; the measured cost decides). */
+  costCents: number;
+  status: "active" | "retired";
+  /** Who makes it (a model vendor, a data provider), shown as its logo. */
+  provider?: { name: string; color?: string; logoUrl?: string };
+  description?: string;
+}
+
+/**
+ * One generic trigger: when outcome X (or one of a list) is reached for a
+ * subject, after delay D, unless outcome Y is reached meanwhile. Or reported
+ * from outside. Each event is itself an occurrence of `event`.
+ */
+export interface Trigger {
+  id: string;
+  label: string;
+  when: OutcomeId[];
+  delayDays: number;
+  unless: OutcomeId[];
+  reported?: boolean;
+  /** The outcome each event is an occurrence of (none for "On demand": the call is traced on the consuming run). */
+  event?: OutcomeId;
   description?: string;
   retired?: boolean;
 }
 
-/** Tactics required and excluded. An empty strategy accepts everything. */
-export interface Strategy {
+export type TacticType =
+  | { kind: "yesno" }
+  | { kind: "list"; values: string[] }
+  | { kind: "number"; unit?: string };
+
+/** A typed property. The same tactics describe scripts and leads, judged by an AI or read from data. */
+export interface Tactic {
   id: string;
   name: string;
-  required: string[];
-  excluded: string[];
+  type: TacticType;
+  describes: Array<"script" | "lead" | "company" | "brand">;
+  source: "data" | "judged";
+  description?: string;
   retired?: boolean;
-}
-
-/** A play = pipe x strategy. A null strategy is the pipe's default play. */
-export interface Play {
-  id: string;
-  pipeId: string;
-  strategyId: string | null;
-  retired?: boolean;
-}
-
-export type WorkflowKind = "rules" | "ai" | "human";
-
-/** How a pipe is performed. It declares the slots it needs filled (template, llm, ...). */
-export interface Workflow {
-  id: string;
-  dynasty: string;
-  pipeId: string;
-  kind: WorkflowKind;
-  slots: string[];
-  tactics: string[];
-  /** Expected cost of processing one input, in cents (before slot options). */
-  costPerTrialCents: number;
-  /** Yield expected by whoever added it, before any data (the prior's centre). */
-  expectedYield?: number;
-  status: "active" | "retired";
 }
 
 /**
- * One option a workflow slot can take: a template dynasty (slot "template"),
- * an LLM dynasty (slot "llm"), or any other slot a workflow declares.
- * `pipeId` null = usable on every pipe.
+ * A rule of a strategy. `input` names the input it attaches to: its
+ * conditions filter the provider scripts at that input of this pipe only.
+ * Without `input`, it filters the pipe's own scripts.
  */
-export interface SlotOption {
+export interface StrategyRule {
+  input?: OutcomeId;
+  conditions: Condition[];
+}
+
+/** A set of conditions on tactics, for one pipe. A play = pipe x strategy. */
+export interface Strategy {
   id: string;
-  slot: string;
   name: string;
-  pipeId: string | null;
-  tactics: string[];
-  /** Expected extra cost per input processed, in cents. */
-  costPerTrialCents: number;
-  status: "active" | "retired";
+  pipeId: string;
+  rules: StrategyRule[];
+  /** Conditions on the subject (lead tactics, outcomes reached): who the play serves. */
+  subject?: Condition[];
+  /** Set when the split mechanism proposed it. */
+  proposed?: { day: number; reason: string };
+  retired?: boolean;
 }
 
-export function legKey(from: StepKey, to: StepKey): string {
-  return `${from}_to_${to}`;
+export interface CatalogueData {
+  leadTracks: LeadTrack[];
+  outcomes: Outcome[];
+  factories: Factory[];
+  pipes: Pipe[];
+  scripts: Script[];
+  triggers: Trigger[];
+  tactics: Tactic[];
+  strategies: Strategy[];
 }
 
-export function defaultPlayId(pipeId: string): string {
-  return `${pipeId}#default`;
-}
+type Kind = keyof CatalogueData;
 
 export interface CatalogueIssue {
   kind: string;
@@ -169,33 +209,15 @@ export interface CatalogueIssue {
   message: string;
 }
 
-/** Does a set of tactics follow a strategy? */
-export function followsStrategy(tactics: readonly string[], strategy: Strategy | null): boolean {
-  if (!strategy) return true;
-  for (const t of strategy.required) if (!tactics.includes(t)) return false;
-  for (const t of strategy.excluded) if (tactics.includes(t)) return false;
-  return true;
+/** The id of the default strategy of a pipe (no condition). */
+export function defaultStrategyId(pipeId: string): string {
+  return `${pipeId}#default`;
 }
-
-export interface CatalogueData {
-  leadTracks: LeadTrack[];
-  steps: Step[];
-  triggers: Trigger[];
-  channels: Channel[];
-  pipes: Pipe[];
-  tactics: Tactic[];
-  strategies: Strategy[];
-  plays: Play[];
-  workflows: Workflow[];
-  slotOptions: SlotOption[];
-}
-
-type Kind = keyof CatalogueData;
 
 /**
  * A mutable catalogue. Lists keep insertion order, so every read is
- * deterministic. Retiring keeps the object (history stays readable) but
- * removes it from every choice.
+ * deterministic. Retiring keeps the object for history and takes it out of
+ * every choice.
  */
 export class Catalogue {
   private readonly data: CatalogueData;
@@ -203,43 +225,42 @@ export class Catalogue {
   constructor(data?: Partial<CatalogueData>) {
     this.data = {
       leadTracks: [...(data?.leadTracks ?? [])],
-      steps: [...(data?.steps ?? [])],
-      triggers: [...(data?.triggers ?? [])],
-      channels: [...(data?.channels ?? [])],
+      outcomes: [...(data?.outcomes ?? [])],
+      factories: [...(data?.factories ?? [])],
       pipes: [...(data?.pipes ?? [])],
+      scripts: [...(data?.scripts ?? [])],
+      triggers: [...(data?.triggers ?? [])],
       tactics: [...(data?.tactics ?? [])],
       strategies: [...(data?.strategies ?? [])],
-      plays: [...(data?.plays ?? [])],
-      workflows: [...(data?.workflows ?? [])],
-      slotOptions: [...(data?.slotOptions ?? [])],
     };
-    for (const pipe of this.data.pipes) this.ensureDefaultPlay(pipe.id);
+    for (const p of this.data.pipes) this.ensureDefaultStrategy(p.id);
   }
 
   snapshot(): CatalogueData {
-    return structuredCloneData(this.data);
+    return JSON.parse(JSON.stringify(this.data)) as CatalogueData;
   }
 
   clone(): Catalogue {
     return new Catalogue(this.snapshot());
   }
 
-  // ---- reads -------------------------------------------------------------
-
   get leadTracks(): readonly LeadTrack[] {
     return this.data.leadTracks;
   }
-  get steps(): readonly Step[] {
-    return this.data.steps;
+  get outcomes(): readonly Outcome[] {
+    return this.data.outcomes;
   }
-  get triggers(): readonly Trigger[] {
-    return this.data.triggers;
-  }
-  get channels(): readonly Channel[] {
-    return this.data.channels;
+  get factories(): readonly Factory[] {
+    return this.data.factories;
   }
   get pipes(): readonly Pipe[] {
     return this.data.pipes;
+  }
+  get scripts(): readonly Script[] {
+    return this.data.scripts;
+  }
+  get triggers(): readonly Trigger[] {
+    return this.data.triggers;
   }
   get tactics(): readonly Tactic[] {
     return this.data.tactics;
@@ -247,191 +268,205 @@ export class Catalogue {
   get strategies(): readonly Strategy[] {
     return this.data.strategies;
   }
-  get plays(): readonly Play[] {
-    return this.data.plays;
-  }
-  get workflows(): readonly Workflow[] {
-    return this.data.workflows;
-  }
-  get slotOptions(): readonly SlotOption[] {
-    return this.data.slotOptions;
-  }
 
-  leadTrack(id: string): LeadTrack | undefined {
-    return this.data.leadTracks.find((t) => t.id === id);
-  }
-  step(key: StepKey): Step | undefined {
-    return this.data.steps.find((s) => s.key === key);
+  outcome(id: OutcomeId): Outcome | undefined {
+    return this.data.outcomes.find((o) => o.id === id);
   }
   pipe(id: string): Pipe | undefined {
     return this.data.pipes.find((p) => p.id === id);
   }
-  channel(slug: string): Channel | undefined {
-    return this.data.channels.find((c) => c.slug === slug);
+  script(id: string): Script | undefined {
+    return this.data.scripts.find((s) => s.id === id);
   }
   trigger(id: string): Trigger | undefined {
     return this.data.triggers.find((t) => t.id === id);
   }
+  tactic(id: string): Tactic | undefined {
+    return this.data.tactics.find((t) => t.id === id);
+  }
   strategy(id: string): Strategy | undefined {
     return this.data.strategies.find((s) => s.id === id);
   }
-  play(id: string): Play | undefined {
-    return this.data.plays.find((p) => p.id === id);
-  }
-  workflow(id: string): Workflow | undefined {
-    return this.data.workflows.find((w) => w.id === id);
-  }
-  slotOption(id: string): SlotOption | undefined {
-    return this.data.slotOptions.find((o) => o.id === id);
+  factory(id: string): Factory | undefined {
+    return this.data.factories.find((f) => f.id === id);
   }
 
-  /** Live pipes leaving a step. */
-  pipesFrom(step: StepKey): Pipe[] {
-    return this.data.pipes.filter((p) => !p.retired && p.from === step && this.isPipeLive(p));
-  }
-
-  /** Live pipes arriving at a step. */
-  pipesInto(step: StepKey): Pipe[] {
-    return this.data.pipes.filter((p) => !p.retired && p.to === step && this.isPipeLive(p));
+  isOurs(pipe: Pipe): boolean {
+    return this.factory(pipe.factory)?.ours ?? false;
   }
 
   isPipeLive(p: Pipe): boolean {
     if (p.retired) return false;
-    const channel = this.channel(p.channel);
-    if (channel?.retired) return false;
-    if (p.from !== START && this.step(p.from)?.retired) return false;
-    if (this.step(p.to)?.retired) return false;
-    return true;
+    if (this.outcome(p.output)?.retired) return false;
+    return p.inputs.every((i) => !this.outcome(i)?.retired);
   }
 
-  /** Live plays of a pipe (its default play first). */
-  playsOf(pipeId: string): Play[] {
-    return this.data.plays.filter(
-      (p) => p.pipeId === pipeId && !p.retired && (p.strategyId === null || !this.strategy(p.strategyId)?.retired),
-    );
+  /** Live pipes producing an outcome. */
+  providersOf(outcome: OutcomeId): Pipe[] {
+    return this.data.pipes.filter((p) => p.output === outcome && this.isPipeLive(p));
   }
 
-  /** Active workflows of a pipe that follow a play's strategy. */
-  workflowsFor(play: Play): Workflow[] {
-    const strategy = play.strategyId ? this.strategy(play.strategyId) ?? null : null;
-    return this.data.workflows.filter(
-      (w) => w.pipeId === play.pipeId && w.status === "active" && followsStrategy(w.tactics, this.subjectStrategy(strategy, "workflow")),
-    );
+  /** The input of a pipe that carries its subject (a lead, a company or a trigger event), if any. */
+  subjectInput(pipe: Pipe): OutcomeId | null {
+    for (const i of pipe.inputs) {
+      const k = this.outcome(i)?.subject;
+      if (k === "lead" || k === "event") return i;
+    }
+    return null;
   }
 
-  /** Active options of one slot usable on a pipe, following a play's strategy. */
-  slotOptionsFor(play: Play, slot: string): SlotOption[] {
-    const strategy = play.strategyId ? this.strategy(play.strategyId) ?? null : null;
-    return this.data.slotOptions.filter(
-      (o) =>
-        o.slot === slot &&
-        o.status === "active" &&
-        (o.pipeId === null || o.pipeId === play.pipeId) &&
-        followsStrategy(o.tactics, this.subjectStrategy(strategy, "slot_option")),
-    );
+  /** A pipe with no lead or event input creates its subjects. */
+  createsSubjects(pipe: Pipe): boolean {
+    return this.subjectInput(pipe) === null && this.outcome(pipe.output)?.subject === "lead";
   }
 
-  /** The part of a strategy that speaks about one subject (a template tactic never gates a workflow). */
-  subjectStrategy(strategy: Strategy | null, subject: TacticSubject): Strategy | null {
-    if (!strategy) return null;
-    const onSubject = (id: string) => this.data.tactics.find((t) => t.id === id)?.appliesTo === subject;
-    return { ...strategy, required: strategy.required.filter(onSubject), excluded: strategy.excluded.filter(onSubject) };
+  /**
+   * Where a pipe's subject comes from: Start for a pipe creating subjects, a
+   * lead state, or a trigger event, found by walking subject inputs back
+   * through outcomes that are neither.
+   */
+  rootsOf(pipe: Pipe, seen: Set<string> = new Set()): Set<OutcomeId> {
+    const roots = new Set<OutcomeId>();
+    if (seen.has(pipe.id)) return roots;
+    seen.add(pipe.id);
+    if (this.createsSubjects(pipe)) {
+      roots.add(START);
+      return roots;
+    }
+    const s = this.subjectInput(pipe);
+    if (!s) return roots;
+    const o = this.outcome(s);
+    if (o?.track || o?.subject === "event") {
+      roots.add(s);
+      return roots;
+    }
+    for (const q of this.providersOf(s)) for (const r of this.rootsOf(q, new Set(seen))) roots.add(r);
+    return roots;
   }
 
-  // ---- writes ------------------------------------------------------------
+  /** Active head version of each dynasty of a pipe, in catalogue order. */
+  dynastiesOf(pipeId: string): Script[] {
+    const heads = new Map<string, Script>();
+    for (const s of this.data.scripts) {
+      if (s.pipeId !== pipeId || s.status !== "active") continue;
+      const cur = heads.get(s.dynasty);
+      if (!cur || s.version > cur.version) heads.set(s.dynasty, s);
+    }
+    return [...heads.values()];
+  }
+
+  /** Every version of a dynasty, oldest first. */
+  versionsOf(dynasty: string): Script[] {
+    return this.data.scripts.filter((s) => s.dynasty === dynasty).sort((a, b) => a.version - b.version);
+  }
+
+  /** The script running for a dynasty today (its active head), if any. */
+  headOf(dynasty: string): Script | undefined {
+    return this.versionsOf(dynasty).filter((s) => s.status === "active").pop();
+  }
+
+  strategiesOf(pipeId: string): Strategy[] {
+    return this.data.strategies.filter((s) => s.pipeId === pipeId && !s.retired);
+  }
+
+  // ---- writes ---------------------------------------------------------------
 
   add<K extends Kind>(kind: K, item: CatalogueData[K][number]): this {
     const list = this.data[kind] as Array<CatalogueData[K][number]>;
-    const id = idOf(kind, item);
-    if (list.some((x) => idOf(kind, x) === id)) throw new Error(`${kind} "${id}" already exists`);
+    const id = (item as { id: string }).id;
+    if (list.some((x) => (x as { id: string }).id === id)) throw new Error(`${kind} "${id}" already exists`);
     list.push(item);
-    if (kind === "pipes") this.ensureDefaultPlay(id);
-    return this;
-  }
-
-  /** Remove an object for good (its history is not kept by the catalogue). */
-  remove(kind: Kind, id: string): this {
-    const list = this.data[kind] as unknown as unknown[];
-    const i = list.findIndex((x) => idOf(kind, x) === id);
-    if (i < 0) throw new Error(`${kind} "${id}" not found`);
-    list.splice(i, 1);
-    if (kind === "pipes") this.data.plays = this.data.plays.filter((p) => p.pipeId !== id);
+    if (kind === "pipes") this.ensureDefaultStrategy(id);
     return this;
   }
 
   /** Retire an object: kept for history, out of every choice. */
   retire(kind: Kind, id: string): this {
-    const list = this.data[kind] as unknown as Array<Record<string, unknown>>;
-    const item = list.find((x) => idOf(kind, x) === id);
+    const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);
     if (!item) throw new Error(`${kind} "${id}" not found`);
-    if (kind === "workflows" || kind === "slotOptions") item.status = "retired";
+    if (kind === "scripts") item.status = "retired";
     else item.retired = true;
     return this;
   }
 
-  private ensureDefaultPlay(pipeId: string): void {
-    const id = defaultPlayId(pipeId);
-    if (!this.data.plays.some((p) => p.id === id)) this.data.plays.push({ id, pipeId, strategyId: null });
+  /** Bring a retired object back. */
+  restore(kind: Kind, id: string): this {
+    const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);
+    if (!item) throw new Error(`${kind} "${id}" not found`);
+    if (kind === "scripts") item.status = "active";
+    else delete item.retired;
+    return this;
   }
 
-  // ---- validation ----------------------------------------------------------
+  /** Add a new version of a dynasty: it runs from now on, the dynasty keeps its history. */
+  upgrade(dynasty: string, changes: Partial<Omit<Script, "dynasty" | "version" | "pipeId">> & { id: string }): Script {
+    const head = this.headOf(dynasty) ?? this.versionsOf(dynasty).pop();
+    if (!head) throw new Error(`dynasty "${dynasty}" not found`);
+    const next: Script = { ...head, ...changes, dynasty, pipeId: head.pipeId, version: head.version + 1, status: "active" };
+    this.add("scripts", next);
+    return next;
+  }
+
+  /** Fork a dynasty: a new dynasty whose prior starts from the parent's. */
+  fork(parentDynasty: string, script: Omit<Script, "parentDynasty" | "version" | "pipeId" | "status"> & { status?: Script["status"] }): Script {
+    const parent = this.headOf(parentDynasty) ?? this.versionsOf(parentDynasty).pop();
+    if (!parent) throw new Error(`dynasty "${parentDynasty}" not found`);
+    const s: Script = { status: "active", ...script, pipeId: parent.pipeId, version: 1, parentDynasty };
+    this.add("scripts", s);
+    return s;
+  }
+
+  private ensureDefaultStrategy(pipeId: string): void {
+    const id = defaultStrategyId(pipeId);
+    if (!this.data.strategies.some((s) => s.id === id)) this.data.strategies.push({ id, name: "Default", pipeId, rules: [] });
+  }
+
+  // ---- validation -------------------------------------------------------------
 
   validate(): CatalogueIssue[] {
     const issues: CatalogueIssue[] = [];
-    const stepKeys = new Set(this.data.steps.map((s) => s.key));
-    const dup = (kind: Kind, items: readonly unknown[]) => {
+    const outcomeIds = new Set(this.data.outcomes.map((o) => o.id));
+    for (const kind of Object.keys(this.data) as Kind[]) {
       const seen = new Set<string>();
-      for (const it of items) {
-        const id = idOf(kind, it);
-        if (seen.has(id)) issues.push({ kind, id, message: "duplicate id" });
-        seen.add(id);
+      for (const it of this.data[kind] as Array<{ id: string }>) {
+        if (seen.has(it.id)) issues.push({ kind, id: it.id, message: "duplicate id" });
+        seen.add(it.id);
       }
-    };
-    (Object.keys(this.data) as Kind[]).forEach((k) => dup(k, this.data[k]));
-    if (stepKeys.has(START)) issues.push({ kind: "steps", id: START, message: `"${START}" is reserved` });
-    for (const s of this.data.steps) {
-      if (s.leadState && !this.data.leadTracks.some((t) => t.id === s.leadState!.leadTrack))
-        issues.push({ kind: "steps", id: s.key, message: `unknown lead track "${s.leadState.leadTrack}"` });
+    }
+    if (outcomeIds.has(START)) issues.push({ kind: "outcomes", id: START, message: `"${START}" is reserved` });
+    for (const o of this.data.outcomes) {
+      if (o.track && !this.data.leadTracks.some((t) => t.id === o.track!.track)) issues.push({ kind: "outcomes", id: o.id, message: `unknown lead track "${o.track.track}"` });
+      if (o.referencePipe && !this.pipe(o.referencePipe)) issues.push({ kind: "outcomes", id: o.id, message: `unknown reference pipe "${o.referencePipe}"` });
     }
     for (const p of this.data.pipes) {
-      if (p.from !== START && !stepKeys.has(p.from)) issues.push({ kind: "pipes", id: p.id, message: `unknown from step "${p.from}"` });
-      if (!stepKeys.has(p.to)) issues.push({ kind: "pipes", id: p.id, message: `unknown to step "${p.to}"` });
-      if (p.from === p.to) issues.push({ kind: "pipes", id: p.id, message: "a pipe cannot loop on one step" });
-      if (!this.channel(p.channel)) issues.push({ kind: "pipes", id: p.id, message: `unknown channel "${p.channel}"` });
-      if (p.mode === "reactive" && !p.triggerId) issues.push({ kind: "pipes", id: p.id, message: "a reactive pipe waits on one trigger" });
-      if (p.mode === "proactive" && p.triggerId) issues.push({ kind: "pipes", id: p.id, message: "a proactive pipe has no trigger" });
+      for (const i of p.inputs) if (!outcomeIds.has(i)) issues.push({ kind: "pipes", id: p.id, message: `unknown input "${i}"` });
+      if (!outcomeIds.has(p.output)) issues.push({ kind: "pipes", id: p.id, message: `unknown output "${p.output}"` });
+      if (p.inputs.includes(p.output)) issues.push({ kind: "pipes", id: p.id, message: "a pipe cannot consume its own output" });
+      if (!this.factory(p.factory)) issues.push({ kind: "pipes", id: p.id, message: `unknown factory "${p.factory}"` });
       if (p.triggerId && !this.trigger(p.triggerId)) issues.push({ kind: "pipes", id: p.id, message: `unknown trigger "${p.triggerId}"` });
     }
+    for (const s of this.data.scripts) {
+      if (!this.pipe(s.pipeId)) issues.push({ kind: "scripts", id: s.id, message: `unknown pipe "${s.pipeId}"` });
+      for (const t of Object.keys(s.tactics)) if (!this.tactic(t)) issues.push({ kind: "scripts", id: s.id, message: `unknown tactic "${t}"` });
+    }
     for (const t of this.data.triggers) {
-      if (t.kind === "outcome" && (!t.outcomeStep || !stepKeys.has(t.outcomeStep)))
-        issues.push({ kind: "triggers", id: t.id, message: "an outcome trigger names a known step" });
+      for (const o of [...t.when, ...t.unless, ...(t.event ? [t.event] : [])]) if (!outcomeIds.has(o)) issues.push({ kind: "triggers", id: t.id, message: `unknown outcome "${o}"` });
     }
     for (const s of this.data.strategies) {
-      for (const t of [...s.required, ...s.excluded])
-        if (!this.data.tactics.some((x) => x.id === t)) issues.push({ kind: "strategies", id: s.id, message: `unknown tactic "${t}"` });
-    }
-    for (const p of this.data.plays) {
-      if (!this.pipe(p.pipeId)) issues.push({ kind: "plays", id: p.id, message: `unknown pipe "${p.pipeId}"` });
-      if (p.strategyId && !this.strategy(p.strategyId)) issues.push({ kind: "plays", id: p.id, message: `unknown strategy "${p.strategyId}"` });
-    }
-    for (const w of this.data.workflows) {
-      if (!this.pipe(w.pipeId)) issues.push({ kind: "workflows", id: w.id, message: `unknown pipe "${w.pipeId}"` });
-      for (const t of w.tactics) if (!this.data.tactics.some((x) => x.id === t)) issues.push({ kind: "workflows", id: w.id, message: `unknown tactic "${t}"` });
-    }
-    for (const o of this.data.slotOptions) {
-      if (o.pipeId && !this.pipe(o.pipeId)) issues.push({ kind: "slotOptions", id: o.id, message: `unknown pipe "${o.pipeId}"` });
+      if (!this.pipe(s.pipeId)) issues.push({ kind: "strategies", id: s.id, message: `unknown pipe "${s.pipeId}"` });
+      for (const r of s.rules) {
+        if (r.input && !this.pipe(s.pipeId)?.inputs.includes(r.input)) issues.push({ kind: "strategies", id: s.id, message: `"${r.input}" is not an input of ${s.pipeId}` });
+        for (const c of r.conditions) if (c.op !== "notReached" && !this.tactic(c.tactic)) issues.push({ kind: "strategies", id: s.id, message: `unknown tactic "${c.tactic}"` });
+      }
     }
     return issues;
   }
 }
 
-function idOf(kind: Kind, item: unknown): string {
-  const rec = item as Record<string, unknown>;
-  if (kind === "steps") return String(rec.key);
-  if (kind === "channels") return String(rec.slug);
-  return String(rec.id);
-}
+/** The trigger of pipes called on demand by a consuming script. */
+export const ON_DEMAND = "on_demand";
 
-function structuredCloneData(d: CatalogueData): CatalogueData {
-  return JSON.parse(JSON.stringify(d)) as CatalogueData;
+/** Is this pipe called on demand (its output is produced at the consumer's input, never ahead)? */
+export function isOnDemand(pipe: Pipe): boolean {
+  return pipe.triggerId === ON_DEMAND;
 }

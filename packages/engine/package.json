@@ -1,7 +1,7 @@
 {
   "name": "@gtm-factory/engine",
   "version": "0.1.0",
-  "description": "The GTM Factory engine: catalogue, funnels, value per dollar, the universal prioritizer, segments, ledger, evidence and a seeded simulator. Pure TypeScript, zero runtime dependencies.",
+  "description": "The GTM Factory engine: outcomes, pipes, triggers and scripts as data, the universal prioritizer with traceability credit, typed tactics and splits, pipe storage, reliability, the ledger and a seeded simulator. Pure TypeScript, zero runtime dependencies.",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",
