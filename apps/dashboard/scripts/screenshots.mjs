@@ -37,14 +37,19 @@ export const PAGES = [
   ["new-campaign-funnels", "/campaigns/new/?step=funnels"],
   ["campaigns", "/campaigns/"],
   ["campaign", "/campaigns/view/?id=campaign-1"],
-  ["audiences", "/audiences/"],
+  ["campaign-reactive", "/campaigns/view/?id=campaign-1f"],
+  ["icps", "/audiences/"],
   ["leads", "/leads/"],
   ["lead", "LEAD"],
   ["companies", "/companies/"],
+  ["pinned-templates", "/pinned/?pin=outcome%3Atemplate_written"],
+  ["pinned-llms", "/pinned/?pin=pipe%3Allm"],
   ["research", "/research/"],
-  ["catalogue", "/catalogue/?tab=channels"],
+  ["catalogue", "/catalogue/"],
   ["catalogue-pipes", "/catalogue/?tab=pipes"],
-  ["catalogue-workflows", "/catalogue/?tab=workflows"],
+  ["catalogue-scripts", "/catalogue/?tab=scripts"],
+  ["catalogue-tactics", "/catalogue/?tab=tactics"],
+  ["catalogue-strategies", "/catalogue/?tab=strategies"],
   ["ledger", "/ledger/"],
   ["how-it-works", "/how-it-works/"],
 ];
@@ -58,12 +63,12 @@ page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
 
 // Day 30 of the default scenario, then every page reads the same saved history.
 await page.goto(`${origin}/?day=30`);
-await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")');
+await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
 let leadHref = "/leads/";
 for (const [name, route] of PAGES) {
   await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route}`);
-  await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")');
-  await page.waitForTimeout(700);
+  await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
+  await page.waitForTimeout(1200);
   // The panel scrolls inside a fixed frame: grow the window to the panel's height to capture it whole.
   const h = await page.evaluate(() => (document.querySelector("main")?.scrollHeight ?? 900) + 64);
   await page.setViewportSize({ width: 1440, height: Math.min(Math.max(900, h), 7000) });

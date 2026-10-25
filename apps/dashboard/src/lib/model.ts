@@ -270,6 +270,8 @@ export function scopeFigures(model: Model, campaigns: readonly Campaign[]): Scop
   }
   // Setup and other work billed to the campaigns outside a day's runs (seed occurrences, setup).
   f.spendCents = campaigns.reduce((s, c) => s + model.session.spentCents(c.id), 0);
+  // Setup of the brands in scope (support work, no outcome): our spend too.
+  for (const r of model.session.runs) if (r.support && r.campaignId && ids.has(r.campaignId)) f.spendCents += r.spendCents;
   f.valueOurs = f.dailyValueOurs.reduce((s, x) => s + x, 0);
   f.valueOther = f.dailyValueOther.reduce((s, x) => s + x, 0);
   f.attempts = f.dailyAttempts.reduce((s, x) => s + x, 0);

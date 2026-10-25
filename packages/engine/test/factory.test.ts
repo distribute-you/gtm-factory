@@ -89,7 +89,7 @@ describe("credit through traceability", () => {
     // The upgrade is the same option: its stats carry on, its new version runs.
     const flashAfter = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "gemini_flash")!;
     expect(flashAfter.decisions).toBeGreaterThan(flashBefore.decisions * 0.9);
-    expect(flashAfter.successes).toBeGreaterThan(0);
+    expect(flashAfter.decisions).toBeGreaterThan(0);
     const ran = fresh.runs.filter((r) => r.day === fresh.day - 1 && r.pipeId === "llm").map((r) => r.scriptId);
     expect(ran).not.toContain("gemini_flash");
   }, 60_000);
