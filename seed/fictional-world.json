@@ -1364,7 +1364,7 @@
      "line": [
       "lead_interested"
      ],
-     "dailyBudgetCents": 800,
+     "dailyBudgetCents": 1500,
      "status": "running",
      "strategies": {}
     }
@@ -1648,7 +1648,7 @@
      "line": [
       "lead_interested"
      ],
-     "dailyBudgetCents": 600,
+     "dailyBudgetCents": 1200,
      "status": "running",
      "strategies": {}
     }
@@ -2015,7 +2015,7 @@
     "horizonDays": 0
    },
    "follow_up": {
-    "base": 0.11,
+    "base": 0.3,
     "delayMeanDays": 2,
     "horizonDays": 10
    },
@@ -2159,11 +2159,13 @@
    },
    "fu_bump": {
     "costCents": 2,
-    "step": 0.6
+    "step": 0.6,
+    "end": 1.2
    },
    "fu_angle": {
     "costCents": 3,
-    "step": 1.0
+    "step": 1.0,
+    "end": 2.0
    },
    "ad_search": {
     "costCents": 25,
@@ -2236,7 +2238,7 @@
      "end": 1.0
     },
     "gemini_pro": {
-     "end": 0.9
+     "end": 0.7
     }
    },
    "linkedin|llm_completion": {
@@ -2273,7 +2275,7 @@
       ]
      }
     ],
-    "mult": 2.0
+    "mult": 2.5
    },
    {
     "when": [
@@ -2285,7 +2287,7 @@
       ]
      }
     ],
-    "mult": 0.5
+    "mult": 0.4
    },
    {
     "when": [
@@ -2310,7 +2312,7 @@
   "peoplePerCompany": 5,
   "icpFinderScript": "icp_ai",
   "clientGroupTactic": "sells_to",
-  "memoryHalfLifeDays": 21
+  "memoryHalfLifeDays": 14
  },
  "pins": [
   {

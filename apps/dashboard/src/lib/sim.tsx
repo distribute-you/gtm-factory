@@ -9,16 +9,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { SimulationSession, WorldSpec } from "@gtm-factory/engine";
 import { buildModel, type Model } from "./model";
-import { DEFAULT_SCENARIO, applyAction, replay, scenarioById, type LoggedAction, type Scenario, type SimAction } from "./world";
+import { WORLD, applyAction, replay, type LoggedAction, type SimAction } from "./world";
+import { DEFAULT_PINS, readPins, writePins, type Pin } from "./pins";
 
-const STORAGE_KEY = "gtm-factory:v1";
+const STORAGE_KEY = "gtm-factory:v2";
 export const SPEEDS = [1, 2, 4, 8] as const;
 export type Speed = (typeof SPEEDS)[number];
 /** The day the dashboard opens on for a first visit: enough history to read every page. */
 export const FIRST_VISIT_DAY = 30;
 
 interface Saved {
-  scenarioId: string;
   seed: number;
   day: number;
   actions: LoggedAction[];
@@ -27,8 +27,10 @@ interface Saved {
 
 interface SimContextValue {
   model: Model | null;
-  scenario: Scenario;
   seed: number;
+  /** Menu entries pinned to the sidebar (configuration, kept in this browser). */
+  pins: Pin[];
+  setPins: (pins: Pin[]) => void;
   playing: boolean;
   speed: Speed;
   scope: string | null;
@@ -38,7 +40,7 @@ interface SimContextValue {
   pause: () => void;
   stepDay: () => void;
   setSpeed: (s: Speed) => void;
-  reset: (scenarioId: string, seed: number) => void;
+  reset: (seed: number) => void;
   dispatch: (action: SimAction) => string | null;
 }
 
@@ -47,11 +49,9 @@ const SimContext = createContext<SimContextValue | null>(null);
 function readSaved(): Saved | null {
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("day") || params.has("scenario") || params.has("seed")) {
-      const scenario = scenarioById(params.get("scenario") ?? DEFAULT_SCENARIO.id);
+    if (params.has("day") || params.has("seed")) {
       return {
-        scenarioId: scenario.id,
-        seed: Number(params.get("seed") ?? scenario.seed) || scenario.seed,
+        seed: Number(params.get("seed") ?? WORLD.seed) || WORLD.seed,
         day: Math.max(0, Math.min(365, Number(params.get("day") ?? FIRST_VISIT_DAY) || 0)),
         actions: [],
         scope: null,
@@ -68,18 +68,17 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
   const worldRef = useRef<WorldSpec | null>(null);
   const sessionRef = useRef<SimulationSession | null>(null);
   const [version, setVersion] = useState(0);
-  const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO);
-  const [seed, setSeed] = useState<number>(DEFAULT_SCENARIO.seed);
+  const [seed, setSeed] = useState<number>(WORLD.seed);
+  const [pins, setPinsState] = useState<Pin[]>(DEFAULT_PINS);
   const [actions, setActions] = useState<LoggedAction[]>([]);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>(2);
   const [scope, setScope] = useState<string | null>(null);
 
-  const load = useCallback((sc: Scenario, sd: number, acts: LoggedAction[], day: number) => {
-    const { world, session, applied } = replay(sc, sd, acts, day);
+  const load = useCallback((sd: number, acts: LoggedAction[], day: number) => {
+    const { world, session, applied } = replay(sd, acts, day);
     worldRef.current = world;
     sessionRef.current = session;
-    setScenario(sc);
     setSeed(sd);
     setActions(applied);
     setVersion((v) => v + 1);
@@ -87,11 +86,12 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
 
   // First load: the saved history (or the URL's), else a first visit opened on day 30.
   useEffect(() => {
+    setPinsState(readPins());
     const saved = readSaved();
     if (saved) {
       setScope(saved.scope);
-      load(scenarioById(saved.scenarioId), saved.seed, saved.actions, saved.day);
-    } else load(DEFAULT_SCENARIO, DEFAULT_SCENARIO.seed, [], FIRST_VISIT_DAY);
+      load(saved.seed, saved.actions, saved.day);
+    } else load(WORLD.seed, [], FIRST_VISIT_DAY);
   }, [load]);
 
   const model = useMemo(() => {
@@ -102,13 +102,13 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
   // Keep the history so a reload lands on the same day.
   useEffect(() => {
     if (!model) return;
-    const saved: Saved = { scenarioId: scenario.id, seed, day: model.day, actions, scope };
+    const saved: Saved = { seed, day: model.day, actions, scope };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     } catch {
       /* storage full or blocked: the session still runs */
     }
-  }, [model, scenario, seed, actions, scope]);
+  }, [model, seed, actions, scope]);
 
   const stepDay = useCallback(() => {
     const s = sessionRef.current;
@@ -139,8 +139,12 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
 
   const value: SimContextValue = {
     model,
-    scenario,
     seed,
+    pins,
+    setPins: (p) => {
+      setPinsState(p);
+      writePins(p);
+    },
     playing,
     speed,
     scope,
@@ -150,10 +154,10 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
     pause: () => setPlaying(false),
     stepDay,
     setSpeed,
-    reset: (scenarioId, sd) => {
+    reset: (sd) => {
       setPlaying(false);
       setScope(null);
-      load(scenarioById(scenarioId), sd, [], 0);
+      load(sd, [], 0);
     },
     dispatch,
   };

@@ -1793,6 +1793,27 @@ export class SimulationSession {
     return this.attempts.filter((a) => a.person?.id === subject).map((a) => ({ campaignId: a.campaign.id, legIndex: a.legIndex, from: a.from, to: a.to, startDay: a.startDay, status: a.status, spentCents: a.spentCents }));
   }
 
+  /**
+   * What a leg costs and yields across the fleet today (every campaign with this leg),
+   * for proposing funnels to a new campaign. Null when no campaign ran it yet.
+   */
+  fleetLegEstimate(from: OutcomeId, to: OutcomeId): { costPerAttempt: number; yieldRate: number; label: "measured" } | null {
+    let att = 0;
+    let s = 0;
+    let c = 0;
+    for (const campaign of this.campaigns()) {
+      const legs = this.legEstimates(campaign);
+      for (const l of legs) {
+        if (l.from !== from || l.to !== to || l.yieldRate === null || l.costPerAttempt === null) continue;
+        att += l.attempts;
+        s += l.yieldRate * l.attempts;
+        c += l.costPerAttempt * l.attempts;
+      }
+    }
+    if (att === 0) return null;
+    return { costPerAttempt: c / att, yieldRate: s / att, label: "measured" };
+  }
+
   /** Number of attempts and of distinct people of a campaign. */
   attemptCount(campaignId?: string): number {
     return campaignId ? this.attempts.filter((a) => a.campaign.id === campaignId).length : this.attempts.length;
