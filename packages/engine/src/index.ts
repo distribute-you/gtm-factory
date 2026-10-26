@@ -13,8 +13,6 @@ export * from "./world";
 export * from "./simulator";
 export * from "./truth";
 export * from "./evidence";
-export * from "./shadow";
-export * from "./shadow-sim";
 
 import { Catalogue } from "./catalogue";
 import { loadWorld as load, type WorldData, type WorldSpec } from "./world";

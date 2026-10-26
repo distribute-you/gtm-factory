@@ -6,7 +6,7 @@
  * Research page, the convergence test), never by the engine's choices.
  */
 
-import { START, isOnDemand, type OutcomeId, type Pipe, type Script } from "./catalogue";
+import { START, type OutcomeId, type Pipe, type Script } from "./catalogue";
 import { legConsumer, playPoint, pointKey, type SimulationSession } from "./simulator";
 import { meetsAll, type Condition } from "./tactics";
 import { marketSample, segmentMultiplier, type Campaign } from "./world";
@@ -49,12 +49,12 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, scripts: Script[], 
   c.ends *= truth.end ?? 1;
   let recall = truth.recall ?? 1;
   let fp = truth.falsePositive ?? 0;
-  const subj = c.session.catalogue.subjectInput(pipe);
-  const order = subj ? [subj, ...pipe.inputs.filter((i) => i !== subj)] : [...pipe.inputs];
+  const subj = c.session.catalogue.subjectMaterial(pipe);
+  const order = subj ? [subj, ...pipe.materials.filter((i) => i !== subj)] : [...pipe.materials];
   for (const i of order) {
     const before = c.steps.length;
     if (!planObtain(c, pipe, i)) return false;
-    // Recall at an attesting pipe comes from the scripts chosen at its inputs.
+    // Recall at an attesting pipe comes from the scripts chosen at its Materials.
     for (const st of c.steps.slice(before)) {
       if (st.kind !== "decide" || st.point !== pointKey(pipe.id, i)) continue;
       const opt = c.assign.get(st.point) ?? st.options[0]!;
@@ -75,22 +75,23 @@ function planObtain(c: Ctx, consumer: Pipe, i: OutcomeId): boolean {
   const s = c.session;
   const out = s.catalogue.outcome(i);
   if (!out) return false;
-  if (out.subject === "event" || i === c.from) return true;
-  const providers = s.catalogue.providersOf(i).filter((p) => !p.reports);
+  if (i === c.from) return true;
+  const providers = s.catalogue.providersOf(i).filter((p) => !p.webhook);
+  const starts = c.campaign.start === START ? new Set<OutcomeId>() : new Set([c.campaign.start]);
   if (out.subject === "lead" || out.subject === "company") {
     // Produced earlier in this leg for the same subject: reused, no choice.
     if (c.produced.has(i)) return true;
-    const rooted = providers.filter((p) => isOnDemand(p) || s.catalogue.rootsOf(p).has(c.from) || (c.from === START && s.catalogue.rootsOf(p).has(START)));
-    // Nothing on this leg can make it: the subject brings it from before (a message written earlier).
+    const rooted = providers.filter((p) => s.catalogue.rootsOf(p, starts).has(c.from) || (c.from === START && s.catalogue.rootsOf(p).has(START)));
+    // Nothing on this leg can make it: the subject brings it from before.
     if (rooted.length === 0) return true;
     return planProduce(c, consumer.id, i, s.allowedScripts(c.campaign, consumer, i, rooted), false);
   }
-  const onDemand = providers.filter((p) => isOnDemand(p));
-  if (onDemand.length > 0) return planProduce(c, consumer.id, i, s.allowedScripts(c.campaign, consumer, i, onDemand), false);
+  if (out.subject === "run") return planProduce(c, consumer.id, i, s.allowedScripts(c.campaign, consumer, i, providers), false);
+  // A brand Unit: chosen among the ones the brand holds, else ordered from a producer.
   const point = pointKey(consumer.id, i);
   const options = s.objectDynasties(c.brandId, i);
-  if (options.length === 0) return false;
-  if (!c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, options });
+  if (options.length === 0) return providers.length === 0 || planProduce(c, consumer.id, i, s.allowedScripts(c.campaign, consumer, i, providers), false);
+  if (options.length > 1 && !c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, options });
   c.seenPoints.add(point);
   const assigned = c.assign.get(point);
   const dyn = assigned && options.includes(assigned) ? assigned : options[0]!;
@@ -121,7 +122,7 @@ export function segmentAverage(s: SimulationSession, brandId: string, conditions
 }
 
 function plan(s: SimulationSession, campaign: Campaign, legIndex: number, assign: Map<string, string>): Ctx | null {
-  const from = legIndex === 0 ? (campaign.entry.kind === "start" ? START : s.catalogue.trigger(campaign.entry.triggerId)?.event ?? START) : campaign.line[legIndex - 1]!;
+  const from = legIndex === 0 ? campaign.start : campaign.line[legIndex - 1]!;
   const to = campaign.line[legIndex]!;
   const c: Ctx = { session: s, campaign, brandId: campaign.brandId, from, to, assign, steps: [], ends: 1, segment: 1, seenPoints: new Set(), produced: new Set(), audience: [] };
   const plays = s.playsFor(campaign, from, to);

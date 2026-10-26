@@ -41,13 +41,13 @@ describe("sales paths and sales funnels are named catalogue objects", () => {
     }
   });
 
-  it("every pipe a leg runs through: the follow-up leg runs the follow-up email, then the reply judge", () => {
+  it("every pipe a leg runs through: the follow-up leg runs the follow-up, the mailbox's replies, then the reply judge", () => {
     const s = new SimulationSession(defaultWorld());
     s.run(12);
-    const follow = s.campaigns().find((c) => c.entry.kind === "trigger")!;
+    const follow = s.campaigns().find((c) => c.start !== START)!;
     const legs = s.campaignPipes(follow);
     const main = legs[0]!.filter((p) => p.main).map((p) => p.pipeId);
-    expect(main).toEqual(["follow_up", "reply_judging"]);
+    expect(main).toEqual(["follow_up", "follow_up_replies", "reply_judging"]);
     expect(legs[0]!.filter((p) => !p.main).map((p) => p.pipeId)).toContain("llm");
   });
 });

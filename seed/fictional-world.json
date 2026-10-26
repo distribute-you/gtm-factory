@@ -20,7 +20,7 @@
     "id": "offer_described",
     "label": "Offer described",
     "plural": "Offers described",
-    "subject": "object",
+    "subject": "brand",
     "contentType": "text",
     "icon": "tag",
     "description": "What the client sells, in its own words."
@@ -29,7 +29,7 @@
     "id": "audience_built",
     "label": "ICP",
     "plural": "ICPs",
-    "subject": "object",
+    "subject": "brand",
     "contentType": "audience",
     "icon": "users-three",
     "description": "Who to reach, as one plain sentence. A judge reads who fits it."
@@ -38,7 +38,7 @@
     "id": "template_written",
     "label": "Template",
     "plural": "Templates",
-    "subject": "object",
+    "subject": "brand",
     "contentType": "text_with_variables",
     "icon": "note-pencil",
     "description": "A message model with variables a writer fills for each lead."
@@ -47,19 +47,28 @@
     "id": "brand_context",
     "label": "Brand context",
     "plural": "Brand contexts",
-    "subject": "object",
+    "subject": "brand",
     "contentType": "text",
     "icon": "book-open",
-    "description": "A summary of the brand, made when a script asks for one."
+    "description": "A summary of the brand, served from the stock while it conforms, made again when none does."
    },
    {
     "id": "llm_completion",
     "label": "LLM completion",
     "plural": "LLM completions",
-    "subject": "object",
+    "subject": "run",
     "contentType": "text",
     "icon": "sparkle",
-    "description": "One answer from a language model, made when a script asks for one."
+    "description": "One answer from a language model to the run that asked: no other run is ever served it."
+   },
+   {
+    "id": "rating",
+    "label": "Rating",
+    "plural": "Ratings",
+    "subject": "brand",
+    "contentType": "rating",
+    "icon": "chart-bar",
+    "description": "Per option at each choice point, what the ledger says about value per dollar. Made each tick by the Supplier rating."
    },
    {
     "id": "lead_found",
@@ -97,6 +106,30 @@
     "plural": "Messages written",
     "subject": "lead",
     "icon": "pencil-simple-line"
+   },
+   {
+    "id": "message_queued",
+    "label": "Message queued",
+    "plural": "Messages queued",
+    "subject": "lead",
+    "icon": "tray-arrow-up",
+    "description": "Our send call accepted the message: it is in the mailbox's queue."
+   },
+   {
+    "id": "message_sent",
+    "label": "Message sent",
+    "plural": "Messages sent",
+    "subject": "lead",
+    "icon": "paper-plane-tilt",
+    "description": "The mailbox reports the message went out."
+   },
+   {
+    "id": "follow_up_queued",
+    "label": "Follow-up queued",
+    "plural": "Follow-ups queued",
+    "subject": "lead",
+    "icon": "arrow-bend-up-right",
+    "description": "Our send call accepted a follow-up in the thread of an earlier message."
    },
    {
     "id": "reply_received",
@@ -168,14 +201,6 @@
     "subject": "lead",
     "icon": "prohibit",
     "description": "An end state: the person asked us to stop."
-   },
-   {
-    "id": "follow_up_due",
-    "label": "Follow-up due",
-    "plural": "Follow-ups due",
-    "subject": "event",
-    "icon": "alarm",
-    "description": "A trigger event: a message went out 4 days ago and no reply came."
    }
   ],
   "factories": [
@@ -212,9 +237,23 @@
   ],
   "pipes": [
    {
+    "id": "supplier_rating",
+    "name": "Supplier rating",
+    "materials": [],
+    "output": "rating",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 0,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing pipe consumes.",
+    "icon": "chart-bar"
+   },
+   {
     "id": "offer_description",
     "name": "Offer description",
-    "inputs": [],
     "output": "offer_described",
     "factory": "client_team",
     "maturity": {
@@ -223,14 +262,12 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client describes its offer."
+    "description": "The client describes its offer.",
+    "materials": []
    },
    {
     "id": "icp_client",
     "name": "ICP from the client",
-    "inputs": [
-     "offer_described"
-    ],
     "output": "audience_built",
     "factory": "client_team",
     "maturity": {
@@ -239,14 +276,14 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client says who to reach."
+    "description": "The client says who to reach.",
+    "materials": [
+     "offer_described"
+    ]
    },
    {
     "id": "icp_finder",
     "name": "ICP finder",
-    "inputs": [
-     "offer_described"
-    ],
     "output": "audience_built",
     "factory": "ours",
     "maturity": {
@@ -255,14 +292,14 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "An AI proposes who to reach, and a finer ICP when the data shows one."
+    "description": "An AI proposes who to reach, and a finer ICP when the data shows one.",
+    "materials": [
+     "offer_described"
+    ]
    },
    {
     "id": "template_writing",
     "name": "Template writing",
-    "inputs": [
-     "offer_described"
-    ],
     "output": "template_written",
     "factory": "ours",
     "maturity": {
@@ -271,14 +308,14 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Writes message models with variables."
+    "description": "Writes message models with variables.",
+    "materials": [
+     "offer_described"
+    ]
    },
    {
     "id": "brand_context",
     "name": "Brand context",
-    "inputs": [
-     "offer_described"
-    ],
     "output": "brand_context",
     "factory": "ours",
     "maturity": {
@@ -287,13 +324,14 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "triggerId": "on_demand",
-    "description": "Summarises the brand when a script asks."
+    "description": "Summarises the brand when a script asks.",
+    "materials": [
+     "offer_described"
+    ]
    },
    {
     "id": "llm",
     "name": "LLM",
-    "inputs": [],
     "output": "llm_completion",
     "factory": "ours",
     "maturity": {
@@ -302,16 +340,13 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "triggerId": "on_demand",
     "description": "Answers a prompt when a script asks.",
-    "icon": "sparkle"
+    "icon": "sparkle",
+    "materials": []
    },
    {
     "id": "sourcing",
     "name": "Lead sourcing",
-    "inputs": [
-     "audience_built"
-    ],
     "output": "lead_found",
     "factory": "ours",
     "maturity": {
@@ -320,14 +355,15 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Turns the market into raw records, one ICP at a time."
+    "description": "Turns the market into raw records, one ICP at a time.",
+    "materials": [
+     "audience_built",
+     "rating"
+    ]
    },
    {
     "id": "identity",
     "name": "Identity",
-    "inputs": [
-     "lead_found"
-    ],
     "output": "lead_identified",
     "factory": "ours",
     "maturity": {
@@ -336,14 +372,15 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Resolves who a raw record is: dedup and merge into one id."
+    "description": "Resolves who a raw record is: dedup and merge into one id.",
+    "materials": [
+     "lead_found",
+     "rating"
+    ]
    },
    {
     "id": "email_finding",
     "name": "Email finding",
-    "inputs": [
-     "lead_identified"
-    ],
     "output": "email_found",
     "factory": "ours",
     "maturity": {
@@ -351,14 +388,15 @@
      "outcomesRequired": 10,
      "delayMeanDays": 0,
      "horizonDays": 0
-    }
+    },
+    "materials": [
+     "lead_identified",
+     "rating"
+    ]
    },
    {
     "id": "company_research",
     "name": "Company research",
-    "inputs": [
-     "lead_identified"
-    ],
     "output": "company_researched",
     "factory": "ours",
     "maturity": {
@@ -367,18 +405,14 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Reads the lead's company. One research serves every lead of a company."
+    "description": "Reads the lead's company. One research serves every lead of a company.",
+    "materials": [
+     "lead_identified"
+    ]
    },
    {
     "id": "writer",
     "name": "Message writer",
-    "inputs": [
-     "email_found",
-     "company_researched",
-     "template_written",
-     "brand_context",
-     "llm_completion"
-    ],
     "output": "message_written",
     "factory": "ours",
     "maturity": {
@@ -386,31 +420,69 @@
      "outcomesRequired": 10,
      "delayMeanDays": 0,
      "horizonDays": 0
-    }
+    },
+    "materials": [
+     "email_found",
+     "company_researched",
+     "template_written",
+     "brand_context",
+     "llm_completion",
+     "rating"
+    ]
    },
    {
     "id": "cold_email",
-    "name": "Cold email",
-    "inputs": [
-     "message_written"
+    "name": "Cold email send",
+    "output": "message_queued",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 12,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "materials": [
+     "message_written",
+     "rating"
+    ],
+    "description": "Our send call: hands the written message to a mailbox."
+   },
+   {
+    "id": "email_delivery",
+    "name": "Mailbox delivery",
+    "materials": [],
+    "output": "message_sent",
+    "factory": "mailbox",
+    "webhook": true,
+    "maturity": {
+     "durationDays": 1,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 1
+    },
+    "description": "A webhook: the mailbox reports each message it sent.",
+    "icon": "paper-plane-tilt"
+   },
+   {
+    "id": "email_replies",
+    "name": "Mailbox replies",
+    "materials": [
+     "message_queued"
     ],
     "output": "reply_received",
-    "factory": "ours",
+    "factory": "mailbox",
     "maturity": {
      "durationDays": 12,
      "outcomesRequired": 10,
      "delayMeanDays": 2.5,
      "horizonDays": 12
-    }
+    },
+    "description": "The mailbox reads the replies to a message we queued.",
+    "icon": "envelope-open"
    },
    {
     "id": "linkedin",
     "name": "LinkedIn outreach",
-    "inputs": [
-     "lead_identified",
-     "template_written",
-     "llm_completion"
-    ],
     "output": "reply_received",
     "factory": "ours",
     "maturity": {
@@ -418,15 +490,17 @@
      "outcomesRequired": 10,
      "delayMeanDays": 3,
      "horizonDays": 12
-    }
+    },
+    "materials": [
+     "lead_identified",
+     "template_written",
+     "llm_completion",
+     "rating"
+    ]
    },
    {
     "id": "reply_judging",
     "name": "Reply judge",
-    "inputs": [
-     "reply_received",
-     "llm_completion"
-    ],
     "output": "lead_interested",
     "factory": "ours",
     "maturity": {
@@ -435,14 +509,16 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Reads a reply and says whether the lead is interested."
+    "description": "Reads a reply and says whether the lead is interested.",
+    "materials": [
+     "reply_received",
+     "llm_completion",
+     "rating"
+    ]
    },
    {
     "id": "crm_import",
     "name": "CRM import",
-    "inputs": [
-     "lead_identified"
-    ],
     "output": "lead_interested",
     "factory": "client_crm",
     "maturity": {
@@ -451,15 +527,13 @@
      "delayMeanDays": 1,
      "horizonDays": 1
     },
-    "reports": true,
-    "description": "The client's CRM marks interested leads. The reference for this outcome."
+    "description": "A webhook: the client's CRM reports the interested leads it sees.",
+    "materials": [],
+    "webhook": true
    },
    {
     "id": "opt_outs",
     "name": "Opt-out reader",
-    "inputs": [
-     "reply_received"
-    ],
     "output": "unsubscribed",
     "factory": "mailbox",
     "maturity": {
@@ -468,13 +542,13 @@
      "delayMeanDays": 1,
      "horizonDays": 1
     },
-    "reports": true,
-    "description": "The mailbox reports people asking to stop."
+    "description": "A webhook: the mailbox reports who asked to stop.",
+    "materials": [],
+    "webhook": true
    },
    {
     "id": "organic",
     "name": "Organic inbound",
-    "inputs": [],
     "output": "lead_interested",
     "factory": "organic",
     "maturity": {
@@ -483,33 +557,48 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "reports": true,
-    "description": "People who reach out by themselves."
+    "description": "A webhook: people who come by themselves, reported as they arrive.",
+    "materials": [],
+    "webhook": true
    },
    {
     "id": "follow_up",
-    "name": "Follow-up email",
-    "inputs": [
-     "follow_up_due",
-     "message_written",
-     "llm_completion"
+    "name": "Follow-up",
+    "output": "follow_up_queued",
+    "factory": "ours",
+    "maturity": {
+     "durationDays": 10,
+     "outcomesRequired": 10,
+     "delayMeanDays": 0,
+     "horizonDays": 0
+    },
+    "materials": [
+     "message_sent",
+     "llm_completion",
+     "rating"
+    ],
+    "description": "Writes and sends the next message in a thread. Its script waits its days since the last message."
+   },
+   {
+    "id": "follow_up_replies",
+    "name": "Mailbox follow-up replies",
+    "materials": [
+     "follow_up_queued"
     ],
     "output": "reply_received",
-    "factory": "ours",
+    "factory": "mailbox",
     "maturity": {
      "durationDays": 10,
      "outcomesRequired": 10,
      "delayMeanDays": 2,
      "horizonDays": 10
     },
-    "triggerId": "follow_up"
+    "description": "The mailbox reads the replies to a follow-up.",
+    "icon": "envelope-open"
    },
    {
     "id": "ads",
     "name": "Ads",
-    "inputs": [
-     "audience_built"
-    ],
     "output": "lead_visited",
     "factory": "ours",
     "maturity": {
@@ -517,14 +606,15 @@
      "outcomesRequired": 10,
      "delayMeanDays": 1,
      "horizonDays": 5
-    }
+    },
+    "materials": [
+     "audience_built",
+     "rating"
+    ]
    },
    {
     "id": "website",
     "name": "Website",
-    "inputs": [
-     "lead_visited"
-    ],
     "output": "lead_interested",
     "factory": "client_team",
     "maturity": {
@@ -533,14 +623,15 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client's website turns a visit into a signup."
+    "description": "The client's website turns a visit into a signup.",
+    "materials": [
+     "lead_visited",
+     "rating"
+    ]
    },
    {
     "id": "ai_booking",
     "name": "AI meeting booking",
-    "inputs": [
-     "lead_interested"
-    ],
     "output": "meeting_booked",
     "factory": "ours",
     "maturity": {
@@ -548,14 +639,14 @@
      "outcomesRequired": 10,
      "delayMeanDays": 1,
      "horizonDays": 6
-    }
+    },
+    "materials": [
+     "lead_interested"
+    ]
    },
    {
     "id": "team_booking",
     "name": "Your team books",
-    "inputs": [
-     "lead_interested"
-    ],
     "output": "meeting_booked",
     "factory": "client_team",
     "maturity": {
@@ -563,14 +654,14 @@
      "outcomesRequired": 10,
      "delayMeanDays": 2,
      "horizonDays": 8
-    }
+    },
+    "materials": [
+     "lead_interested"
+    ]
    },
    {
     "id": "reminders",
     "name": "Meeting reminders",
-    "inputs": [
-     "meeting_booked"
-    ],
     "output": "meeting_attended",
     "factory": "ours",
     "maturity": {
@@ -578,14 +669,14 @@
      "outcomesRequired": 10,
      "delayMeanDays": 3,
      "horizonDays": 10
-    }
+    },
+    "materials": [
+     "meeting_booked"
+    ]
    },
    {
     "id": "closing",
     "name": "Your team closing",
-    "inputs": [
-     "meeting_attended"
-    ],
     "output": "paid_client",
     "factory": "client_team",
     "maturity": {
@@ -593,10 +684,27 @@
      "outcomesRequired": 10,
      "delayMeanDays": 7,
      "horizonDays": 21
-    }
+    },
+    "materials": [
+     "meeting_attended"
+    ]
    }
   ],
   "scripts": [
+   {
+    "id": "rating_pooled",
+    "pipeId": "supplier_rating",
+    "dynasty": "rating_pooled",
+    "version": 1,
+    "name": "Pooled Thompson rating",
+    "kind": "rules",
+    "tactics": {
+     "reads_evidence": true
+    },
+    "costCents": 1,
+    "status": "active",
+    "description": "Beliefs pooled from the script's level everywhere down to the client, with delay censoring and measured costs."
+   },
    {
     "id": "offer_client",
     "pipeId": "offer_description",
@@ -896,6 +1004,28 @@
     "status": "active"
    },
    {
+    "id": "mb_send",
+    "pipeId": "email_delivery",
+    "dynasty": "mb_send",
+    "version": 1,
+    "name": "Mailbox send report",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
+    "id": "mb_replies",
+    "pipeId": "email_replies",
+    "dynasty": "mb_replies",
+    "version": 1,
+    "name": "Mailbox inbox",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
+    "status": "active"
+   },
+   {
     "id": "li_connect",
     "pipeId": "linkedin",
     "dynasty": "li_connect",
@@ -957,7 +1087,9 @@
     "version": 1,
     "name": "Short bump",
     "kind": "ai",
-    "tactics": {},
+    "tactics": {
+     "wait_days": 4
+    },
     "costCents": 2,
     "status": "active"
    },
@@ -968,8 +1100,21 @@
     "version": 1,
     "name": "New angle",
     "kind": "ai",
-    "tactics": {},
+    "tactics": {
+     "wait_days": 4
+    },
     "costCents": 3,
+    "status": "active"
+   },
+   {
+    "id": "mb_fu_replies",
+    "pipeId": "follow_up_replies",
+    "dynasty": "mb_fu_replies",
+    "version": 1,
+    "name": "Mailbox inbox",
+    "kind": "rules",
+    "tactics": {},
+    "costCents": 0,
     "status": "active"
    },
    {
@@ -1074,30 +1219,6 @@
     "tactics": {},
     "costCents": 0,
     "status": "active"
-   }
-  ],
-  "triggers": [
-   {
-    "id": "on_demand",
-    "label": "On demand",
-    "when": [],
-    "delayDays": 0,
-    "unless": [],
-    "reported": true,
-    "description": "A consuming script asks the engine for this input."
-   },
-   {
-    "id": "follow_up",
-    "label": "Follow-up due",
-    "when": [
-     "message_written"
-    ],
-    "delayDays": 4,
-    "unless": [
-     "reply_received"
-    ],
-    "event": "follow_up_due",
-    "description": "4 days after a message, unless a reply came."
    }
   ],
   "tactics": [
@@ -1248,6 +1369,44 @@
      "brand"
     ],
     "source": "data"
+   },
+   {
+    "id": "wait_days",
+    "name": "Days since last message",
+    "type": {
+     "kind": "number",
+     "unit": "days"
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data",
+    "description": "A script waits this many days after the Unit it consumes landed before it runs."
+   },
+   {
+    "id": "reads_evidence",
+    "name": "Reads the ledger",
+    "type": {
+     "kind": "yesno"
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data",
+    "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every option its prior."
+   },
+   {
+    "id": "age_days",
+    "name": "Age",
+    "type": {
+     "kind": "number",
+     "unit": "days"
+    },
+    "describes": [
+     "unit"
+    ],
+    "source": "data",
+    "description": "Days since a Unit landed in the stock."
    }
   ],
   "strategies": [
@@ -1257,14 +1416,14 @@
     "pipeId": "identity",
     "rules": [
      {
-      "input": "lead_found",
       "conditions": [
        {
         "op": "range",
         "tactic": "recontact_days",
         "min": 60
        }
-      ]
+      ],
+      "material": "lead_found"
      }
     ]
    },
@@ -1274,14 +1433,14 @@
     "pipeId": "writer",
     "rules": [
      {
-      "input": "llm_completion",
       "conditions": [
        {
         "op": "equals",
         "tactic": "tier",
         "value": "pro"
        }
-      ]
+      ],
+      "material": "llm_completion"
      }
     ]
    },
@@ -1295,6 +1454,23 @@
       "op": "notReached",
       "outcomes": [
        "unsubscribed"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "writer#fresh-context",
+    "name": "Brand context younger than 30 days",
+    "pipeId": "writer",
+    "rules": [
+     {
+      "material": "brand_context",
+      "conditions": [
+       {
+        "op": "range",
+        "tactic": "age_days",
+        "max": 30
+       }
       ]
      }
     ]
@@ -1337,9 +1513,6 @@
      "brandId": "brand-1",
      "offerId": "offer-1",
      "name": "Paid clients from cold outreach",
-     "entry": {
-      "kind": "start"
-     },
      "line": [
       "lead_interested",
       "meeting_booked",
@@ -1350,23 +1523,21 @@
      "status": "running",
      "strategies": {
       "reply_judging": "reply_judging#no-opt-outs"
-     }
+     },
+     "start": "start"
     },
     {
      "id": "campaign-1f",
      "brandId": "brand-1",
      "offerId": "offer-1",
-     "name": "Follow-ups",
-     "entry": {
-      "kind": "trigger",
-      "triggerId": "follow_up"
-     },
+     "name": "Follow-ups after each message sent",
      "line": [
       "lead_interested"
      ],
      "dailyBudgetCents": 1500,
      "status": "running",
-     "strategies": {}
+     "strategies": {},
+     "start": "message_sent"
     }
    ],
    "seeds": [
@@ -1449,7 +1620,8 @@
     }
    ],
    "connected": [
-    "crm_import"
+    "crm_import",
+    "email_delivery"
    ],
    "truthMultiplier": 1.0,
    "organicPerDay": 0.5
@@ -1488,9 +1660,6 @@
      "brandId": "brand-2",
      "offerId": "offer-2",
      "name": "Meetings from cold outreach",
-     "entry": {
-      "kind": "start"
-     },
      "line": [
       "lead_interested",
       "meeting_booked"
@@ -1498,8 +1667,10 @@
      "dailyBudgetCents": 2500,
      "status": "running",
      "strategies": {
-      "identity": "identity#recontact-60"
-     }
+      "identity": "identity#recontact-60",
+      "writer": "writer#fresh-context"
+     },
+     "start": "start"
     }
    ],
    "seeds": [
@@ -1582,7 +1753,8 @@
     }
    ],
    "connected": [
-    "crm_import"
+    "crm_import",
+    "email_delivery"
    ],
    "truthMultiplier": 1.1,
    "organicPerDay": 0.5
@@ -1621,9 +1793,6 @@
      "brandId": "brand-3",
      "offerId": "offer-3",
      "name": "Paid clients, pro models for writing",
-     "entry": {
-      "kind": "start"
-     },
      "line": [
       "lead_interested",
       "meeting_booked",
@@ -1634,23 +1803,21 @@
      "status": "running",
      "strategies": {
       "writer": "writer#pro-models"
-     }
+     },
+     "start": "start"
     },
     {
      "id": "campaign-3f",
      "brandId": "brand-3",
      "offerId": "offer-3",
-     "name": "Follow-ups",
-     "entry": {
-      "kind": "trigger",
-      "triggerId": "follow_up"
-     },
+     "name": "Follow-ups after each message sent",
      "line": [
       "lead_interested"
      ],
      "dailyBudgetCents": 1200,
      "status": "running",
-     "strategies": {}
+     "strategies": {},
+     "start": "message_sent"
     }
    ],
    "seeds": [
@@ -1732,7 +1899,9 @@
      "truthEnd": 0.6
     }
    ],
-   "connected": [],
+   "connected": [
+    "email_delivery"
+   ],
    "truthMultiplier": 0.9,
    "organicPerDay": 0.5
   },
@@ -1768,9 +1937,6 @@
      "brandId": "brand-4",
      "offerId": "offer-4",
      "name": "Paid clients from ads",
-     "entry": {
-      "kind": "start"
-     },
      "line": [
       "lead_visited",
       "lead_interested",
@@ -1780,7 +1946,8 @@
      ],
      "dailyBudgetCents": 2500,
      "status": "running",
-     "strategies": {}
+     "strategies": {},
+     "start": "start"
     }
    ],
    "seeds": [
@@ -1862,7 +2029,9 @@
      "truthEnd": 0.6
     }
    ],
-   "connected": [],
+   "connected": [
+    "email_delivery"
+   ],
    "truthMultiplier": 1.0,
    "organicPerDay": 0.5
   }
@@ -1985,9 +2154,9 @@
     "horizonDays": 0
    },
    "cold_email": {
-    "base": 0.24,
-    "delayMeanDays": 2.5,
-    "horizonDays": 12
+    "base": 0.98,
+    "delayMeanDays": 0,
+    "horizonDays": 0
    },
    "linkedin": {
     "base": 0.12,
@@ -2002,22 +2171,31 @@
    "crm_import": {
     "base": 1,
     "delayMeanDays": 1,
-    "horizonDays": 1
+    "horizonDays": 1,
+    "webhook": {
+     "attests": true
+    }
    },
    "opt_outs": {
     "base": 0.2,
     "delayMeanDays": 1,
-    "horizonDays": 1
+    "horizonDays": 1,
+    "webhook": {
+     "on": "reply_received"
+    }
    },
    "organic": {
     "base": 1,
     "delayMeanDays": 0,
-    "horizonDays": 0
+    "horizonDays": 0,
+    "webhook": {
+     "creates": true
+    }
    },
    "follow_up": {
-    "base": 0.3,
-    "delayMeanDays": 2,
-    "horizonDays": 10
+    "base": 0.98,
+    "delayMeanDays": 0,
+    "horizonDays": 0
    },
    "ads": {
     "base": 0.2,
@@ -2050,6 +2228,29 @@
     "base": 0.15,
     "delayMeanDays": 7,
     "horizonDays": 21
+   },
+   "supplier_rating": {
+    "base": 1,
+    "delayMeanDays": 0,
+    "horizonDays": 0
+   },
+   "email_delivery": {
+    "base": 0.98,
+    "delayMeanDays": 0,
+    "horizonDays": 1,
+    "webhook": {
+     "on": "message_queued"
+    }
+   },
+   "email_replies": {
+    "base": 0.24,
+    "delayMeanDays": 2.5,
+    "horizonDays": 12
+   },
+   "follow_up_replies": {
+    "base": 0.3,
+    "delayMeanDays": 2,
+    "horizonDays": 10
    }
   },
   "scripts": {
@@ -2070,7 +2271,7 @@
    },
    "ctx_short": {
     "costCents": 1,
-    "end": 0.6
+    "end": 0.95
    },
    "ctx_full": {
     "costCents": 2,
@@ -2134,11 +2335,11 @@
    },
    "ce_now": {
     "costCents": 4,
-    "step": 0.6
+    "end": 0.6
    },
    "ce_morning": {
     "costCents": 4,
-    "step": 1.0
+    "end": 1.0
    },
    "li_connect": {
     "costCents": 40,
@@ -2159,12 +2360,10 @@
    },
    "fu_bump": {
     "costCents": 2,
-    "step": 0.6,
-    "end": 1.2
+    "end": 0.72
    },
    "fu_angle": {
     "costCents": 3,
-    "step": 1.0,
     "end": 2.0
    },
    "ad_search": {
@@ -2201,6 +2400,18 @@
     "step": 1.4
    },
    "cl_call": {
+    "costCents": 0
+   },
+   "rating_pooled": {
+    "costCents": 1
+   },
+   "mb_send": {
+    "costCents": 0
+   },
+   "mb_replies": {
+    "costCents": 0
+   },
+   "mb_fu_replies": {
     "costCents": 0
    }
   },
@@ -2312,7 +2523,8 @@
   "peoplePerCompany": 5,
   "icpFinderScript": "icp_ai",
   "clientGroupTactic": "sells_to",
-  "memoryHalfLifeDays": 14
+  "memoryHalfLifeDays": 14,
+  "ticksPerDay": 24
  },
  "pins": [
   {

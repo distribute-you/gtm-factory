@@ -25,12 +25,17 @@ export function delayFromPmf(pmf: readonly number[]): DelayDistribution {
   return { cdf };
 }
 
-/** Geometric delays with a given mean, truncated at `horizonDays` (the rest lands on the last day). */
-export function geometricDelay(meanDays: number, horizonDays: number): DelayDistribution {
+/**
+ * Geometric delays with a given mean, truncated at `horizonDays` (the rest
+ * lands on the last day). `fixedDays` of the mean are certain (a Unit
+ * advances one pipe per tick): nothing lands before them.
+ */
+export function geometricDelay(meanDays: number, horizonDays: number, fixedDays = 0): DelayDistribution {
   if (meanDays <= 0 || horizonDays <= 0) return { cdf: [1] };
-  const q = 1 / (1 + meanDays);
+  const shift = Math.max(0, Math.min(Math.floor(fixedDays), Math.floor(meanDays), horizonDays));
+  const q = 1 / (1 + Math.max(0, meanDays - shift));
   const pmf: number[] = [];
-  for (let d = 0; d <= horizonDays; d++) pmf.push(q * Math.pow(1 - q, d));
+  for (let d = 0; d <= horizonDays; d++) pmf.push(d < shift ? 0 : q * Math.pow(1 - q, d - shift));
   return delayFromPmf(pmf);
 }
 

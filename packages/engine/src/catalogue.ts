@@ -1,8 +1,8 @@
 /**
- * The catalogue: every object of a GTM factory as data. Four objects carry a
- * status of their own: outcomes, pipes, triggers and scripts. Tactics and
- * strategies describe them. Nothing in the engine is keyed on a particular id:
- * add an outcome, a pipe or a script and it competes like the others.
+ * The catalogue: every object of a GTM factory as data. Three objects carry a
+ * status of their own: outcomes, pipes and scripts. Tactics and strategies
+ * describe them. Nothing in the engine is keyed on a particular id: add an
+ * outcome, a pipe or a script and it competes like the others.
  */
 
 import type { Condition, TacticValue } from "./tactics";
@@ -13,10 +13,12 @@ export const START = "start";
 export type OutcomeId = string;
 
 /**
- * What an occurrence of an outcome is about: a lead (a person), a company, an
- * object (an ICP, a template, an LLM completion), or a trigger event.
+ * What a Unit of an outcome is about, its subject: a lead (a person), a
+ * company, the brand (an ICP, a template, a brand context), or the run that
+ * ordered it (an LLM completion answers one run's question: no other run is
+ * ever served it).
  */
-export type SubjectKind = "lead" | "company" | "object" | "event";
+export type SubjectKind = "lead" | "company" | "brand" | "run";
 
 /** A lead state on a lead track. Tracks are never added together. */
 export interface TrackPlace {
@@ -25,14 +27,15 @@ export interface TrackPlace {
 }
 
 /**
- * What an occurrence of an object outcome holds, as data: a reader shows it
+ * What a Unit of a brand or run outcome holds, as data: a reader shows it
  * with one renderer per content type, whatever the outcome is.
  *  - text_with_variables: a text with {{variables}}, versioned in its dynasty;
  *  - text: plain text;
  *  - audience: a sentence describing who, with the conditions a judge reads from it;
+ *  - rating: per option at each choice point, beliefs about value per dollar (a Supplier rating);
  *  - list, record, image: other shapes.
  */
-export type ContentType = "text_with_variables" | "text" | "audience" | "list" | "record" | "image";
+export type ContentType = "text_with_variables" | "text" | "audience" | "rating" | "list" | "record" | "image";
 
 export interface Outcome {
   id: OutcomeId;
@@ -41,7 +44,7 @@ export interface Outcome {
   subject: SubjectKind;
   /** The lead state this outcome is, when it is one. */
   track?: TrackPlace;
-  /** For an object outcome: what its occurrences hold. */
+  /** For a brand or run outcome: what its Units hold. */
   contentType?: ContentType;
   /** The pipe whose output other producers of this outcome are measured against. */
   referencePipe?: string;
@@ -80,28 +83,26 @@ export interface Maturity {
 }
 
 /**
- * A pipe transforms input outcomes into one output outcome. It may need
- * several inputs (the message writer needs a verified email, the company
- * research, a template, a brand context and an LLM completion). Each input is
- * an outcome: produced ahead (an ICP, a template) or on demand (an LLM
- * completion). A pipe with no lead input creates its subjects: it turns the
- * market into leads.
+ * A pipe turns its Bill of materials into one output outcome. Its Bill of
+ * materials lists the outcomes it consumes per Unit produced; one line is one
+ * Material (the message writer: a verified email, a company researched, a
+ * template, a brand context, an LLM completion, a Rating). A pipe with no lead
+ * Material creates its subjects: it turns the market into leads.
  */
 export interface Pipe {
   id: string;
   name: string;
-  inputs: OutcomeId[];
+  /** The Bill of materials: one Material per line, each an outcome consumed per Unit produced. */
+  materials: OutcomeId[];
   output: OutcomeId;
   factory: string;
-  /**
-   * A reactive pipe waits on one trigger. On the "On demand" trigger it runs
-   * when a consuming script asks the engine for its output (an LLM completion,
-   * a brand context): one run, one occurrence, at the consumer's input.
-   */
-  triggerId?: string | null;
   maturity: Maturity;
-  /** A pipe of another factory that runs on its own schedule and reports what it produced (a CRM import, the organic market). */
-  reports?: boolean;
+  /**
+   * A webhook: the pipe has no internal Material, its producer is another
+   * factory (the prospect, the client's CRM), and its script runs when the
+   * webhook is called instead of at the tick.
+   */
+  webhook?: boolean;
   description?: string;
   icon?: string;
   retired?: boolean;
@@ -133,24 +134,6 @@ export interface Script {
   description?: string;
 }
 
-/**
- * One generic trigger: when outcome X (or one of a list) is reached for a
- * subject, after delay D, unless outcome Y is reached meanwhile. Or reported
- * from outside. Each event is itself an occurrence of `event`.
- */
-export interface Trigger {
-  id: string;
-  label: string;
-  when: OutcomeId[];
-  delayDays: number;
-  unless: OutcomeId[];
-  reported?: boolean;
-  /** The outcome each event is an occurrence of (none for "On demand": the call is traced on the consuming run). */
-  event?: OutcomeId;
-  description?: string;
-  retired?: boolean;
-}
-
 export type TacticType =
   | { kind: "yesno" }
   | { kind: "list"; values: string[] }
@@ -161,20 +144,37 @@ export interface Tactic {
   id: string;
   name: string;
   type: TacticType;
-  describes: Array<"script" | "lead" | "company" | "brand">;
+  describes: Array<"script" | "lead" | "company" | "brand" | "unit">;
   source: "data" | "judged";
   description?: string;
   retired?: boolean;
 }
 
 /**
- * A rule of a strategy. `input` names the input it attaches to: its
- * conditions filter the provider scripts at that input of this pipe only.
- * Without `input`, it filters the pipe's own scripts.
+ * A rule of a strategy. `material` names the Material it attaches to: its
+ * conditions enter the Specification of that Material of this pipe only, so
+ * they filter both the Units served from the stock and the producer scripts
+ * ordered from. Without `material`, it filters the pipe's own scripts.
  */
 export interface StrategyRule {
-  input?: OutcomeId;
+  material?: OutcomeId;
   conditions: Condition[];
+}
+
+/**
+ * New generic object. A Specification is what a consumer asks for when it
+ * pulls an outcome (its cahier des charges): the subject (the lead, the
+ * company of a lead, the brand), conditions on tactics (a Unit's age, its
+ * producer's channel: the Campaign's strategy conditions enter here) and a
+ * quantity. A push carries no Specification: the pushed Unit is the Material.
+ */
+export interface Specification {
+  outcome: OutcomeId;
+  /** The subject the Units must be about (null: any subject of the brand). */
+  subject: string | null;
+  brandId: string;
+  conditions: Condition[];
+  quantity: number;
 }
 
 /** A set of conditions on tactics, for one pipe. A play = pipe x strategy. */
@@ -191,15 +191,15 @@ export interface Strategy {
 }
 
 /**
- * A sales path: a straight line of lead states from Start (or a trigger's
- * event) to a target. Named on first sight, never renamed.
+ * A sales path: a straight line of lead states from a start outcome (Start,
+ * the market, or any outcome) to a target. Named on first sight, never renamed.
  */
 export interface SalesPath {
   id: string;
   name: string;
-  /** START, or the event outcome of the trigger that opens it. */
-  entry: OutcomeId;
-  /** The lead states after the entry; the last one is the target. */
+  /** START, or the outcome the path starts from. */
+  start: OutcomeId;
+  /** The lead states after the start; the last one is the target. */
   line: OutcomeId[];
 }
 
@@ -212,12 +212,12 @@ export interface SalesFunnel {
   plays: string[];
 }
 
-export function salesPathId(entry: OutcomeId, line: readonly OutcomeId[]): string {
-  return `path:${[entry, ...line].join(">")}`;
+export function salesPathId(start: OutcomeId, line: readonly OutcomeId[]): string {
+  return `path:${[start, ...line].join(">")}`;
 }
 
-export function salesFunnelId(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): string {
-  return `funnel:${[entry, ...line].join(">")}|${plays.join("+")}`;
+export function salesFunnelId(start: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): string {
+  return `funnel:${[start, ...line].join(">")}|${plays.join("+")}`;
 }
 
 export interface CatalogueData {
@@ -226,7 +226,6 @@ export interface CatalogueData {
   factories: Factory[];
   pipes: Pipe[];
   scripts: Script[];
-  triggers: Trigger[];
   tactics: Tactic[];
   strategies: Strategy[];
   /** Sales paths and sales funnels named so far (names are given on first sight and kept). */
@@ -254,6 +253,8 @@ export function defaultStrategyId(pipeId: string): string {
  */
 export class Catalogue {
   private readonly data: CatalogueData;
+  /** Reads computed from the lists, kept until the next write. */
+  private readonly memo = new Map<string, unknown>();
 
   constructor(data?: Partial<CatalogueData>) {
     this.data = {
@@ -262,7 +263,6 @@ export class Catalogue {
       factories: [...(data?.factories ?? [])],
       pipes: [...(data?.pipes ?? [])],
       scripts: [...(data?.scripts ?? [])],
-      triggers: [...(data?.triggers ?? [])],
       tactics: [...(data?.tactics ?? [])],
       strategies: [...(data?.strategies ?? [])],
       salesPaths: [...(data?.salesPaths ?? [])],
@@ -294,9 +294,6 @@ export class Catalogue {
   get scripts(): readonly Script[] {
     return this.data.scripts;
   }
-  get triggers(): readonly Trigger[] {
-    return this.data.triggers;
-  }
   get tactics(): readonly Tactic[] {
     return this.data.tactics;
   }
@@ -323,31 +320,31 @@ export class Catalogue {
   }
 
   /** The sales path of a line: its stored name, or the name it would get now (nothing is stored). */
-  peekSalesPath(entry: OutcomeId, line: readonly OutcomeId[]): SalesPath {
-    const id = salesPathId(entry, line);
-    return this.salesPath(id) ?? { id, name: this.freshName(this.pathNames(entry, line), new Set(this.salesPaths.map((p) => p.name))), entry, line: [...line] };
+  peekSalesPath(start: OutcomeId, line: readonly OutcomeId[]): SalesPath {
+    const id = salesPathId(start, line);
+    return this.salesPath(id) ?? { id, name: this.freshName(this.pathNames(start, line), new Set(this.salesPaths.map((p) => p.name))), start, line: [...line] };
   }
 
   /** The sales path of a line, named on first sight and kept. */
-  nameSalesPath(entry: OutcomeId, line: readonly OutcomeId[]): SalesPath {
-    const p = this.peekSalesPath(entry, line);
+  nameSalesPath(start: OutcomeId, line: readonly OutcomeId[]): SalesPath {
+    const p = this.peekSalesPath(start, line);
     if (!this.salesPath(p.id)) this.data.salesPaths!.push(p);
     return p;
   }
 
   /** The sales funnel of a line and its plays: its stored name, or the name it would get now (nothing is stored). */
-  peekSalesFunnel(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
-    const id = salesFunnelId(entry, line, plays);
+  peekSalesFunnel(start: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
+    const id = salesFunnelId(start, line, plays);
     const found = this.salesFunnel(id);
     if (found) return found;
-    const path = this.peekSalesPath(entry, line);
+    const path = this.peekSalesPath(start, line);
     return { id, name: this.freshName(this.funnelNames(path, plays), new Set(this.salesFunnels.map((f) => f.name))), pathId: path.id, plays: [...plays] };
   }
 
   /** The sales funnel of a line and its plays, named on first sight (its path too) and kept. */
-  nameSalesFunnel(entry: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
-    this.nameSalesPath(entry, line);
-    const f = this.peekSalesFunnel(entry, line, plays);
+  nameSalesFunnel(start: OutcomeId, line: readonly OutcomeId[], plays: readonly string[]): SalesFunnel {
+    this.nameSalesPath(start, line);
+    const f = this.peekSalesFunnel(start, line, plays);
     if (!this.salesFunnel(f.id)) this.data.salesFunnels!.push(f);
     return f;
   }
@@ -358,9 +355,9 @@ export class Catalogue {
   }
 
   /** Plain words, most general first: "Paid clients from the market", then the states it passes through. */
-  private pathNames(entry: OutcomeId, line: readonly OutcomeId[]): string[] {
-    const target = line[line.length - 1] ?? entry;
-    const from = entry === START ? "the market" : (this.triggers.find((t) => t.event === entry)?.label ?? this.outcome(entry)?.label ?? entry).toLowerCase();
+  private pathNames(start: OutcomeId, line: readonly OutcomeId[]): string[] {
+    const target = line[line.length - 1] ?? start;
+    const from = start === START ? "the market" : this.plural(start).toLowerCase();
     const base = `${this.plural(target)} from ${from}`;
     const via = line.slice(0, -1).map((o) => this.plural(o).toLowerCase());
     return via.length > 0 ? [base, `${base}, through ${via.length > 1 ? `${via.slice(0, -1).join(", ")} and ${via[via.length - 1]}` : via[0]}`] : [base];
@@ -370,8 +367,8 @@ export class Catalogue {
   private funnelNames(path: SalesPath, plays: readonly string[]): string[] {
     const names = plays.map((id) => this.pipe(id)?.name ?? id);
     const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? path.name;
-    const target = this.plural(path.line[path.line.length - 1] ?? path.entry).toLowerCase();
-    const from = path.entry === START ? "the market" : (this.triggers.find((t) => t.event === path.entry)?.label ?? path.entry).toLowerCase();
+    const target = this.plural(path.line[path.line.length - 1] ?? path.start).toLowerCase();
+    const from = path.start === START ? "the market" : this.plural(path.start).toLowerCase();
     return [`${list} for ${target}`, `${list} for ${target}, from ${from}`];
   }
 
@@ -391,9 +388,6 @@ export class Catalogue {
   script(id: string): Script | undefined {
     return this.data.scripts.find((s) => s.id === id);
   }
-  trigger(id: string): Trigger | undefined {
-    return this.data.triggers.find((t) => t.id === id);
-  }
   tactic(id: string): Tactic | undefined {
     return this.data.tactics.find((t) => t.id === id);
   }
@@ -411,34 +405,47 @@ export class Catalogue {
   isPipeLive(p: Pipe): boolean {
     if (p.retired) return false;
     if (this.outcome(p.output)?.retired) return false;
-    return p.inputs.every((i) => !this.outcome(i)?.retired);
+    return p.materials.every((i) => !this.outcome(i)?.retired);
   }
 
   /** Live pipes producing an outcome. */
   providersOf(outcome: OutcomeId): Pipe[] {
-    return this.data.pipes.filter((p) => p.output === outcome && this.isPipeLive(p));
+    const k = `providers|${outcome}`;
+    const hit = this.memo.get(k) as Pipe[] | undefined;
+    if (hit) return hit;
+    const v = this.data.pipes.filter((p) => p.output === outcome && this.isPipeLive(p));
+    this.memo.set(k, v);
+    return v;
   }
 
-  /** The input of a pipe that carries its subject (a lead, a company or a trigger event), if any. */
-  subjectInput(pipe: Pipe): OutcomeId | null {
-    for (const i of pipe.inputs) {
-      const k = this.outcome(i)?.subject;
-      if (k === "lead" || k === "event") return i;
-    }
+  /** The Material of a pipe that carries its subject (a lead), if any. */
+  subjectMaterial(pipe: Pipe): OutcomeId | null {
+    for (const i of pipe.materials) if (this.outcome(i)?.subject === "lead") return i;
     return null;
   }
 
-  /** A pipe with no lead or event input creates its subjects. */
+  /** A pipe with no lead Material and a lead output creates its subjects (it turns the market into leads). */
   createsSubjects(pipe: Pipe): boolean {
-    return this.subjectInput(pipe) === null && this.outcome(pipe.output)?.subject === "lead";
+    return !pipe.webhook && this.subjectMaterial(pipe) === null && this.outcome(pipe.output)?.subject === "lead";
   }
 
   /**
-   * Where a pipe's subject comes from: Start for a pipe creating subjects, a
-   * lead state, or a trigger event, found by walking subject inputs back
-   * through outcomes that are neither.
+   * Where a pipe's subject comes from: Start for a pipe creating subjects, or
+   * a lead state, found by walking subject Materials back through outcomes
+   * that are not lead states. `starts` adds outcomes a campaign may start
+   * from (a Message sent): a pipe consuming one is rooted there.
    */
-  rootsOf(pipe: Pipe, seen: Set<string> = new Set()): Set<OutcomeId> {
+  rootsOf(pipe: Pipe, starts: ReadonlySet<OutcomeId> = new Set(), seen?: Set<string>): Set<OutcomeId> {
+    if (seen) return this.computeRoots(pipe, starts, seen);
+    const k = `roots|${pipe.id}|${[...starts].sort().join(",")}`;
+    const hit = this.memo.get(k) as Set<OutcomeId> | undefined;
+    if (hit) return hit;
+    const v = this.computeRoots(pipe, starts, new Set());
+    this.memo.set(k, v);
+    return v;
+  }
+
+  private computeRoots(pipe: Pipe, starts: ReadonlySet<OutcomeId>, seen: Set<string>): Set<OutcomeId> {
     const roots = new Set<OutcomeId>();
     if (seen.has(pipe.id)) return roots;
     seen.add(pipe.id);
@@ -446,14 +453,14 @@ export class Catalogue {
       roots.add(START);
       return roots;
     }
-    const s = this.subjectInput(pipe);
+    const s = this.subjectMaterial(pipe);
     if (!s) return roots;
     const o = this.outcome(s);
-    if (o?.track || o?.subject === "event") {
+    if (o?.track || starts.has(s)) {
       roots.add(s);
-      return roots;
+      if (o?.track) return roots;
     }
-    for (const q of this.providersOf(s)) for (const r of this.rootsOf(q, new Set(seen))) roots.add(r);
+    for (const q of this.providersOf(s)) if (!q.webhook) for (const r of this.computeRoots(q, starts, new Set(seen))) roots.add(r);
     return roots;
   }
 
@@ -485,6 +492,7 @@ export class Catalogue {
   // ---- writes ---------------------------------------------------------------
 
   add<K extends Kind>(kind: K, item: CatalogueData[K][number]): this {
+    this.memo.clear();
     const list = this.data[kind] as Array<CatalogueData[K][number]>;
     const id = (item as { id: string }).id;
     if (list.some((x) => (x as { id: string }).id === id)) throw new Error(`${kind} "${id}" already exists`);
@@ -495,6 +503,7 @@ export class Catalogue {
 
   /** Retire an object: kept for history, out of every choice. */
   retire(kind: Kind, id: string): this {
+    this.memo.clear();
     const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);
     if (!item) throw new Error(`${kind} "${id}" not found`);
     if (kind === "scripts") item.status = "retired";
@@ -504,6 +513,7 @@ export class Catalogue {
 
   /** Bring a retired object back. */
   restore(kind: Kind, id: string): this {
+    this.memo.clear();
     const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);
     if (!item) throw new Error(`${kind} "${id}" not found`);
     if (kind === "scripts") item.status = "active";
@@ -552,23 +562,21 @@ export class Catalogue {
       if (o.referencePipe && !this.pipe(o.referencePipe)) issues.push({ kind: "outcomes", id: o.id, message: `unknown reference pipe "${o.referencePipe}"` });
     }
     for (const p of this.data.pipes) {
-      for (const i of p.inputs) if (!outcomeIds.has(i)) issues.push({ kind: "pipes", id: p.id, message: `unknown input "${i}"` });
+      for (const i of p.materials) if (!outcomeIds.has(i)) issues.push({ kind: "pipes", id: p.id, message: `unknown Material "${i}"` });
       if (!outcomeIds.has(p.output)) issues.push({ kind: "pipes", id: p.id, message: `unknown output "${p.output}"` });
-      if (p.inputs.includes(p.output)) issues.push({ kind: "pipes", id: p.id, message: "a pipe cannot consume its own output" });
+      if (p.materials.includes(p.output)) issues.push({ kind: "pipes", id: p.id, message: "a pipe cannot consume its own output" });
       if (!this.factory(p.factory)) issues.push({ kind: "pipes", id: p.id, message: `unknown factory "${p.factory}"` });
-      if (p.triggerId && !this.trigger(p.triggerId)) issues.push({ kind: "pipes", id: p.id, message: `unknown trigger "${p.triggerId}"` });
+      if (p.webhook && this.factory(p.factory)?.ours) issues.push({ kind: "pipes", id: p.id, message: "a webhook's producer is another factory" });
+      if (p.webhook && p.materials.length > 0) issues.push({ kind: "pipes", id: p.id, message: "a webhook has no internal Material" });
     }
     for (const s of this.data.scripts) {
       if (!this.pipe(s.pipeId)) issues.push({ kind: "scripts", id: s.id, message: `unknown pipe "${s.pipeId}"` });
       for (const t of Object.keys(s.tactics)) if (!this.tactic(t)) issues.push({ kind: "scripts", id: s.id, message: `unknown tactic "${t}"` });
     }
-    for (const t of this.data.triggers) {
-      for (const o of [...t.when, ...t.unless, ...(t.event ? [t.event] : [])]) if (!outcomeIds.has(o)) issues.push({ kind: "triggers", id: t.id, message: `unknown outcome "${o}"` });
-    }
     for (const s of this.data.strategies) {
       if (!this.pipe(s.pipeId)) issues.push({ kind: "strategies", id: s.id, message: `unknown pipe "${s.pipeId}"` });
       for (const r of s.rules) {
-        if (r.input && !this.pipe(s.pipeId)?.inputs.includes(r.input)) issues.push({ kind: "strategies", id: s.id, message: `"${r.input}" is not an input of ${s.pipeId}` });
+        if (r.material && !this.pipe(s.pipeId)?.materials.includes(r.material)) issues.push({ kind: "strategies", id: s.id, message: `"${r.material}" is not a Material of ${s.pipeId}` });
         for (const c of r.conditions) if (c.op !== "notReached" && !this.tactic(c.tactic)) issues.push({ kind: "strategies", id: s.id, message: `unknown tactic "${c.tactic}"` });
       }
     }
@@ -576,10 +584,3 @@ export class Catalogue {
   }
 }
 
-/** The trigger of pipes called on demand by a consuming script. */
-export const ON_DEMAND = "on_demand";
-
-/** Is this pipe called on demand (its output is produced at the consumer's input, never ahead)? */
-export function isOnDemand(pipe: Pipe): boolean {
-  return pipe.triggerId === ON_DEMAND;
-}

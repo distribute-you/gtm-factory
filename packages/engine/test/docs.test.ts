@@ -30,9 +30,9 @@ describe("docs/framework.md", () => {
     expect(doc).toContain("needs 5 meetings, the booking leg needs 12.5 interested leads, the first leg needs 625 attempts");
   });
 
-  it("budget shadow price", () => {
+  it("budget and the price of a dollar", () => {
     const r = allocateBudget([{ id: "a", valuePerDollar: 6, capacity: 300 }, { id: "b", valuePerDollar: 3, capacity: 1000 }], 500);
-    expect(doc).toContain(`is worth **${money(r.shadowPrice)}**`);
+    expect(doc).toContain(`is worth **${money(r.dollarPrice)}**`);
   });
 
   it("pooling", () => {

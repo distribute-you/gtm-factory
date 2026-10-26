@@ -1,6 +1,6 @@
 /**
- * The ledger. A run is a production order: it consumes occurrences, produces
- * occurrences and has a cost. From the runs alone the ledger answers two
+ * The ledger. A run is a production order: it consumes Units, produces
+ * Units and has a cost. From the runs alone the ledger answers two
  * different questions:
  *
  *  DECIDE (choices read this): each pipe's OWN cost per input processed and
@@ -11,16 +11,16 @@
  *  solved, abnormal loss and support stated apart.
  *
  * Money is integer cents. The to-the-cent check:
- *   sum of standard cost on occurrences (one charge per consumption)
+ *   sum of standard cost on Units (one charge per consumption)
  *   - reuse gain + spend of runs producing none = total run spend.
  */
 
 type StepKey = string;
 
-export interface LedgerOccurrence {
+export interface LedgerUnit {
   id: string;
   outcome: StepKey;
-  /** The lead or object this occurrence is about. */
+  /** The lead or object this Unit is about. */
   subject: string;
   runId: string;
   day: number;
@@ -36,9 +36,9 @@ export interface LedgerRun {
   day: number;
   /** Integer cents. */
   spendCents: number;
-  /** Ids of the occurrences this run consumed. */
+  /** Ids of the Units this run consumed. */
   consumed: string[];
-  /** Inputs processed, when they are not all consumed occurrences (a run from Start processes trials). Default: consumed count, or 1. */
+  /** Inputs processed, when they are not all consumed Units (a run from Start processes trials). Default: consumed count, or 1. */
   inputs?: number;
   /** Work for no outcome (setup, experiments...): stated apart. */
   support?: { kind: string; reason: string };
@@ -54,7 +54,7 @@ export interface LedgerRun {
 export interface PipeOwnCost {
   pipeId: string;
   spendCents: number;
-  /** Inputs processed (each run's `inputs`, else its consumed occurrences, else 1). */
+  /** Inputs processed (each run's `inputs`, else its consumed Units, else 1). */
   inputs: number;
   outputs: number;
   /** Dollars per input processed. */
@@ -78,9 +78,9 @@ export interface OutcomeUnitCost {
 
 export interface LedgerReport {
   totalSpendCents: number;
-  /** Standard cost of each occurrence (its share of its producing run), cents. */
+  /** Standard cost of each Unit (its share of its producing run), cents. */
   standardCents: Record<string, number>;
-  /** Consumptions per occurrence. */
+  /** Consumptions per Unit. */
   consumptions: Record<string, number>;
   standardChargedCents: number;
   reuseGainCents: number;
@@ -105,12 +105,12 @@ export function splitCents(totalCents: number, weights: readonly number[]): numb
   return out;
 }
 
-export function buildLedger(runs: readonly LedgerRun[], occurrences: readonly LedgerOccurrence[]): LedgerReport {
+export function buildLedger(runs: readonly LedgerRun[], units: readonly LedgerUnit[]): LedgerReport {
   const runById = new Map(runs.map((r) => [r.id, r]));
-  const occById = new Map(occurrences.map((o) => [o.id, o]));
-  const producedBy = new Map<string, LedgerOccurrence[]>();
-  for (const o of occurrences) {
-    if (!runById.has(o.runId)) throw new Error(`occurrence ${o.id} names unknown run ${o.runId}`);
+  const unitById = new Map(units.map((o) => [o.id, o]));
+  const producedBy = new Map<string, LedgerUnit[]>();
+  for (const o of units) {
+    if (!runById.has(o.runId)) throw new Error(`Unit ${o.id} names unknown run ${o.runId}`);
     producedBy.set(o.runId, [...(producedBy.get(o.runId) ?? []), o]);
   }
 
@@ -127,7 +127,7 @@ export function buildLedger(runs: readonly LedgerRun[], occurrences: readonly Le
       throw new Error(`run ${r.id}: a support or abnormal-loss run produces nothing`);
     if (new Set(produced.map((o) => o.outcome)).size > 1) throw new Error(`run ${r.id}: one run produces one outcome key`);
     for (const id of r.consumed) {
-      if (!occById.has(id)) throw new Error(`run ${r.id} consumes unknown occurrence ${id}`);
+      if (!unitById.has(id)) throw new Error(`run ${r.id} consumes unknown Unit ${id}`);
       consumptions[id] = (consumptions[id] ?? 0) + 1;
     }
     if (produced.length === 0) {
@@ -143,7 +143,7 @@ export function buildLedger(runs: readonly LedgerRun[], occurrences: readonly Le
 
   let standardChargedCents = 0;
   let reuseGainCents = 0;
-  for (const o of occurrences) {
+  for (const o of units) {
     const s = standardCents[o.id] ?? 0;
     const charges = Math.max(1, consumptions[o.id] ?? 0);
     standardChargedCents += s * charges;
@@ -171,9 +171,9 @@ export function buildLedger(runs: readonly LedgerRun[], occurrences: readonly Le
   }));
 
   // ---- REPORT: unit cost per outcome, every path ---------------------------
-  const outcomes = [...new Set([...occurrences.map((o) => o.outcome), ...runs.map((r) => r.target).filter((t): t is string => !!t)])];
+  const outcomes = [...new Set([...units.map((o) => o.outcome), ...runs.map((r) => r.target).filter((t): t is string => !!t)])];
   const produced = new Map<StepKey, number>();
-  for (const o of occurrences) produced.set(o.outcome, (produced.get(o.outcome) ?? 0) + (o.quantity ?? 1));
+  for (const o of units) produced.set(o.outcome, (produced.get(o.outcome) ?? 0) + (o.quantity ?? 1));
   const production = new Map<StepKey, number>();
   const inputCounts = new Map<StepKey, Map<StepKey, number>>();
   for (const r of runs) {
@@ -183,7 +183,7 @@ export function buildLedger(runs: readonly LedgerRun[], occurrences: readonly Le
     production.set(out, (production.get(out) ?? 0) + r.spendCents);
     const m = inputCounts.get(out) ?? new Map<StepKey, number>();
     for (const id of r.consumed) {
-      const input = occById.get(id)!.outcome;
+      const input = unitById.get(id)!.outcome;
       m.set(input, (m.get(input) ?? 0) + 1);
     }
     inputCounts.set(out, m);

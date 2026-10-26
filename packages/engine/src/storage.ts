@@ -1,7 +1,7 @@
 /**
  * Storage: one database schema per pipe. The scripts of a pipe share their
  * pipe's storage; nobody else reads or writes it. Across pipes, data moves
- * only through consumed outcome occurrences. A script receives the storage of
+ * only through consumed outcome Units. A script receives the storage of
  * its own pipe and nothing that could reach another one: there is no lookup by
  * pipe id on the interface it is handed.
  */
