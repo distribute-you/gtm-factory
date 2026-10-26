@@ -86,7 +86,7 @@ export function translateCatalogue(pub: PublicCatalogue, options: TranslateOptio
       if (!t.from) continue;
       const a = stateOf(stepByKey.get(t.from));
       const b = stateOf(stepByKey.get(t.to));
-      // The step past the state keeps its own outcome: the end of the leg, unless the end is the state itself.
+      // The step past the state keeps its own outcome: the end of the leg, except when the end is the state itself.
       if (a && a === b) apart.add(t.to !== b ? t.to : t.from);
     }
   }

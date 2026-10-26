@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { SimulationSession, convergence, hiddenBest, shareOnBest, worldFromData, type PointConvergence } from "../src";
-import { defaultWorld, worldData } from "./helpers";
+import { RETIRED, defaultWorld, worldData } from "./helpers";
 
 /** The default world, fixed seed, 60 days: shared by every test of this file. */
 let s: SimulationSession;
@@ -329,7 +329,7 @@ describe("the code knows no object by name", () => {
       const text = readFileSync(`${src}/${f}`, "utf8");
       const code = text.split("\n").filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//"));
       expect(code.join("\n"), f).not.toMatch(/["'`](template|llm|icp|audience_built|template_written|llm_completion|message_sent|follow_up)/i);
-      expect(text, f).not.toMatch(/occurrence|shadow|unless|trigger/i);
+      for (const w of RETIRED) expect(text, f).not.toMatch(w);
     }
   });
 });

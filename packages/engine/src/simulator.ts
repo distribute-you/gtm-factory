@@ -555,6 +555,7 @@ export class SimulationSession {
     this.spentToday.clear();
     const tpd = this.ticksPerDay;
     this.rate(day);
+    const order = this.campaigns().filter((c) => c.status === "running");
     for (let t = 0; t < tpd; t++) {
       this.tickIndex = day * tpd + t;
       // The daily budget is spread over the day's ticks; what a tick leaves is there for the next one.
@@ -562,8 +563,7 @@ export class SimulationSession {
       this.deliver(day);
       this.webhooks(day, t === 0);
       // All campaigns run each tick, each on its own budget.
-      for (const campaign of this.campaigns()) {
-        if (campaign.status !== "running") continue;
+      for (const campaign of order) {
         if (this.isProactive(campaign)) this.pull(campaign, day);
         else this.advanceOpen(campaign, day);
       }
