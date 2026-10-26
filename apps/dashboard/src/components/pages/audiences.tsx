@@ -35,7 +35,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
     <>
       <PageHeader
         title={<>{plural(dyns.length, o.label, o.plural ?? `${o.label}s`)} competing</>}
-        sub={`Each ${o.label} is one plain sentence, an occurrence that competes at the input that consumes it. ${forks > 0 ? `${plural(forks, "finer one was", "finer ones were")} proposed by the data and compete too.` : "The data proposes finer ones when a split proves it."}`}
+        sub={`Each ${o.label} is one plain sentence, a Unit that competes at the Material that consumes it. ${forks > 0 ? `${plural(forks, "finer one was", "finer ones were")} proposed by the data and compete too.` : "The data proposes finer ones when a split proves it."}`}
       />
       {brands.map((client) => {
         const mine = dyns.filter((d) => d.brandId === client.brand.id).sort((a, b) => b.share - a.share || b.picks - a.picks);
@@ -61,7 +61,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
                       </div>
                       <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : "Other factory"}</ToneDot>
                     </div>
-                    <ContentView model={model} occurrence={d.head} type={o.contentType} />
+                    <ContentView model={model} unit={d.head} type={o.contentType} />
                     <div className="k-inset grid grid-cols-2 divide-x divide-[var(--line-subtle)] rounded-[8px]">
                       <div className="px-3 py-2">
                         <p className="k-label">Share of picks</p>

@@ -89,9 +89,16 @@ export interface ApiRankedFunnel {
   label: "expected" | "measured";
 }
 
+/**
+ * A new Campaign orders production: its funnel names its start outcome (Start:
+ * proactive, it pulls; any other outcome: reactive, it pushes each landed Unit)
+ * and its target; it carries a daily budget and an optional volume per period.
+ */
 export interface ApiNewCampaign {
   brandId: string;
   funnelId: string;
+  /** At most this many new subjects per period. */
+  volume?: { units: number; periodDays: number } | null;
   /** Hard daily cap: no run starts once today's spend would pass it. */
   dailyBudgetCents: number;
   /** Strategy id per pipe; a pipe left out plays its default strategy. */
@@ -100,7 +107,7 @@ export interface ApiNewCampaign {
 
 export type ApiCampaignStatus = "paused" | "live";
 
-/** Count of occurrences reached, per outcome. */
+/** Count of Units reached, per outcome. */
 export type ApiOutcomeCounts = Record<OutcomeId, number>;
 
 export interface ApiCampaign {
@@ -109,8 +116,13 @@ export interface ApiCampaign {
   name: string;
   funnelId: string;
   funnelName: string;
+  /** START (the market: the campaign pulls), or the outcome whose Units it pushes. */
+  start: OutcomeId;
+  /** The outcome it orders. */
+  target: OutcomeId;
   status: ApiCampaignStatus;
   dailyBudgetCents: number;
+  volume: { units: number; periodDays: number } | null;
   spentTodayCents: number;
   spentTotalCents: number;
   /** Today's spend reached the cap: nothing more runs until tomorrow (UTC). */
@@ -138,10 +150,10 @@ export interface ApiOption {
 }
 
 export interface ApiChoicePoint {
-  /** `pipeId:input` (the consuming pipe and the input), or `pipeId` for the pipe's own script. */
+  /** `pipeId|material` (the consuming pipe and the Material), or `pipeId` for the pipe's own script. */
   id: string;
   pipeId: string;
-  input: OutcomeId | null;
+  material: OutcomeId | null;
   label: string;
   options: ApiOption[];
 }
@@ -194,7 +206,7 @@ export interface ApiOverview {
   /** The scheduler: last tick and whether it is running. */
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
   /**
-   * Sidebar pins, as data: an outcome pin lists its object dynasties (GET /objects?outcome=),
+   * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=),
    * a pipe pin its scripts (GET /scripts?pipeId=). The factory ships its own (Templates, LLMs).
    */
   pins?: Pin[];
@@ -211,7 +223,8 @@ export interface ApiCampaignDetail {
   recentRuns: ApiRun[];
 }
 
-export interface ApiOccurrence {
+/** One Unit of the ledger's stock: one piece of an outcome about one subject. */
+export interface ApiUnit {
   id: string;
   outcome: OutcomeId;
   at: string;
@@ -240,7 +253,7 @@ export interface ApiLead {
 
 export interface ApiLeadDetail {
   lead: ApiLead;
-  occurrences: ApiOccurrence[];
+  units: ApiUnit[];
   runs: ApiRun[];
   choices: ApiChoice[];
 }
@@ -251,7 +264,7 @@ export interface ApiObjectVersion {
   name: string;
   content: string;
   createdAt: string;
-  /** Head of its dynasty: what an input choosing this dynasty consumes now. */
+  /** Head of its dynasty: what a Material choosing this dynasty consumes now. */
   head: boolean;
 }
 

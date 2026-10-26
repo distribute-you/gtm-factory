@@ -1,8 +1,7 @@
 /**
- * The evidence book: what the engine has seen at every choice point, and the
- * beliefs it reads from it. One book serves a simulated world (the simulator
- * fills it as runs land) and an observed one (a shadow session fills it from a
- * snapshot): the beliefs, the pooling and the leg estimates are the same code.
+ * The evidence book: what the ledger and the traceability show at every
+ * choice point, and the beliefs the Supplier rating reads from it (the
+ * pooling, the delay censoring and the leg estimates).
  *
  * Evidence is kept in cells: per (point, option, client) and per day of the
  * decision, the decisions made (t), those that reached the end of their leg (s),
@@ -54,11 +53,6 @@ export interface EvidenceContext {
   parentOf(option: string): string | null;
   /** Half-life of evidence, days (0 or unset = never fade). */
   memoryHalfLifeDays?: number;
-  /**
-   * The evidence no longer moves (an observed snapshot): every derived figure is
-   * computed once and kept. A simulation leaves it off: its cells move during the day.
-   */
-  frozen?: boolean;
 }
 
 export interface LegEstimateRead {
@@ -74,8 +68,8 @@ export interface LegEstimateRead {
  * attempts count for the share of outcomes already due) and the measured cost
  * per attempt.
  */
-export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number): LegEstimateRead {
-  const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)));
+export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): LegEstimateRead {
+  const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)), fixedDays);
   const cohorts: Cohort[] = [];
   let attempts = 0;
   let reached = 0;
@@ -98,8 +92,8 @@ export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day
 }
 
 /** A leg's raw counts from its cohorts: attempts, reached, censoring-corrected trials, cents spent. */
-export function legCountsOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number): { attempts: number; reached: number; successes: number; trials: number; costCents: number } {
-  const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)));
+export function legCountsOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): { attempts: number; reached: number; successes: number; trials: number; costCents: number } {
+  const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)), fixedDays);
   const cohorts: Cohort[] = [];
   let attempts = 0;
   let reached = 0;
@@ -121,7 +115,7 @@ export class EvidenceBook {
   readonly pointOptions = new Map<string, Set<string>>();
   readonly optionPoints = new Map<string, Set<string>>();
   /** Mean delay and horizon from a point's decision to its leg's end. */
-  readonly pointDelay = new Map<string, { mean: number; horizon: number }>();
+  readonly pointDelay = new Map<string, { mean: number; horizon: number; fixed: number }>();
   private readonly beliefCache = new Map<string, { posterior: BetaPosterior; cost: CostBelief }>();
   private readonly baselineCache = new Map<string, { byDay: Map<number, number> }>();
 
@@ -141,9 +135,9 @@ export class EvidenceBook {
     bumpCell(this.cohorts, EvidenceBook.cellKey(point, option, brandId), day, field, by);
   }
 
-  /** A choice point offered these options, with this delay from the decision to its leg's end. */
-  offer(point: string, options: readonly string[], remDelay: number, horizon = 0): void {
-    if (!this.pointDelay.has(point)) this.pointDelay.set(point, { mean: remDelay, horizon: Math.max(horizon, Math.ceil(remDelay * 4)) });
+  /** A choice point offered these options, with this delay from the decision to its leg's end (`fixed` days of it certain). */
+  offer(point: string, options: readonly string[], remDelay: number, horizon = 0, fixed = 0): void {
+    if (!this.pointDelay.has(point)) this.pointDelay.set(point, { mean: remDelay, horizon: Math.max(horizon, Math.ceil(remDelay * 4)), fixed });
     let ps = this.pointOptions.get(point);
     if (!ps) this.pointOptions.set(point, (ps = new Set()));
     for (const o of options) {
@@ -155,8 +149,8 @@ export class EvidenceBook {
   }
 
   delayOf(point: string): DelayDistribution {
-    const d = this.pointDelay.get(point) ?? { mean: 0, horizon: 0 };
-    return geometricDelay(d.mean, Math.max(1, d.horizon));
+    const d = this.pointDelay.get(point) ?? { mean: 0, horizon: 0, fixed: 0 };
+    return geometricDelay(d.mean, Math.max(1, d.horizon), d.fixed);
   }
 
   /**
@@ -167,18 +161,8 @@ export class EvidenceBook {
    * factory was still learning is not blamed for it.
    */
   counts(point: string, option: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
-    if (!this.ctx.frozen) return this.computeCounts(point, option, brands, day, delay);
-    const key = `${point}${SEP}${option}${SEP}${day}${SEP}${brands.join(",")}`;
-    const hit = this.countsCache.get(key);
-    if (hit) return hit;
-    const v = this.computeCounts(point, option, brands, day, delay);
-    this.countsCache.set(key, v);
-    return v;
+    return this.computeCounts(point, option, brands, day, delay);
   }
-
-  private readonly countsCache = new Map<string, Counts & { cost: number; n: number }>();
-  private readonly liftCache = new Map<string, { lift: number; weight: number }>();
-  private readonly groupLiftCache = new Map<string, number>();
 
   private computeCounts(point: string, option: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
     const base = this.baselineOf(point, day, delay);
@@ -260,13 +244,7 @@ export class EvidenceBook {
 
   /** How much better than its points' average an option does everywhere it is offered (its overall level). */
   private liftOf(option: string, day: number): { lift: number; weight: number } {
-    if (!this.ctx.frozen) return this.computeLift(option, day);
-    const key = `${option}${SEP}${day}`;
-    const hit = this.liftCache.get(key);
-    if (hit) return hit;
-    const v = this.computeLift(option, day);
-    this.liftCache.set(key, v);
-    return v;
+    return this.computeLift(option, day);
   }
 
   private computeLift(option: string, day: number): { lift: number; weight: number } {
@@ -289,15 +267,12 @@ export class EvidenceBook {
 
   /** The level of every option sharing a signature (their tactic group). */
   private groupLift(sig: string, day: number): number {
-    const key = `${sig}${SEP}${day}`;
-    if (this.ctx.frozen && this.groupLiftCache.has(key)) return this.groupLiftCache.get(key)!;
     const groupOpts = [...this.optionPoints.keys()].filter((o) => this.signatureOf(o) === sig);
     const g = groupOpts.reduce((acc, o) => {
       const l = this.liftOf(o, day);
       return { s: acc.s + l.lift * l.weight, w: acc.w + l.weight };
     }, { s: 0, w: 0 });
     const v = (g.s + 2) / (g.w + 2);
-    if (this.ctx.frozen) this.groupLiftCache.set(key, v);
     return v;
   }
 

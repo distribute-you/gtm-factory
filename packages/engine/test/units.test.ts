@@ -26,9 +26,11 @@ describe("the catalogue", () => {
     expect(c.strategies.filter((s) => s.id.endsWith("#default"))).toHaveLength(c.pipes.length);
   });
 
-  it("finds where a pipe's subject comes from by walking its inputs", () => {
+  it("finds where a pipe's subject comes from by walking its subject Materials", () => {
     const c = new Catalogue(worldData().catalogue);
-    expect([...c.rootsOf(c.pipe("reply_judging")!)].sort()).toEqual(["follow_up_due", "start"]);
+    expect([...c.rootsOf(c.pipe("reply_judging")!)].sort()).toEqual(["start"]);
+    // A campaign starting from Message sent reaches the reply judge through the follow-up.
+    expect([...c.rootsOf(c.pipe("reply_judging")!, new Set(["message_sent"]))].sort()).toEqual(["message_sent", "start"]);
     expect([...c.rootsOf(c.pipe("ai_booking")!)]).toEqual(["lead_interested"]);
     expect(c.createsSubjects(c.pipe("sourcing")!)).toBe(true);
     expect(c.createsSubjects(c.pipe("llm")!)).toBe(false);
@@ -135,6 +137,6 @@ describe("the two calculations", () => {
   it("funds actions by value per dollar and prices the marginal dollar", () => {
     const r = allocateBudget([{ id: "a", valuePerDollar: 6, capacity: 300 }, { id: "b", valuePerDollar: 3, capacity: 1000 }], 500);
     expect(r.funded.map((f) => f.amount)).toEqual([300, 200]);
-    expect(r.shadowPrice).toBe(3);
+    expect(r.dollarPrice).toBe(3);
   });
 });

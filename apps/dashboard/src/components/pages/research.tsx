@@ -43,12 +43,12 @@ function Research({ model }: { model: Model }) {
             {converged} of {big} choice points back their hidden best
           </>
         }
-        sub="Every input choice, made by one prioritizer. The world hides the true best option at each input; here is how fast the engine finds it."
+        sub="Every choice, made by one prioritizer. The world hides the true best option at each Material; here is how fast the Supplier rating finds it."
         right={<span>Day {model.day}</span>}
       />
 
       {all.length === 0 ? (
-        <EmptyNote>No input choice yet. Press play.</EmptyNote>
+        <EmptyNote>No choice yet. Press play.</EmptyNote>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section>
@@ -111,7 +111,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
         <StatTile label="On the hidden best" note="last 7 days">
           <Figure value={formatRatePct(share)} tone={share != null && share >= 0.8 ? "run" : undefined} />
         </StatTile>
-        <StatTile label="First 10 days" note="the engine knew nothing">
+        <StatTile label="First 10 days" note="nothing was known yet">
           <Figure value={formatRatePct(first && first.p > 0 ? first.b / first.p : null)} tone="muted" />
         </StatTile>
         <StatTile label="Picks" note={`${campaigns.length} campaigns`}>
@@ -131,7 +131,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
             <SectionTitle count={row.options.length} right={<span>{brand}</span>}>
               {c.name}
             </SectionTitle>
-            <CardTable footer="Belief = what the engine reads today. Hidden truth = what the world really does, never read by the engine.">
+            <CardTable footer="Belief = what the Rating reads today. Hidden truth = what the world really does, never read by any choice.">
               <thead>
                 <tr className="k-line-subtle border-b">
                   <th className={TH}>Option</th>
@@ -187,14 +187,14 @@ function MultiPlugged({ model }: { model: Model }) {
   if (rows.length === 0) return null;
   return (
     <section className="mt-10">
-      <SectionTitle right={<span>The choice lives on the input, never on the provider pipe</span>}>One pipe, several inputs</SectionTitle>
+      <SectionTitle right={<span>The choice lives on the Material, never on the provider pipe</span>}>One pipe, several Materials</SectionTitle>
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((r) => (
           <div key={r.pipeId} className="k-card p-4">
             <div className="flex items-center gap-2">
               <Mark kind="pipe" id={r.pipeId} icon={model.catalogue.pipe(r.pipeId)?.icon} size={28} />
               <span className="text-[14px] font-medium">{pipeName(model.catalogue, r.pipeId)}</span>
-              <span className="k-fg3 ml-auto text-[12px]">plugged at {r.inputs.length} inputs</span>
+              <span className="k-fg3 ml-auto text-[12px]">plugged at {r.inputs.length} Materials</span>
             </div>
             <div className="k-inset mt-3 divide-y divide-[var(--line-subtle)] rounded-[8px]">
               {r.inputs.map((i) => (
@@ -212,7 +212,7 @@ function MultiPlugged({ model }: { model: Model }) {
   );
 }
 
-/** Strategies the split mechanism proposed from the tactics of the scripts picked at an input. */
+/** Strategies the split mechanism proposed from the tactics of the scripts picked at a Material. */
 function ProposedStrategies({ model }: { model: Model }) {
   const proposals = model.session.proposals.filter((p) => p.kind === "strategy" && p.point);
   return (

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CaretDownIcon, CheckIcon, LightningIcon } from "@phosphor-icons/react";
-import { defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
+import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
+import { START, defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
 import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
@@ -34,12 +34,12 @@ export function CampaignsPage() {
 function CampaignList({ model, scope }: { model: Model; scope: string | null }) {
   const campaigns = scopedCampaigns(model, scope);
   const running = campaigns.filter((c) => c.status === "running").length;
-  const reactive = campaigns.filter((c) => c.entry.kind === "trigger").length;
+  const reactive = campaigns.filter((c) => c.start !== START).length;
   return (
     <>
       <PageHeader
         title={`${running} of ${plural(campaigns.length, "campaign", "campaigns")} running`}
-        sub={`Each one is a sales funnel: a straight line of lead states, one play per leg. ${plural(reactive, "campaign starts", "campaigns start")} on a trigger instead of the market.`}
+        sub={`A campaign orders production: a target, a daily budget and a start outcome. Started from the market it pulls on its target each tick; ${plural(reactive, "campaign starts", "campaigns start")} from an outcome and pushes each of its Units.`}
         right={
           <Link href="/campaigns/new/" className="k-btn-strong">
             New campaign
@@ -50,7 +50,8 @@ function CampaignList({ model, scope }: { model: Model; scope: string | null }) 
         <thead>
           <tr className="k-line-subtle border-b">
             <th className={TH}>Campaign</th>
-            <th className={TH}>Type</th>
+            <th className={TH}>Start</th>
+            <th className={TH}>Target</th>
             <th className={`${TH} text-right`}>
               <RoiLabel>Expected ROI</RoiLabel>
             </th>
@@ -69,7 +70,7 @@ function CampaignList({ model, scope }: { model: Model; scope: string | null }) 
           ))}
           {campaigns.length === 0 && (
             <tr>
-              <td colSpan={8}>
+              <td colSpan={9}>
                 <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>
               </td>
             </tr>
@@ -83,12 +84,11 @@ function CampaignList({ model, scope }: { model: Model; scope: string | null }) 
 function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) {
   const e = model.session.economics(campaign.id);
   const brand = model.clients.find((x) => x.brand.id === campaign.brandId)?.brand.name;
-  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
   return (
     <tr className="k-row k-line-subtle border-b last:border-b-0">
       <td className={`${TD} max-w-[460px]`}>
         <Link href={campaignHref(campaign.id)} className="flex min-w-0 items-start gap-2.5">
-          {trigger ? <Mark kind="trigger" id={trigger.id} size={34} /> : <Mark kind="funnel" id={campaign.id} size={34} />}
+          <Mark kind="funnel" id={campaign.id} size={34} />
           <span className="min-w-0">
             <span className="block truncate font-medium">{campaign.name}</span>
             <span className="k-fg3 block truncate text-[12px]">{brand}</span>
@@ -99,14 +99,10 @@ function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) 
         </Link>
       </td>
       <td className={TD}>
-        {trigger ? (
-          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px]">
-            <LightningIcon size={13} weight="fill" className="text-[var(--data-amber)]" />
-            {trigger.label}
-          </span>
-        ) : (
-          <span className="k-fg2 text-[12px]">Daily</span>
-        )}
+        <span className="k-fg2 whitespace-nowrap text-[12px]">{campaign.start === START ? "Start: pulls" : `${outcomeLabel(model.catalogue, campaign.start)}: pushes`}</span>
+      </td>
+      <td className={TD}>
+        <span className="k-fg2 whitespace-nowrap text-[12px]">{outcomeLabel(model.catalogue, targetOf(campaign))}</span>
       </td>
       <td className={TDN}>
         <RoiWithRange value={e.expected.value} low={e.expected.low} high={e.expected.high} />
@@ -127,7 +123,7 @@ function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) 
       <td className={TD}>
         <span className="flex flex-col gap-0.5">
           <StateDot running={campaign.status === "running"} />
-          <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{campaign.entry.kind === "trigger" ? "Up to " : ""}{formatCents(campaign.dailyBudgetCents)}/day</span>
+          <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{formatCents(campaign.dailyBudgetCents)}/day</span>
         </span>
       </td>
     </tr>
@@ -169,12 +165,12 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
   const legs = campaignLegs(model, campaign);
   const points = pointsOf(model, campaign);
   const brand = model.clients.find((x) => x.brand.id === campaign.brandId)?.brand.name;
-  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
   const target = targetOf(campaign);
+  const proactive = campaign.start === START;
   return (
     <>
       <div className="mb-6 flex flex-wrap items-start gap-3">
-        {trigger ? <Mark kind="trigger" id={trigger.id} size={40} /> : <Mark kind="funnel" id={campaign.id} size={40} />}
+        <Mark kind="funnel" id={campaign.id} size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="text-[24px] font-medium leading-8 tracking-[-0.02em]">{campaign.name}</h1>
           <p className="k-fg2 text-[13px]">
@@ -186,6 +182,27 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
           <StatusControl model={model} campaign={campaign} />
           <BudgetControl campaign={campaign} />
         </div>
+      </div>
+
+      <div className="k-card mb-6 grid grid-cols-1 divide-y divide-[var(--line-subtle)] sm:grid-cols-3 sm:divide-x sm:divide-y-0" data-testid="campaign-order">
+        <Kpi label="Start outcome">
+          <span className="flex flex-col gap-1">
+            <OutcomeChip model={model} outcome={campaign.start} size={16} />
+            <span className="k-fg3 text-[12px] font-normal">{proactive ? "Proactive: pulls on its target at each tick" : "Reactive: pushes each Unit that lands into its first pipe"}</span>
+          </span>
+        </Kpi>
+        <Kpi label="Target">
+          <span className="flex flex-col gap-1">
+            <OutcomeChip model={model} outcome={target} size={16} />
+            <span className="k-fg3 text-[12px] font-normal">Worth {formatUsd(e.targetValue)} each</span>
+          </span>
+        </Kpi>
+        <Kpi label="Daily budget">
+          <span className="flex flex-col gap-1">
+            <span>{formatCents(campaign.dailyBudgetCents)}</span>
+            <span className="k-fg3 text-[12px] font-normal">{campaign.volume ? `At most ${formatCount(campaign.volume.units)} new subjects per ${plural(campaign.volume.periodDays, "day", "days")}` : "No volume limit"}</span>
+          </span>
+        </Kpi>
       </div>
 
       <div className="k-card mb-6 px-4 py-3">
@@ -264,8 +281,8 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
       <Plays model={model} campaign={campaign} />
 
       <section className="mb-8">
-        <SectionTitle count={points.length} right={<span>In the order the engine decides them for each subject</span>}>
-          Input choices
+        <SectionTitle count={points.length} right={<span>In the order they are made for each subject</span>}>
+          Choices at each Material
         </SectionTitle>
         {points.length === 0 ? (
           <div className="k-card">
@@ -280,7 +297,7 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         )}
       </section>
 
-      {trigger && <TriggerFeed model={model} campaign={campaign} />}
+      {!proactive && <PushFeed model={model} campaign={campaign} />}
 
       <div className="mt-8">
         <WhyFeed model={model} campaignIds={new Set([campaign.id])} limit={10} />
@@ -339,7 +356,7 @@ function BudgetControl({ campaign }: { campaign: Campaign }) {
   return (
     <>
       <button type="button" className="k-btn tabular-nums" onClick={() => setOpen(true)}>
-        {campaign.entry.kind === "trigger" ? "Up to " : ""}
+
         {formatCents(campaign.dailyBudgetCents)}/day
         <CaretDownIcon size={11} className="k-fg3" />
       </button>
@@ -469,7 +486,7 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
           <>
             {chosen.rules.map((r, i) => (
               <p key={i} className="text-[12px]">
-                <span className="k-fg3">{r.input ? `At ${outcomeLabel(model.catalogue, r.input).toLowerCase()}: ` : "Its own scripts: "}</span>
+                <span className="k-fg3">{r.material ? `At ${outcomeLabel(model.catalogue, r.material).toLowerCase()}: ` : "Its own scripts: "}</span>
                 {r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}
               </p>
             ))}
@@ -482,7 +499,7 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
             {chosen.proposed && <p className="k-fg3 text-[12px]">Proposed by a split on day {chosen.proposed.day}: {chosen.proposed.reason}.</p>}
           </>
         ) : (
-          <p className="k-fg3 text-[12px]">No condition: every script competes at every input.</p>
+          <p className="k-fg3 text-[12px]">No condition: every script competes at every Material.</p>
         )}
       </div>
     </div>
@@ -563,30 +580,27 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
   );
 }
 
-/** The trigger events that opened attempts of a reactive campaign. */
-function TriggerFeed({ model, campaign }: { model: Model; campaign: Campaign }) {
-  const events = model.session.triggerEvents.filter((e) => e.campaignIds.includes(campaign.id));
-  const trigger = campaign.entry.kind === "trigger" ? model.catalogue.trigger(campaign.entry.triggerId) : null;
-  const recent = events.slice(-8).reverse();
+/** The Units a reactive campaign pushed into its first pipe, newest first. */
+function PushFeed({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const pushes = model.session.pushes.filter((p) => p.campaignId === campaign.id);
+  const recent = pushes.slice(-8).reverse();
+  const start = outcomeLabel(model.catalogue, campaign.start).toLowerCase();
   return (
     <section className="mb-8">
-      <SectionTitle count={events.length}>Trigger events</SectionTitle>
+      <SectionTitle count={pushes.length}>Units pushed</SectionTitle>
       <div className="k-card p-4">
-        {trigger && (
-          <p className="k-fg2 mb-3 text-[13px]">
-            When {trigger.when.map((w) => outcomeLabel(model.catalogue, w).toLowerCase()).join(" or ")} is reached, after {plural(trigger.delayDays, "day", "days")}
-            {trigger.unless.length ? `, unless ${trigger.unless.map((u) => outcomeLabel(model.catalogue, u).toLowerCase()).join(" or ")} came meanwhile` : ""}: an event, then this campaign runs its funnel on that lead.
-          </p>
-        )}
+        <p className="k-fg2 mb-3 text-[13px]">
+          Each {start} that lands for this brand goes into the campaign&apos;s first pipe, as far as the daily budget allows. The scripts decide when to run: a follow-up waits its days since the last message.
+        </p>
         {recent.length === 0 ? (
-          <p className="k-fg3 text-[13px]">No event yet. Press play.</p>
+          <p className="k-fg3 text-[13px]">Nothing pushed yet. Press play.</p>
         ) : (
           <div className="divide-y divide-[var(--line-subtle)]">
-            {recent.map((ev) => (
-              <Link key={ev.occurrenceId} href={`/leads/view/?id=${encodeURIComponent(ev.subject)}`} className="k-hover flex items-center gap-3 py-2">
-                <Mark kind="trigger" id={ev.triggerId} size={20} />
-                <span className="min-w-0 flex-1 truncate text-[13px]">{ev.subject}</span>
-                <span className="k-mono k-fg3 text-[12px]">Day {ev.day}</span>
+            {recent.map((p) => (
+              <Link key={p.unitId} href={`/leads/view/?id=${encodeURIComponent(p.subject)}`} className="k-hover flex items-center gap-3 py-2">
+                <Mark kind="outcome" id={campaign.start} icon={model.catalogue.outcome(campaign.start)?.icon} size={20} />
+                <span className="min-w-0 flex-1 truncate text-[13px]">{p.subject}</span>
+                <span className="k-mono k-fg3 text-[12px]">Day {p.day}</span>
               </Link>
             ))}
           </div>

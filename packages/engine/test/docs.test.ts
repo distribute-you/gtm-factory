@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { allocateBudget, buildLedger, censoredCounts, chainCostPerTarget, costForwardLine, legBreakdown, pooledEstimate, valueBackwardLine } from "../src";
+import { acmeSession } from "./acme";
+import { RETIRED } from "./helpers";
 
 const doc = readFileSync(fileURLToPath(new URL("../../../docs/framework.md", import.meta.url)), "utf8");
 const money = (raw: number) => {
@@ -13,8 +15,40 @@ const pct = (x: number, digits: number) => `${(x * 100).toFixed(digits)}%`;
 describe("docs/framework.md", () => {
   it("has no em or en dash and none of the retired words", () => {
     expect(doc).not.toMatch(/[–—]/);
-    for (const w of [/workflow/i, /lineage/i, /reporter/i, /dimension/i, /credence/i, /internal pipe/i, /\bsettings?\b/i, /\bagency\b/i]) expect(doc).not.toMatch(w);
+    for (const w of [/workflow/i, /lineage/i, /reporter/i, /dimension/i, /credence/i, /internal pipe/i, /\bsettings?\b/i, /\bagency\b/i, ...RETIRED, /on demand/i, /\binputs?\b/i, /the engine/i]) expect(doc).not.toMatch(w);
   });
+
+  it("defines every object of the model", () => {
+    for (const o of ["Outcome", "Unit", "Lead track", "Pipe", "Bill of materials", "Script", "Run", "Specification", "Campaign", "Factory"]) expect(doc).toContain(`| **${o}** |`);
+    expect(doc).toContain("**Material**");
+    expect(doc).toMatch(/\*\*Specification\*\* \| New generic object\./);
+    for (const w of ["`pull(specification, quantity, budget)`", "`push(unit, budget)`", "**Supplier rating**", "**Rating**", "**webhook**", "**proactive**", "**reactive**", "## 4. The ledger is the common stock"]) expect(doc).toContain(w);
+  });
+
+  it("the worked pull: Acme orders Meetings booked with $10 a day", () => {
+    const s = acmeSession(12);
+    const c = s.campaigns()[0]!;
+    expect(c.dailyBudgetCents).toBe(1000);
+    expect(doc).toContain("a daily budget of $10 and 20 new subjects a day");
+    // Paul, the first lead: each Unit of his chain lands one tick after the run that made it.
+    const booked = s.units.find((u) => u.outcome === "meeting_booked")!;
+    const chain: Record<string, number> = {};
+    for (let u: (typeof s.units)[number] | undefined = booked; u; ) {
+      chain[u.outcome] = u.day;
+      const subject: [string, string] | undefined = Object.entries(u.materials).find(([o]) => s.catalogue.outcome(o)?.subject === "lead");
+      u = subject ? s.unit(subject[1]) : undefined;
+    }
+    expect(doc).toContain(`Paul's Lead found lands at tick **${chain.lead_found}**`);
+    expect(doc).toContain(`his Lead identified lands at tick **${chain.lead_identified}**`);
+    expect(doc).toContain(`his Verified email lands at tick **${chain.email_found}**`);
+    expect(doc).toContain(`his Meeting booked lands at tick **${chain.meeting_booked}**`);
+    expect(doc).toContain(`Acme spends **${money(s.days[3]!.spendCents[c.id]! / 100)}** that tick`);
+    const writers = s.runs.filter((r) => r.pipeId === "writer");
+    expect(s.units.filter((u) => u.outcome === "brand_context")).toHaveLength(1);
+    expect(doc).toContain(`One Brand context was made for **${writers.length}** messages`);
+    const researched = s.units.filter((u) => u.outcome === "company_researched").length;
+    expect(doc).toContain(`**${researched}** Company researched Units served **${writers.length}** messages`);
+  }, 60_000);
 
   it("two calculations", () => {
     const legs = [
@@ -30,9 +64,9 @@ describe("docs/framework.md", () => {
     expect(doc).toContain("needs 5 meetings, the booking leg needs 12.5 interested leads, the first leg needs 625 attempts");
   });
 
-  it("budget shadow price", () => {
+  it("budget and the price of a dollar", () => {
     const r = allocateBudget([{ id: "a", valuePerDollar: 6, capacity: 300 }, { id: "b", valuePerDollar: 3, capacity: 1000 }], 500);
-    expect(doc).toContain(`is worth **${money(r.shadowPrice)}**`);
+    expect(doc).toContain(`is worth **${money(r.dollarPrice)}**`);
   });
 
   it("pooling", () => {

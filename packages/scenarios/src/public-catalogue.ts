@@ -2,8 +2,11 @@
  * distribute.you's public catalogue, as its identity-free reads serve it
  * (features-service `GET /public/channels` and `GET /public/catalogue/steps`),
  * kept to the catalogue fields only. `stripPublicReads` drops every figure that
- * is a production rate, a fleet statistic or a price, and renames every
- * channel the catalogue calls "agency-*" to "managed-*".
+ * is a production rate, a fleet statistic or a price, renames every channel
+ * the catalogue calls "agency-*" to "managed-*", and states what each
+ * reactive leg consumes in the framework's words: the steps its pipe consumes
+ * (a fact another system reports is one of them) and how many days its
+ * scripts wait after the Unit they consume landed.
  */
 
 export interface PublicStep {
@@ -27,7 +30,10 @@ export interface PublicTransition {
   from: string | null;
   to: string;
   mode: "proactive" | "reactive";
-  triggerId: string | null;
+  /** For a reactive leg: the steps (or reported facts) its pipe consumes besides `from`; several = any one of them. */
+  consumes: string[];
+  /** For a reactive leg that waits: the days its scripts wait after the Unit they consume landed. */
+  waitDays: number | null;
   pipe: { id: string; name: string; icon: string | null; color: string | null } | null;
 }
 
@@ -62,17 +68,13 @@ export interface PublicFunnel {
   steps: string[];
 }
 
-export interface PublicTrigger {
+/** A fact another system reports (a hot lead, a number given), that a reactive leg consumes. */
+export interface PublicFact {
   id: string;
   label: string;
   description: string | null;
   icon: string | null;
-  fromStep: string | null;
-  firedBy: string | null;
-  kind: string | null;
-  type: string | null;
-  outcomeKey: string | null;
-  params: Record<string, unknown> | null;
+  reportedBy: string | null;
 }
 
 export interface PublicCatalogue {
@@ -82,7 +84,7 @@ export interface PublicCatalogue {
   channels: PublicChannel[];
   legs: PublicLeg[];
   funnels: PublicFunnel[];
-  triggers: PublicTrigger[];
+  facts: PublicFact[];
   /** Legacy leg keys and the served spelling they map to (per channel type). */
   legKeyCorrespondence: { channelType: string; legacyLegKey: string; legKey: string }[];
 }
@@ -108,6 +110,31 @@ function keyOf(x: unknown): string | null {
 }
 
 /**
+ * What a reactive leg of the public read consumes, from the reaction it names
+ * (the read's own field): the step reached, the step a delay counts from (and
+ * the delay, in days), the steps of an "any of", or a fact another system
+ * reports. A condition the read attaches to a delay is dropped: who is never
+ * served is a strategy's choice, never a rule of the leg.
+ */
+function reactionsOf(read: Json[]): { consumesOf(id: string | null): { consumes: string[]; waitDays: number | null }; facts: PublicFact[] } {
+  const byId = new Map(read.map((r) => [String(r.id), r]));
+  const facts = new Map<string, PublicFact>();
+  const consumesOf = (id: string | null, seen = new Set<string>()): { consumes: string[]; waitDays: number | null } => {
+    const r = id ? byId.get(id) : undefined;
+    if (!id || !r || seen.has(id)) return { consumes: [], waitDays: null };
+    seen.add(id);
+    const params = (r.params && typeof r.params === "object" ? r.params : {}) as Json;
+    if (r.type === "outcome" && typeof r.outcomeKey === "string") return { consumes: [r.outcomeKey], waitDays: null };
+    if (r.kind === "delay" && typeof params.afterStep === "string") return { consumes: [params.afterStep], waitDays: Math.round((Number(params.minutes ?? 0) / 1440) * 10000) / 10000 };
+    if (r.kind === "any_of" && Array.isArray(params.memberTriggerIds)) return { consumes: [...new Set((params.memberTriggerIds as string[]).flatMap((m) => consumesOf(m, seen).consumes))], waitDays: null };
+    const fid = `fact:${id}`;
+    facts.set(fid, { id: fid, label: String(r.label), description: str(r.description), icon: str(r.icon), reportedBy: str(params.reportedBy) });
+    return { consumes: [fid], waitDays: null };
+  };
+  return { consumesOf, facts: [...facts.values()] };
+}
+
+/**
  * Keep the catalogue fields of the two public reads, nothing else: no rate, no
  * count, no cost, no price, no delivery or booking statistic.
  */
@@ -129,6 +156,7 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     if (d) descriptions.set(String(s.key), d);
   }
   for (const s of steps) s.description = descriptions.get(s.key) ?? null;
+  const reactions = reactionsOf((channelsRead.triggers as Json[]) ?? []);
   const channels: PublicChannel[] = ((channelsRead.channels as Json[]) ?? []).map((c) => ({
     slug: renameAgency(String(c.slug)),
     name: renameAgency(String(c.name)),
@@ -142,12 +170,15 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     managed: c.managed === true,
     transitions: ((c.stepTransitions as Json[]) ?? []).map((t) => {
       const pipe = t.pipe as Json | null;
+      const reactive = t.mode === "reactive";
+      const r = reactive ? reactions.consumesOf(str(t.triggerId)) : { consumes: [], waitDays: null };
       return {
         legKey: String(t.legKey),
         from: keyOf(t.from),
         to: keyOf(t.to)!,
-        mode: t.mode === "reactive" ? "reactive" : "proactive",
-        triggerId: str(t.triggerId),
+        mode: reactive ? "reactive" : "proactive",
+        consumes: r.consumes,
+        waitDays: r.waitDays,
         pipe: pipe ? { id: renameAgency(String(pipe.id)), name: String(pipe.name), icon: str(pipe.icon), color: str(pipe.color) } : null,
       };
     }),
@@ -170,18 +201,7 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     entryLegKey: str(f.entryLegKey),
     steps: ((f.steps as string[]) ?? []).slice(),
   }));
-  const triggers: PublicTrigger[] = ((channelsRead.triggers as Json[]) ?? []).map((t) => ({
-    id: String(t.id),
-    label: String(t.label),
-    description: str(t.description),
-    icon: str(t.icon),
-    fromStep: str(t.fromStep),
-    firedBy: str(t.firedBy),
-    kind: str(t.kind),
-    type: str(t.type),
-    outcomeKey: str(t.outcomeKey),
-    params: t.params && typeof t.params === "object" ? (t.params as Record<string, unknown>) : null,
-  }));
   const legKeyCorrespondence = ((channelsRead.legKeyCorrespondence as Json[]) ?? []).map((x) => ({ channelType: String(x.channelType), legacyLegKey: String(x.legacyLegKey), legKey: String(x.legKey) }));
-  return { source: meta.source, readAt: meta.readAt, steps, channels, legs, funnels, triggers, legKeyCorrespondence };
+  const facts = [...reactions.facts].sort((a, b) => (a.id < b.id ? -1 : 1));
+  return { source: meta.source, readAt: meta.readAt, steps, channels, legs, funnels, facts, legKeyCorrespondence };
 }

@@ -15,8 +15,9 @@ describe("distribute.you's public catalogue in the framework's model", () => {
     let legs = 0;
     for (const c of PUB.channels) for (const tr of c.transitions) {
       legs++;
-      const pipe = t.pipeOf(c.slug, tr.legKey);
-      expect(pipe && ids.has(pipe)).toBe(true);
+      const pipes = t.pipesOf(c.slug, tr.legKey);
+      expect(pipes.length).toBeGreaterThan(0);
+      for (const pipe of pipes) expect(ids.has(pipe)).toBe(true);
     }
     expect(legs).toBeGreaterThan(80);
     expect(t.catalogue.pipes.length).toBeLessThan(legs / 2);
@@ -24,10 +25,10 @@ describe("distribute.you's public catalogue in the framework's model", () => {
     expect(channel.type).toEqual({ kind: "list", values: expect.arrayContaining(PUB.channels.map((c) => c.name)) });
     expect(new Catalogue(t.catalogue).validate()).toEqual([]);
     const world = buildDistributeWorld(PUB);
-    for (const s of world.catalogue.scripts.filter((x) => !["llm", "template_writing", "icp_client", "icp_finder"].includes(x.pipeId))) expect(typeof s.tactics.channel).toBe("string");
+    for (const s of world.catalogue.scripts.filter((x) => !["llm", "template_writing", "icp_client", "icp_finder", "supplier_rating"].includes(x.pipeId))) expect(typeof s.tactics.channel).toBe("string");
   });
 
-  test("lead states are tracks; evidence steps are their state unless a pipe would loop on it", () => {
+  test("lead states are tracks; evidence steps are their state, except where a pipe would loop on it", () => {
     const t = translateCatalogue(PUB);
     expect(t.outcomeOfStep("conversation")).toBe("lead_interested");
     expect(t.outcomeOfStep("signup")).toBe("lead_interested");
@@ -36,7 +37,21 @@ describe("distribute.you's public catalogue in the framework's model", () => {
     expect(t.outcomeOfStep("purchase")).toBe("purchase");
     const tracked = t.catalogue.outcomes.filter((o) => o.track).map((o) => o.id).sort();
     expect(tracked).toEqual(["lead_interested", "lead_visited", "meeting_attended", "meeting_booked", "paid_client"]);
-    for (const p of t.catalogue.pipes) expect(p.inputs).not.toContain(p.output);
+    for (const p of t.catalogue.pipes) expect(p.materials).not.toContain(p.output);
+  });
+
+  test("a reactive leg consumes what it reacts to; a delay is its scripts' waiting; a reported fact is a webhook's outcome", () => {
+    const t = translateCatalogue(PUB);
+    // Cold WhatsApp reacts to a number another system reports: that fact is in its pipe's Bill of materials.
+    const wa = PUB.channels.find((c) => c.slug === "cold-whatsapp-outreach")!;
+    const given = t.pipesOf(wa.slug, wa.transitions.find((x) => x.consumes.includes("fact:whatsapp_number_given"))!.legKey);
+    expect(given.map((id) => t.catalogue.pipes.find((p) => p.id === id)!.materials[0])).toEqual(["fact:whatsapp_number_given"]);
+    const follow = PUB.channels.find((c) => c.slug === "ai-follow-up-email")!;
+    const delayed = follow.transitions.find((x) => x.from === "website_visit" && x.to === "signup")!;
+    expect(t.waitOf(follow.slug, delayed.legKey)).toBeCloseTo(30 / 1440, 3);
+    const hot = t.catalogue.outcomes.find((o) => o.id === "fact:hot_lead")!;
+    expect(hot.subject).toBe("lead");
+    expect(t.catalogue.pipes.find((p) => p.output === hot.id)!.webhook).toBe(true);
   });
 
   test("no production figure, no price and never the word agency", () => {
@@ -56,7 +71,7 @@ describe("distribute.you's public catalogue in the framework's model", () => {
     const s = new SimulationSession(world);
     s.run(30);
     for (const c of s.campaigns()) {
-      if (c.entry.kind !== "start") continue;
+      if (c.start !== "start") continue;
       expect(s.spentCents(c.id)).toBeGreaterThan(0);
       const reached = s.days.reduce((n, d) => n + (d.outcomes[c.id]?.[c.line[0]!] ?? 0), 0);
       expect(reached).toBeGreaterThan(0);

@@ -1,16 +1,52 @@
 "use client";
 
 /**
- * Shared catalogue pieces, all read off data: a script's card and provider logo, one renderer
- * per content type of an object outcome, and the version editor (read, edit = new version,
- * compare two versions). No piece knows an outcome, a pipe or a script by name.
+ * Shared catalogue pieces, all read off data: a script's card and provider logo, a pipe's Bill of
+ * materials, one renderer per content type of a brand outcome, and the version editor (read, edit =
+ * new version, compare two versions). No piece knows an outcome, a pipe or a script by name.
  */
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { describeCondition, type Catalogue, type ContentType, type Occurrence, type Script } from "@gtm-factory/engine";
+import { describeCondition, type Catalogue, type ContentType, type Pipe, type Unit, type Script } from "@gtm-factory/engine";
 import { Mark } from "./mark";
-import { diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
+import { billOfMaterials, diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
+
+/**
+ * A pipe's Bill of materials: the outcomes it consumes per Unit produced, one line per Material,
+ * with the pipes producing each (they share one stock) and the choice made among them.
+ */
+export function BillOfMaterials({ model, pipe }: { model: Model; pipe: Pipe }) {
+  const rows = billOfMaterials(model, pipe);
+  if (rows.length === 0)
+    return <p className="k-fg3 text-[13px]">{pipe.webhook ? "No Material: another factory calls its webhook." : "No Material: it draws its subjects from the market."}</p>;
+  return (
+    <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]" data-testid="bill-of-materials">
+      {rows.map((r) => (
+        <div key={r.material} className="flex items-start gap-2.5 px-3 py-2 text-[13px]">
+          <Mark kind="outcome" id={r.material} icon={model.catalogue.outcome(r.material)?.icon} size={20} />
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5">
+              <span className="font-medium">{r.label}</span>
+              {r.subject && <span className="k-chip">Subject</span>}
+            </p>
+            <p className="k-fg3 text-[12px]">{r.how}</p>
+            <p className="k-fg2 truncate text-[12px]">{r.producers.length ? `Made by ${r.producers.map((p) => p.name).join(", ")}` : "Made by no pipe yet"}</p>
+          </div>
+          {r.point ? (
+            <Link href={`/research/?point=${encodeURIComponent(r.point)}`} className="shrink-0 text-right hover:underline">
+              <span className="k-fg3 block text-[11px]">Chosen</span>
+              <span className="block max-w-[160px] truncate text-[12px] font-medium">{r.choice ?? "—"}</span>
+            </Link>
+          ) : (
+            <span className="k-fg4 shrink-0 text-[12px]">No choice</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** A script's provider, as its logo: an image when the data serves one, else its initials in its colour. */
 export function ProviderLogo({ script, size = 20 }: { script: Script; size?: number }) {
@@ -96,15 +132,15 @@ export function tacticValueText(catalogue: Catalogue, tactic: string, value: unk
 }
 
 /** One renderer per content type: the same view for every outcome holding that type. */
-export function ContentView({ model, occurrence, type }: { model: Model; occurrence: Occurrence; type: ContentType | undefined }) {
-  const text = occurrence.text ?? "";
+export function ContentView({ model, unit, type }: { model: Model; unit: Unit; type: ContentType | undefined }) {
+  const text = unit.text ?? "";
   if (type === "text_with_variables") return <TextWithVariables text={text} />;
   if (type === "audience")
     return (
       <div className="space-y-2">
         <p className="text-[14px] leading-6">{text}</p>
         <div className="flex flex-wrap gap-1">
-          {(occurrence.conditions ?? []).map((c, i) => (
+          {(unit.conditions ?? []).map((c, i) => (
             <span key={i} className="k-chip">
               {describeCondition(c, model.catalogue)}
             </span>
@@ -168,7 +204,7 @@ export function VersionDiff({ from, to }: { from: string; to: string }) {
 
 /**
  * Read, edit and compare the versions of one object dynasty. Saving an edit makes a new
- * version: the input choices keep the dynasty and serve its new head from the next run.
+ * version: the choices keep the dynasty and serve its new head from the next run.
  */
 export function VersionEditor({
   model,
@@ -177,7 +213,7 @@ export function VersionEditor({
   onSave,
 }: {
   model: Model;
-  versions: Occurrence[];
+  versions: Unit[];
   type: ContentType | undefined;
   onSave?: (text: string) => string | null;
 }) {
@@ -216,7 +252,7 @@ export function VersionEditor({
           {versions.length} {versions.length === 1 ? "version" : "versions"} · made by {headScript(model.catalogue, model.catalogue.script(head.scriptId ?? "")?.dynasty ?? "")?.name ?? "a script"}
         </span>
       </div>
-      {mode === "read" && <ContentView model={model} occurrence={head} type={type} />}
+      {mode === "read" && <ContentView model={model} unit={head} type={type} />}
       {mode === "edit" && (
         <div className="space-y-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className="k-input w-full resize-y py-2 leading-6" style={{ font: "inherit", height: "auto" }} aria-label="New version" />
@@ -264,7 +300,7 @@ export function VersionEditor({
   );
 }
 
-function VersionPick({ versions, value, onChange }: { versions: Occurrence[]; value: number; onChange: (i: number) => void }) {
+function VersionPick({ versions, value, onChange }: { versions: Unit[]; value: number; onChange: (i: number) => void }) {
   return (
     <select className="k-input px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="Version">
       {versions.map((v, i) => (

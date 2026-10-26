@@ -166,7 +166,7 @@ export function ApiNewBrandPage() {
             <Field label="Who it sells to" hint="One plain sentence. Example: heads of sales at US software companies with 50 to 500 people.">
               <textarea className="k-input min-h-[56px] w-full py-1.5" style={{ font: "inherit", height: "auto" }} value={icp} onChange={(e) => setIcp(e.target.value)} />
             </Field>
-            <Field label="Lifetime revenue of one client (optional)" hint="In dollars. The engine values a paid client at this amount.">
+            <Field label="Lifetime revenue of one client (optional)" hint="In dollars. A paid client is valued at this amount.">
               <label className="k-input flex w-48 items-center gap-1 px-2">
                 <span className="k-fg3">$</span>
                 <input className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={ltv} onChange={(e) => setLtv(e.target.value.replace(/[^0-9.]/g, ""))} />

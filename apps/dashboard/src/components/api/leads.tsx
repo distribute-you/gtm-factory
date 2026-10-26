@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import type { ApiChoice, ApiLead, ApiLeadDetail, ApiOccurrence, CatalogueData } from "@gtm-factory/engine";
+import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/engine";
 import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, useApi } from "@/lib/api/client";
@@ -152,15 +152,15 @@ function Lead({ d, catalogue, campaignName }: { d: ApiLeadDetail; catalogue: Cat
         </div>
 
         <section>
-          <SectionTitle count={d.occurrences.length}>Timeline</SectionTitle>
-          {d.occurrences.length === 0 ? (
+          <SectionTitle count={d.units.length}>Timeline</SectionTitle>
+          {d.units.length === 0 ? (
             <div className="k-card">
               <EmptyNote>Nothing reached yet.</EmptyNote>
             </div>
           ) : (
             <ol className="space-y-2">
-              {d.occurrences.map((oc) => (
-                <OccurrenceCard key={oc.id} oc={oc} catalogue={catalogue} choiceById={choiceById} />
+              {d.units.map((oc) => (
+                <UnitCard key={oc.id} oc={oc} catalogue={catalogue} choiceById={choiceById} />
               ))}
             </ol>
           )}
@@ -237,7 +237,7 @@ function ReportPaid({ leadId, done }: { leadId: string; done: boolean }) {
   );
 }
 
-function OccurrenceCard({ oc, catalogue, choiceById }: { oc: ApiOccurrence; catalogue: CatalogueData | undefined; choiceById: Map<string, ApiChoice> }) {
+function UnitCard({ oc, catalogue, choiceById }: { oc: ApiUnit; catalogue: CatalogueData | undefined; choiceById: Map<string, ApiChoice> }) {
   return (
     <li className="k-card p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -264,7 +264,7 @@ function OccurrenceCard({ oc, catalogue, choiceById }: { oc: ApiOccurrence; cata
   );
 }
 
-/** What an occurrence holds, shown as is: a subject and a body as an email, text as text, other fields as a list. */
+/** What a Unit holds, shown as is: a subject and a body as an email, text as text, other fields as a list. */
 function Content({ content }: { content: Record<string, unknown> }) {
   const { subject, body, text, ...rest } = content as { subject?: unknown; body?: unknown; text?: unknown } & Record<string, unknown>;
   const entries = Object.entries(rest).filter(([, v]) => v != null && v !== "");

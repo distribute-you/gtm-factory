@@ -7,9 +7,9 @@ import { outcomeLabel, type Model } from "@/lib/model";
 import { campaignLine, rankedLine, type FunnelLineModel } from "@/lib/funnels";
 
 /**
- * A sales funnel drawn as its straight line: Start (or the trigger whose events open it), then
- * every pipe each leg runs through, in the order they run, with what each makes, up to the target.
- * A pipe feeding a side input (a research, a model call) rides as a small mark beside the pipe it
+ * A sales funnel drawn as its straight line: its start outcome (Start, or the outcome whose Units a
+ * reactive campaign pushes), then every pipe each leg runs through, in the order they run, with what
+ * each makes, up to the target. A pipe feeding a side Material (a research, a model call) rides as a small mark beside the pipe it
  * feeds. The plays list of a campaign reads the same model: they never disagree.
  */
 export function FunnelLine({ model, campaign, funnel, line: given, size = "sm", scroll = true }: { model: Model; campaign?: Campaign; funnel?: RankedFunnel; line?: FunnelLineModel | null; size?: "sm" | "md"; scroll?: boolean }) {
@@ -18,14 +18,7 @@ export function FunnelLine({ model, campaign, funnel, line: given, size = "sm", 
   const icon = size === "md" ? 18 : 14;
   const drawn = (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${size === "md" ? "text-[13px]" : "text-[12px]"}`} data-funnel={line.funnel?.id ?? line.path.id}>
-      {line.trigger ? (
-        <span className="inline-flex items-center gap-1">
-          <Mark kind="trigger" id={line.trigger.id} size={icon} />
-          <span className="k-fg2">{line.trigger.label}</span>
-        </span>
-      ) : (
-        <OutcomeChip model={model} outcome={START} size={icon} />
-      )}
+      <OutcomeChip model={model} outcome={line.start} size={icon} />
       {line.legs.map((l, k) => (
         <span key={`${k}:${l.from}>${l.to}`} className="inline-flex items-center gap-1.5">
           {l.parts.map((p) => (

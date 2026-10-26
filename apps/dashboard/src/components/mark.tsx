@@ -137,7 +137,7 @@ const ICONS: Record<string, Icon> = {
 export const KIND_ICON = {
   outcome: FlowArrowIcon,
   leadTrack: PathIcon,
-  trigger: LightningIcon,
+  campaign: LightningIcon,
   pipe: BirdIcon,
   funnel: FunnelIcon,
   path: PathIcon,
@@ -195,7 +195,7 @@ export function Mark({
     <span
       aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center ${size <= 18 ? "rounded-[5px]" : "rounded-[8px]"} ${
-        quiet ? "bg-[var(--bg-inset)] text-[var(--fg-2)] shadow-[inset_0_0_0_1px_var(--line)]" : ""
+        quiet ? "bg-[var(--bg-inset)] text-[var(--fg-2)] ring-1 ring-inset ring-[var(--line)]" : ""
       }`}
       style={{ width: size, height: size, ...(quiet ? {} : { background: `${color}24`, color }) }}
     >

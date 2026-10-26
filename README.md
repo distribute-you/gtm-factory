@@ -1,6 +1,6 @@
 # GTM Factory
 
-An open framework for running go-to-market as an agentic factory: outcomes, pipes that turn input outcomes into the next one, scripts that compete inside each pipe (rules, AI, people), triggers that wake them, and one engine that makes every input choice with the best value per dollar.
+An open framework for running go-to-market as an agentic factory, in a plant's own words: Campaigns order outcomes, pipes make them from their Bill of materials, scripts compete inside each pipe (rules, AI, people), every Unit lands in one ledger that is the common stock, and a Supplier rating makes every choice with the best value per dollar.
 
 Built by [distribute.you](https://distribute.you). Revenue made easy.
 
@@ -10,10 +10,11 @@ Built by [distribute.you](https://distribute.you). Revenue made easy.
 
 ## What it is
 
-- **A model.** Four objects carry a status: outcomes, pipes, triggers and scripts. Tactics (typed: yes/no, a list, a number) and strategies (conditions per input) describe them. Scripts and object occurrences (templates, ICPs) live in dynasties of versions. Everything is data.
-- **An engine.** It orchestrates: for each subject it picks the play of each leg, then at every input of every pipe the script providing it or the occurrence to consume. One universal prioritizer makes every input choice: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client, with delay censoring and measured costs. Every occurrence carries its traceability, so every choice is credited on the end of its leg.
-- **A ledger.** Every run is a production order, ours or another factory's. Decisions read each option's own cost; reports read the every-path ledger, reconciled to the cent.
-- **A simulator.** A fictional world published as data, with a hidden truth, played day by day, so you can watch the engine converge.
+- **A model.** Three objects carry a status: outcomes, pipes and scripts. An outcome is a part reference; a Unit is one piece of it. A pipe's Bill of materials lists the outcomes it consumes per Unit produced, one Material per line. Tactics (typed: yes/no, a list, a number) and strategies (conditions per Material) describe them. Scripts and brand Units (templates, ICPs) live in dynasties of versions. Everything is data.
+- **Pull and push.** A Campaign is a target, a daily budget and a start outcome. From Start it pulls on its target at each tick, most advanced Units first; from any other outcome it pushes each Unit that lands. Each pipe serves itself from the stock with a Specification (subject, conditions, quantity), or orders a new piece from one producer. Every Run is one script executed: one Unit or none.
+- **A Supplier rating.** An auxiliary cost center that reads the ledger and the traceability and makes, each tick, the Rating every choosing pipe consumes: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client, with delay censoring and measured costs. Every Unit carries its traceability, so every choice is credited on the end of its leg.
+- **A ledger.** The common stock of every Unit, from every producer. Decisions read each option's own cost; reports read the every-path ledger, reconciled to the cent.
+- **A simulator.** A fictional world published as data, with a hidden truth, played tick by tick, so you can watch every choice converge.
 
 Read the spec: [docs/framework.md](docs/framework.md).
 
@@ -21,7 +22,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 
 | Path | What |
 |---|---|
-| `packages/engine` | The engine. TypeScript, zero runtime dependencies, pure and deterministic. |
+| `packages/engine` | The framework's code: catalogue, pull and push, ledger, Supplier rating, simulator. TypeScript, zero runtime dependencies, pure and deterministic. |
 | `seed/fictional-world.json` | The fictional world: catalogue, clients, market and hidden truth. Every scenario number lives here. |
 | `seed/distribute-catalogue.json`, `seed/distribute-world.json` | distribute.you's public catalogue (no production figure, no price) and the "distribute.you catalogue" scenario built on it, fictional clients and numbers. |
 | `packages/scenarios` | The translation of distribute.you's public catalogue into the model (a pipe is a leg, a channel is a tactic) and the scenario builder. |
@@ -49,19 +50,18 @@ for (const point of convergence(session)) console.log(point.point, shareOnBest(p
 
 ## The dashboard
 
-Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Play**, and watch fictional clients win paying clients. Every page reads the engine:
+Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Play**, and watch fictional clients win paying clients. Every page reads the framework's code:
 
 | Page | What you see |
 |---|---|
-| Today | Return measured beside expected on one formula, value won by our runs beside other factories, outcomes per lead track, why the engine chose. |
-| New campaign | Pick a client, a target and an entry (Start or a trigger), get the best sales funnels by value per dollar, choose strategies per pipe, launch. |
-| Campaigns | Each campaign's named sales funnel, every pipe each leg runs through, its plays and strategies, every input choice with its options, beliefs and the hidden best. |
+| Today | Return measured beside expected on one formula, value won by our runs beside other factories, outcomes per lead track, why each choice was made. |
+| New campaign | Pick a client, a target and a start outcome (Start, or an outcome whose Units the campaign pushes), get the best sales funnels by value per dollar, choose strategies per pipe, launch. |
+| Campaigns | Each campaign's order (start outcome, target, daily budget), its named sales funnel, every pipe each leg runs through, its plays and strategies, every choice with its options, beliefs and the hidden best. |
 | ICPs | Competing ICP sentences per client, the finer ones the splits proposed, and the verdict of every split. |
-| Leads, Companies | A board per lead state and track; each lead's timeline with the traceability of every occurrence. |
-| Pinned pages | Pin any outcome or pipe: Templates and LLMs ship pinned. Read, edit (a new version) and compare versions; scripts as cards; where a pipe is plugged and the best script at each input; its pipe storage. |
+| Leads, Companies | A board per lead state and track; each lead's timeline with the traceability of every Unit. |
+| Pinned pages | Pin any outcome or pipe: Templates and LLMs ship pinned. Read, edit (a new version) and compare versions; scripts as cards; a pipe's Bill of materials, where it is plugged and the best script at each Material; its pipe storage. |
 | Research | Convergence of every choice point toward the hidden best option, beliefs beside the hidden truth, strategies proposed by splits. |
-| Catalogue | Outcomes, pipes, scripts, triggers, sales paths and funnels, tactics, strategies and factories. Upgrade, fork, retire, pin. |
-| Shadow | Open a snapshot of an observed factory (a file kept in the tab, or a snapshot of the simulation): every client reconciled with production, today beside what the engine would do, and the actions it would launch. Read only. |
+| Catalogue | Outcomes, pipes with their Bill of materials, scripts, sales paths and funnels, tactics, strategies and factories. Upgrade, fork, retire, pin. |
 | Ledger | Every-path unit costs beside each pipe's own cost, our spend beside other factories', reconciled to the cent. |
 | How it works | The framework's core ideas, linked to the spec. |
 | Api data source | Build with `NEXT_PUBLIC_DATA_SOURCE=api` and the same dashboard runs a real factory through the factory API: brands, campaigns with a daily cap, leads, templates, LLMs, research and the ledger. See [docs/api.md](docs/api.md). |

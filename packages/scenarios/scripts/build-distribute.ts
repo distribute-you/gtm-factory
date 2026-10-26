@@ -23,4 +23,4 @@ if (channelsPath && stepsPath) {
   writeFileSync(seed("distribute-catalogue.json"), JSON.stringify(pub, null, 2) + "\n");
 } else pub = JSON.parse(readFileSync(seed("distribute-catalogue.json"), "utf8")) as PublicCatalogue;
 writeFileSync(seed("distribute-world.json"), JSON.stringify(buildDistributeWorld(pub), null, 2) + "\n");
-console.log(`${pub.channels.length} channels, ${pub.steps.length} steps, ${pub.triggers.length} triggers`);
+console.log(`${pub.channels.length} channels, ${pub.steps.length} steps, ${pub.facts.length} reported facts`);

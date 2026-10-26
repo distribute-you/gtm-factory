@@ -17,7 +17,7 @@ export function ApiResearchPage() {
             <>
               <PageHeader
                 title={plural(points.length, "choice point", "choice points")}
-                sub="At every input where several options compete, the belief the engine holds about each one. It picks by value per dollar, with one Thompson draw."
+                sub="At every Material where several options compete, the belief the Supplier rating holds about each one. The choosing pipe picks by value per dollar, with one Thompson draw."
               />
               <PointsList points={points} />
             </>

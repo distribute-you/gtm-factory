@@ -62,7 +62,7 @@ export function newClient(model: Model, input: { name: string; audienceText: str
   const brandId = `brand-${k}`;
   const from = model.clients[0];
   const audience = model.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired)?.id;
-  const seeds = (from?.seeds ?? []).filter((s) => model.catalogue.outcome(s.outcome)?.subject === "object" && s.outcome !== audience).map((s) => ({ ...s }));
+  const seeds = (from?.seeds ?? []).filter((s) => model.catalogue.outcome(s.outcome)?.subject === "brand" && s.outcome !== audience).map((s) => ({ ...s }));
   const script = clientAudienceScript(model);
   if (audience && script && input.audienceText.trim()) seeds.push({ outcome: audience, scriptId: script, dynasty: "stated-by-client", version: 1, name: "The client's words", text: input.audienceText.trim(), conditions: [] });
   return {

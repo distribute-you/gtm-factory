@@ -1,7 +1,7 @@
 /**
  * A simulated world: the clients, their market (fictional people and
  * companies), the catalogue they run on, and the HIDDEN truth the engine must
- * learn (yields, costs, delays, the effect of every script, occurrence and lead
+ * learn (yields, costs, delays, the effect of every script, Unit and lead
  * tactic). Every number of a scenario is data here, never in the engine or the
  * dashboard.
  */
@@ -36,19 +36,25 @@ export interface Offer {
   outcomeValues?: Record<OutcomeId, number>;
 }
 
-/** Where a campaign's sales funnel starts: the market, or a trigger's events. */
-export type CampaignEntry = { kind: "start" } | { kind: "trigger"; triggerId: string };
-
+/**
+ * The Campaign orders production: a target outcome, a daily budget (and an
+ * optional volume per period), and a start outcome. Started from Start (the
+ * market) it is proactive: at each tick it pulls on its target. Started from
+ * any other outcome it is reactive: each Unit of that outcome landing for its
+ * brand is pushed into its first pipe, as far as its budget allows.
+ */
 export interface Campaign {
   id: string;
   brandId: string;
   offerId: string;
   name: string;
-  entry: CampaignEntry;
-  /** The lead states of its sales funnel after the entry; the last one is the target. */
+  /** START (the market: proactive), or the outcome whose Units it pushes (reactive). */
+  start: OutcomeId;
+  /** The lead states of its sales funnel after the start; the last one is the target. */
   line: OutcomeId[];
   dailyBudgetCents: number;
-  maxVolume?: number;
+  /** At most this many new subjects per period. */
+  volume?: { units: number; periodDays: number };
   status: "running" | "paused";
   /** The strategy chosen per pipe (a play = pipe x strategy). A pipe left out plays its default. */
   strategies: Record<string, string>;
@@ -56,12 +62,12 @@ export interface Campaign {
   pinned?: Record<number, string>;
 }
 
-/** An occurrence that exists before the campaign runs: the client's ICP, a template. */
-export interface SeedOccurrence {
+/** A Unit in the stock before the campaign runs: the client's ICP, a template. */
+export interface SeedUnit {
   outcome: OutcomeId;
   /** The script producing it (its pipe and factory follow). */
   scriptId: string;
-  /** Object occurrences have dynasties too: a template is a version of its template dynasty. */
+  /** Brand Units have dynasties too: a template is a version of its template dynasty. */
   dynasty: string;
   version: number;
   /** A fork starts from its parent dynasty's posterior. */
@@ -71,7 +77,7 @@ export interface SeedOccurrence {
   text: string;
   /** For an ICP: who it describes, as conditions on lead tactics (what a judge would read from the sentence). */
   conditions?: Condition[];
-  /** Hidden: how much this occurrence changes the end of the leg it serves. */
+  /** Hidden: how much this Unit changes the end of the leg it serves. */
   truthEnd?: number;
 }
 
@@ -80,8 +86,8 @@ export interface WorldClient {
   brand: Brand;
   offer: Offer;
   campaigns: Campaign[];
-  seeds: SeedOccurrence[];
-  /** Pipes of other factories this client connected (its CRM import). */
+  seeds: SeedUnit[];
+  /** Webhooks of other factories this client connected (its CRM import). */
   connected: string[];
   /** Hidden: how much this client's market answers, all else equal. */
   truthMultiplier: number;
@@ -120,14 +126,22 @@ export interface PipeTruth {
   base: number;
   delayMeanDays: number;
   horizonDays: number;
-  /** For a pipe whose input may be a false attestation: yield multiplier then. */
+  /** For a pipe whose subject Material may be a false attestation: yield multiplier then. */
   onFalseInput?: number;
+  /**
+   * For a webhook: when the other factory calls it. `creates`: it brings new
+   * leads (the organic market, at the client's organic rate); `attests`: it
+   * reports the true facts of its output it sees (a CRM import, at its
+   * script's recall); `on`: it reports on each Unit of that outcome landing
+   * (a mailbox reporting a message sent), with the pipe's base rate and delay.
+   */
+  webhook?: { creates?: boolean; attests?: boolean; on?: OutcomeId };
 }
 
 export interface WorldTruth {
   pipes: Record<string, PipeTruth>;
   scripts: Record<string, ScriptTruth>;
-  /** Per input (point key "consumer|input"), the effects that differ there. */
+  /** Per Material (point key "consumer|material"), the effects that differ there. */
   at: Record<string, Record<string, Partial<ScriptTruth>>>;
   /** Lead tactics that change the first leg's fact. */
   segments: { when: Condition[]; mult: number }[];
@@ -156,6 +170,8 @@ export interface WorldSettings {
   clientGroupTactic: string;
   /** Half-life of evidence, days: older decisions weigh less (0 = never fade). */
   memoryHalfLifeDays?: number;
+  /** Ticks per day (default 1): at each tick every campaign pulls or pushes and a Unit advances one pipe. */
+  ticksPerDay?: number;
 }
 
 export interface WorldSpec {

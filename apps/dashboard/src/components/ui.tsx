@@ -191,7 +191,7 @@ export function Initials({ name, size = 20, round = false }: { name: string; siz
       .join("") || "?";
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center bg-[var(--bg-inset)] font-medium text-[var(--fg-2)] shadow-[inset_0_0_0_1px_var(--line)] ${round ? "rounded-full" : "rounded-[5px]"}`}
+      className={`inline-flex shrink-0 items-center justify-center bg-[var(--bg-inset)] font-medium text-[var(--fg-2)] ring-1 ring-inset ring-[var(--line)] ${round ? "rounded-full" : "rounded-[5px]"}`}
       style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.42)) }}
     >
       {letters}
@@ -333,7 +333,7 @@ export function RoiLabel({ children = "ROI" }: { children?: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1" title={ROI_TIP}>
       {children}
-      <span aria-hidden="true" className="k-fg4 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] shadow-[inset_0_0_0_1px_var(--line)]">
+      <span aria-hidden="true" className="k-fg4 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] ring-1 ring-inset ring-[var(--line)]">
         i
       </span>
     </span>

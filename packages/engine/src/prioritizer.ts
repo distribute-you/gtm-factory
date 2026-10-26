@@ -1,6 +1,6 @@
 /**
  * The universal prioritizer: ONE algorithm for every choice (the play of a
- * leg, the script of a pipe at an input, the occurrence to consume). Thompson
+ * leg, the script of a pipe at an input, the Unit to consume). Thompson
  * sampling on value per dollar:
  *
  *  1. every option carries a Beta belief about the share of its decisions that

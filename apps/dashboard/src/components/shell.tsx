@@ -5,9 +5,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowCounterClockwiseIcon,
-  EyeIcon,
-  LightningIcon,
-  XIcon,
   BookOpenIcon,
   BuildingsIcon,
   CaretDownIcon,
@@ -31,9 +28,7 @@ import { useSim, SPEEDS, type Speed } from "@/lib/sim";
 import { leadRows } from "@/lib/model";
 import { formatCount } from "@/lib/format";
 import { pinHref, pinKey } from "@/lib/pins";
-import { useShadow } from "@/lib/shadow";
 import { SCENARIOS, SCENARIO_IDS, type ScenarioId } from "@/lib/world";
-import { OpenSnapshot } from "./pages/shadow";
 
 export const REPO_URL = "https://github.com/distribute-you/gtm-factory";
 
@@ -48,7 +43,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {open && <div className="fixed inset-0 z-40 bg-[#10101247] lg:hidden" onClick={() => setOpen(false)} />}
         <div
           className={`fixed inset-y-0 left-0 z-50 flex bg-[var(--bg-canvas)] transition-transform duration-200 ease-[cubic-bezier(.23,1,.32,1)] lg:static lg:z-auto lg:translate-x-0 ${
-            open ? "translate-x-0 shadow-xl" : "-translate-x-full"
+            open ? "translate-x-0 ring-1 ring-[var(--line)]" : "-translate-x-full"
           }`}
         >
           <Suspense fallback={<aside className="w-[248px]" />}>
@@ -99,7 +94,6 @@ function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
   const { model, scope, pins } = useSim();
-  const { shadow } = useShadow();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
   const campaigns = model ? model.campaigns.filter((c) => !scope || c.brandId === scope) : [];
   const campaignId = search.get("id");
@@ -108,28 +102,14 @@ function Sidebar() {
   const audience = model?.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired);
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
-      {shadow ? (
-        <div className="px-2 pt-2">
-          <div className="flex h-9 items-center gap-2 px-2">
-            <Mark kind="audience" id="shadow" size={22} quiet />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium">{shadow.snapshot.name}</span>
-              <span className="k-fg3 block truncate text-[11px] leading-3">Shadow mode · read only</span>
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2 px-2 pt-2">
-          <ScopeSwitcher />
-          <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
-            <PlusIcon size={14} weight="bold" />
-            New campaign
-          </Link>
-        </div>
-      )}
+      <div className="space-y-2 px-2 pt-2">
+        <ScopeSwitcher />
+        <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
+          <PlusIcon size={14} weight="bold" />
+          New campaign
+        </Link>
+      </div>
       <nav className="k-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-3">
-        <ShadowNav at={at} />
-        {!shadow && (
           <>
             <div className="space-y-px">
               <NavItem href="/" label="Today" icon={<HouseIcon size={15} />} active={at("/")} />
@@ -145,7 +125,7 @@ function Sidebar() {
                       key={c.id}
                       href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
                       label={scope ? c.name : `${brand}: ${c.name}`}
-                      icon={c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={16} /> : <Mark kind="funnel" id={c.id} size={16} />}
+                      icon={<Mark kind="funnel" id={c.id} size={16} />}
                       active={active}
                       trailing={
                         c.status === "running" ? (
@@ -182,7 +162,6 @@ function Sidebar() {
               <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
             </Group>
           </>
-        )}
         <Group title="Learn">
           <NavItem href="/how-it-works/" label="How it works" icon={<BookOpenIcon size={15} />} active={at("/how-it-works")} />
           <a href={REPO_URL} target="_blank" rel="noreferrer" className="flex h-7 items-center gap-2 rounded-[8px] pl-2 pr-1.5 text-[13px] text-[var(--fg-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--fg-1)]">
@@ -201,19 +180,6 @@ function Sidebar() {
         . Revenue made easy.
       </p>
     </aside>
-  );
-}
-
-/** Shadow mode's pages, when a snapshot is open. */
-function ShadowNav({ at }: { at: (p: string) => boolean }) {
-  const { shadow, busy } = useShadow();
-  const pathname = usePathname() ?? "/";
-  if (!shadow && !busy) return null;
-  return (
-    <Group title="Shadow">
-      <NavItem href="/shadow/" label="Clients" icon={<EyeIcon size={15} />} active={at("/shadow") || pathname.startsWith("/shadow/client")} trailing={<Count n={shadow?.snapshot.clients.length} />} />
-      <NavItem href="/shadow/actions/" label="Actions" icon={<LightningIcon size={15} />} active={at("/shadow/actions")} trailing={<Count n={shadow?.report.actions.length} />} />
-    </Group>
   );
 }
 
@@ -257,32 +223,7 @@ function ScopeSwitcher() {
 
 /** The simulator, always in reach above every page: the day, play / pause / one day / speed, the scenario, reset on a seed. */
 function SimBar() {
-  const { shadow } = useShadow();
-  return shadow ? <ShadowBar /> : <SimulatorBar />;
-}
-
-/** With a snapshot open: what it is, and the way back to the simulator. */
-function ShadowBar() {
-  const { shadow, close } = useShadow();
-  if (!shadow) return null;
-  return (
-    <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-2 lg:pl-0" role="toolbar" aria-label="Shadow mode">
-      <span className="k-label hidden shrink-0 pl-1 sm:inline">Shadow</span>
-      <span className="flex min-w-0 shrink items-center gap-1.5 pl-1 pr-1">
-        <EyeIcon size={14} className="k-fg3 shrink-0" />
-        <span className="truncate text-[14px] font-medium" data-testid="shadow-name">
-          {shadow.snapshot.name}
-        </span>
-        <span className="k-fg3 hidden shrink-0 text-[12px] md:inline">read {shadow.snapshot.takenAt.slice(0, 10)} · nothing executes</span>
-      </span>
-      <span className="ml-auto" />
-      <OpenSnapshot compact />
-      <button type="button" className="k-btn shrink-0" onClick={close} title="Close the snapshot and go back to the simulator">
-        <XIcon size={13} />
-        Close
-      </button>
-    </div>
-  );
+  return <SimulatorBar />;
 }
 
 function SimulatorBar() {
@@ -335,8 +276,6 @@ function SimulatorBar() {
         <ArrowCounterClockwiseIcon size={13} />
         Reset
       </button>
-      <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
-      <OpenSnapshot compact />
     </div>
   );
 }

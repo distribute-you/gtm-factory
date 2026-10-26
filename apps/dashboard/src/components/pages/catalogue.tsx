@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PushPinIcon, PushPinSlashIcon } from "@phosphor-icons/react";
-import { defaultStrategyId, describeCondition, describeTacticType, isOnDemand, type Pipe, type Script } from "@gtm-factory/engine";
-import { ProviderLogo, ScriptCard, tacticValueText } from "@/components/catalogue-bits";
+import { defaultStrategyId, describeCondition, describeTacticType, type Pipe, type Script } from "@gtm-factory/engine";
+import { BillOfMaterials, ProviderLogo, ScriptCard, tacticValueText } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
@@ -16,9 +16,9 @@ import { pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
 import { campaignsRunning } from "@/lib/funnels";
 import { useSim } from "@/lib/sim";
 
-const TABS = ["outcomes", "pipes", "scripts", "triggers", "paths", "tactics", "strategies", "factories"] as const;
+const TABS = ["outcomes", "pipes", "scripts", "paths", "tactics", "strategies", "factories"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { paths: "Sales paths", outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", triggers: "Triggers", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
+const TAB_LABEL: Record<Tab, string> = { paths: "Sales paths", outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
 
 export function CataloguePage() {
   const { model } = useSim();
@@ -41,7 +41,6 @@ function Catalogue({ model }: { model: Model }) {
     outcomes: c.outcomes.filter((x) => !x.retired).length,
     pipes: c.pipes.filter((p) => c.isPipeLive(p)).length,
     scripts: new Set(c.scripts.filter((s) => s.status === "active").map((s) => s.dynasty)).size,
-    triggers: c.triggers.filter((t) => !t.retired).length,
     paths: c.salesPaths.length,
     tactics: c.tactics.filter((t) => !t.retired).length,
     strategies: c.strategies.filter((s) => !s.retired).length,
@@ -55,13 +54,12 @@ function Catalogue({ model }: { model: Model }) {
             {counts.pipes} pipes, {counts.scripts} scripts competing
           </>
         }
-        sub="Everything is data: outcomes, pipes, triggers and scripts. Add, upgrade, fork or retire while the factory runs."
+        sub="Everything is data: outcomes, pipes and scripts, described by tactics and strategies. Add, upgrade, fork or retire while the factory runs."
       />
       <Tabs tabs={TABS.map((t) => ({ id: t, label: TAB_LABEL[t], count: counts[t] }))} value={tab} onChange={setTab} />
       {tab === "outcomes" && <Outcomes model={model} />}
       {tab === "pipes" && <Pipes model={model} />}
       {tab === "scripts" && <Scripts model={model} />}
-      {tab === "triggers" && <Triggers model={model} />}
       {tab === "paths" && <SalesPaths model={model} />}
       {tab === "tactics" && <Tactics model={model} />}
       {tab === "strategies" && <Strategies model={model} />}
@@ -75,7 +73,7 @@ function SalesPaths({ model }: { model: Model }) {
   const c = model.catalogue;
   return (
     <div className="space-y-6">
-      <p className="k-fg2 text-[13px]">A sales path is a straight line of lead states from Start or a trigger to a target. A sales funnel is a path with one play per leg. Each gets a name the first time it is seen, and keeps it.</p>
+      <p className="k-fg2 text-[13px]">A sales path is a straight line of lead states from a start outcome (Start, the market, or any outcome) to a target. A sales funnel is a path with one play per leg. Each gets a name the first time it is seen, and keeps it.</p>
       {c.salesPaths.length === 0 ? (
         <div className="k-card">
           <EmptyNote>No sales path has been run yet.</EmptyNote>
@@ -91,7 +89,7 @@ function SalesPaths({ model }: { model: Model }) {
                   {p.name}
                 </Link>
               </SectionTitle>
-              <p className="k-fg3 mb-2 text-[12px]">{[p.entry, ...p.line].map((o) => outcomeLabel(c, o)).join(" → ")}</p>
+              <p className="k-fg3 mb-2 text-[12px]">{[p.start, ...p.line].map((o) => outcomeLabel(c, o)).join(" → ")}</p>
               <div className="k-card divide-y divide-[var(--line-subtle)]">
                 {funnels.map((f) => {
                   const running = campaignsRunning(model, f.id);
@@ -126,18 +124,18 @@ function PinButton({ pin }: { pin: Pin }) {
   );
 }
 
-const SUBJECT: Record<string, string> = { lead: "A lead", company: "A company", object: "An object", event: "A trigger event" };
-const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", list: "A list", record: "A record", image: "An image" };
+const SUBJECT: Record<string, string> = { lead: "A lead", company: "A company", brand: "The brand", run: "The run that asked" };
+const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", rating: "Beliefs per option", list: "A list", record: "A record", image: "An image" };
 
 function Outcomes({ model }: { model: Model }) {
   const c = model.catalogue;
   const produced = useMemo(() => {
     const m = new Map<string, number>();
-    for (const o of model.session.occurrences) m.set(o.outcome, (m.get(o.outcome) ?? 0) + 1);
+    for (const o of model.session.units) m.set(o.outcome, (m.get(o.outcome) ?? 0) + 1);
     return m;
   }, [model]);
   return (
-    <CardTable footer="An outcome is something reached for a subject. Lead states sit on a lead track; tracks are never added together.">
+    <CardTable footer="An outcome is a part reference; each Unit is one physical piece of it, about one subject. Lead states sit on a lead track; tracks are never added together.">
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>Outcome</th>
@@ -145,7 +143,7 @@ function Outcomes({ model }: { model: Model }) {
           <th className={TH}>Lead track</th>
           <th className={TH}>Holds</th>
           <th className={TH}>Made by</th>
-          <th className={`${TH} text-right`}>Occurrences</th>
+          <th className={`${TH} text-right`}>Units</th>
           <th className={TH} />
         </tr>
       </thead>
@@ -171,12 +169,12 @@ function Outcomes({ model }: { model: Model }) {
                 <td className={TD}>{o.contentType ? CONTENT[o.contentType] : <span className="k-fg4">—</span>}</td>
                 <td className={TD}>
                   <span className="k-fg2 block max-w-[280px] truncate text-[12px]">
-                    {providers.map((p) => p.name).join(", ") || "A trigger"}
+                    {providers.map((p) => p.name).join(", ") || "No pipe yet"}
                     {o.referencePipe ? ` · reference: ${pipeName(c, o.referencePipe)}` : ""}
                   </span>
                 </td>
                 <td className={TDN}>{formatCount(produced.get(o.id) ?? 0)}</td>
-                <td className={`${TD} text-right`}>{o.subject === "object" && <PinButton pin={{ kind: "outcome", id: o.id, label: o.plural ?? o.label, ...(o.icon ? { icon: o.icon } : {}) }} />}</td>
+                <td className={`${TD} text-right`}>{o.subject === "brand" && <PinButton pin={{ kind: "outcome", id: o.id, label: o.plural ?? o.label, ...(o.icon ? { icon: o.icon } : {}) }} />}</td>
               </tr>
             );
           })}
@@ -191,11 +189,11 @@ function Pipes({ model }: { model: Model }) {
   const pipe = open ? c.pipe(open) : undefined;
   return (
     <>
-      <CardTable footer="A pipe turns its inputs into one outcome. Its scripts share its pipe storage; nobody else reads it.">
+      <CardTable footer="A pipe turns its Bill of materials into one outcome. Each pipe pulls what it needs, or is pushed a Unit. Its scripts share its pipe storage: notes and references to Units, never copies.">
         <thead>
           <tr className="k-line-subtle border-b">
             <th className={TH}>Pipe</th>
-            <th className={TH}>Inputs → output</th>
+            <th className={TH}>Bill of materials → output</th>
             <th className={TH}>Factory</th>
             <th className={TH}>Runs on</th>
             <th className={`${TH} text-right`}>Scripts</th>
@@ -206,7 +204,6 @@ function Pipes({ model }: { model: Model }) {
         <tbody>
           {c.pipes.map((p) => {
             const rows = model.session.storageReport(p.id).tables.reduce((s, t) => s + t.rows, 0);
-            const trigger = p.triggerId ? c.trigger(p.triggerId) : null;
             return (
               <tr key={p.id} className={`k-row k-line-subtle cursor-pointer border-b last:border-0 ${p.retired ? "k-fg3" : ""}`} onClick={() => setOpen(p.id)}>
                 <td className={TD}>
@@ -220,7 +217,7 @@ function Pipes({ model }: { model: Model }) {
                   <span className="k-fg2 block max-w-[380px] truncate text-[12px]">{pipeLine(c, p)}</span>
                 </td>
                 <td className={TD}>{c.isOurs(p) ? "Ours" : factoryName(c, p.factory)}</td>
-                <td className={TD}>{trigger ? (isOnDemand(p) ? "On demand" : trigger.label) : p.reports ? "Its own schedule" : c.createsSubjects(p) ? "The budget" : "Its inputs"}</td>
+                <td className={TD}>{p.webhook ? "A webhook call" : c.createsSubjects(p) ? "A pull from Start" : "A pull or a push"}</td>
                 <td className={TDN}>{c.dynastiesOf(p.id).length}</td>
                 <td className={TDN}>{pluggedAt(model, p.id).length || <span className="k-fg4">—</span>}</td>
                 <td className={TDN}>{rows ? formatCount(rows) : <span className="k-fg4">—</span>}</td>
@@ -264,17 +261,18 @@ function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClos
       <dl className="mt-4 grid grid-cols-[120px_minmax(0,1fr)] gap-y-2 text-[13px]">
         <dt className="k-label pt-0.5">Factory</dt>
         <dd>{c.isOurs(pipe) ? "Ours" : `${factoryName(c, pipe.factory)} (another factory)`}</dd>
-        <dt className="k-label pt-0.5">Inputs</dt>
-        <dd>{pipe.inputs.length ? pipe.inputs.map((i) => outcomeLabel(c, i)).join(", ") : "The market"}</dd>
         <dt className="k-label pt-0.5">Output</dt>
         <dd>{outcomeLabel(c, pipe.output)}</dd>
         <dt className="k-label pt-0.5">Delay</dt>
-        <dd>{pipe.maturity.delayMeanDays ? `${pipe.maturity.delayMeanDays} days on average, up to ${pipe.maturity.horizonDays}` : "Same day"}</dd>
+        <dd>{pipe.maturity.delayMeanDays ? `${pipe.maturity.delayMeanDays} days on average, up to ${pipe.maturity.horizonDays}` : "The next tick"}</dd>
       </dl>
+
+      <p className="k-label mb-1.5 mt-5">Bill of materials</p>
+      <BillOfMaterials model={model} pipe={pipe} />
 
       <p className="k-label mb-1.5 mt-5">Where it is plugged</p>
       {plugged.length === 0 ? (
-        <EmptyNote>Not chosen at any input yet.</EmptyNote>
+        <EmptyNote>Not chosen at any Material yet.</EmptyNote>
       ) : (
         <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]">
           {plugged.map((p) => (
@@ -295,7 +293,7 @@ function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClos
       </div>
 
       <p className="k-label mb-1.5 mt-5">Pipe storage</p>
-      <p className="k-fg3 mb-2 text-[12px]">Private to this pipe's scripts. Other pipes get its data only through the occurrences it produces.</p>
+      <p className="k-fg3 mb-2 text-[12px]">Private to this pipe's scripts. Other pipes get its data only through the Units it produces.</p>
       {storage.tables.length === 0 ? (
         <EmptyNote>Nothing stored yet.</EmptyNote>
       ) : (
@@ -410,50 +408,7 @@ function ScriptDrawer({ model, dynasty, onClose }: { model: Model; dynasty: stri
   );
 }
 
-function Triggers({ model }: { model: Model }) {
-  const c = model.catalogue;
-  const fired = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const e of model.session.triggerEvents) m.set(e.triggerId, (m.get(e.triggerId) ?? 0) + 1);
-    return m;
-  }, [model]);
-  return (
-    <CardTable footer="One generic trigger: when an outcome is reached, after a delay, unless another is reached meanwhile. Each event is an occurrence.">
-      <thead>
-        <tr className="k-line-subtle border-b">
-          <th className={TH}>Trigger</th>
-          <th className={TH}>When</th>
-          <th className={TH}>After</th>
-          <th className={TH}>Unless</th>
-          <th className={TH}>Event</th>
-          <th className={`${TH} text-right`}>Fired</th>
-        </tr>
-      </thead>
-      <tbody>
-        {c.triggers.map((t) => (
-          <tr key={t.id} className="k-row k-line-subtle border-b last:border-0">
-            <td className={TD}>
-              <span className="flex items-center gap-2">
-                <Mark kind="trigger" id={t.id} size={22} />
-                <span className="min-w-0">
-                  <span className="block font-medium">{t.label}</span>
-                  {t.description && <span className="k-fg3 block max-w-[320px] truncate text-[12px]">{t.description}</span>}
-                </span>
-              </span>
-            </td>
-            <td className={TD}>{t.when.length ? t.when.map((o) => outcomeLabel(c, o)).join(" or ") : t.reported ? "Reported" : "—"}</td>
-            <td className={TD}>{t.delayDays ? `${t.delayDays} days` : "At once"}</td>
-            <td className={TD}>{t.unless.length ? t.unless.map((o) => outcomeLabel(c, o)).join(" or ") : <span className="k-fg4">—</span>}</td>
-            <td className={TD}>{t.event ? outcomeLabel(c, t.event) : <span className="k-fg3">A consuming script's call</span>}</td>
-            <td className={TDN}>{t.event ? formatCount(fired.get(t.id) ?? 0) : <span className="k-fg4">—</span>}</td>
-          </tr>
-        ))}
-      </tbody>
-    </CardTable>
-  );
-}
-
-const DESCRIBES: Record<string, string> = { script: "Scripts", lead: "Leads", company: "Companies", brand: "Clients" };
+const DESCRIBES: Record<string, string> = { script: "Scripts", lead: "Leads", company: "Companies", brand: "Clients", unit: "Units" };
 
 function Tactics({ model }: { model: Model }) {
   const c = model.catalogue;
@@ -511,7 +466,7 @@ function Strategies({ model }: { model: Model }) {
     .filter((g) => g.strategies.some((s) => s.id !== defaultStrategyId(g.pipe.id)));
   return (
     <div className="space-y-6">
-      <p className="k-fg2 text-[13px]">A strategy is a set of conditions on tactics, for one pipe. Its rules attach to the pipe's inputs. A campaign chooses one per pipe; a pipe it leaves out plays its default.</p>
+      <p className="k-fg2 text-[13px]">A strategy is a set of conditions on tactics, for one pipe. Its rules attach to the Materials of the pipe. A campaign chooses one per pipe; a pipe it leaves out plays its default.</p>
       {byPipe.map(({ pipe, strategies }) => (
         <section key={pipe.id}>
           <SectionTitle count={strategies.length}>{pipe.name}</SectionTitle>
@@ -531,7 +486,7 @@ function Strategies({ model }: { model: Model }) {
                     <div className="mt-1 space-y-1">
                       {s.rules.map((r, i) => (
                         <p key={i} className="flex flex-wrap items-center gap-1 text-[12px]">
-                          <span className="k-fg3">{r.input ? `At its ${outcomeLabel(c, r.input).toLowerCase()} input:` : "Its own scripts:"}</span>
+                          <span className="k-fg3">{r.material ? `At its ${outcomeLabel(c, r.material).toLowerCase()} Material:` : "Its own scripts:"}</span>
                           {r.conditions.map((cond, j) => (
                             <span key={j} className="k-chip">
                               {describeCondition(cond, c)}
@@ -549,7 +504,7 @@ function Strategies({ model }: { model: Model }) {
                           ))}
                         </p>
                       )}
-                      {isDefault && <p className="k-fg3 text-[12px]">No condition: every script at every input.</p>}
+                      {isDefault && <p className="k-fg3 text-[12px]">No condition: every script at every Material.</p>}
                       {s.proposed && <p className="k-fg3 text-[12px]">{s.proposed.reason}</p>}
                     </div>
                   </div>
@@ -567,13 +522,13 @@ function Strategies({ model }: { model: Model }) {
 function Factories({ model }: { model: Model }) {
   const rows = useMemo(() => factoryFigures(model), [model]);
   return (
-    <CardTable footer="Every occurrence names its producer: one of our runs, or another factory at its access cost. Our return values only what our runs produced.">
+    <CardTable footer="Every unit names its producer: one of our runs, or another factory at its access cost. Our return values only what our runs produced.">
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>Factory</th>
           <th className={TH}>Pipes</th>
           <th className={`${TH} text-right`}>Runs</th>
-          <th className={`${TH} text-right`}>Occurrences</th>
+          <th className={`${TH} text-right`}>Units</th>
           <th className={`${TH} text-right`}>Spent</th>
         </tr>
       </thead>
@@ -591,7 +546,7 @@ function Factories({ model }: { model: Model }) {
               <span className="k-fg2 block max-w-[420px] truncate text-[12px]">{f.pipes.map((p) => pipeName(model.catalogue, p)).join(", ") || "—"}</span>
             </td>
             <td className={TDN}>{formatCount(f.runs)}</td>
-            <td className={TDN}>{formatCount(f.occurrences)}</td>
+            <td className={TDN}>{formatCount(f.units)}</td>
             <td className={TDN}>
               {formatCents(f.spendCents)}
               <span className="k-fg3 ml-1 text-[12px]">{f.ours ? "our spend" : "access cost"}</span>

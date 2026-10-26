@@ -44,6 +44,7 @@ export const PAGES = [
   ["companies", "/companies/"],
   ["pinned-templates", "/pinned/?pin=outcome%3Atemplate_written"],
   ["pinned-llms", "/pinned/?pin=pipe%3Allm"],
+  ["pipe-writer", "/pinned/?pin=pipe%3Awriter"],
   ["research", "/research/"],
   ["catalogue", "/catalogue/"],
   ["catalogue-pipes", "/catalogue/?tab=pipes"],
@@ -87,7 +88,6 @@ for (const [name, route] of PAGES) {
     leadHref = [...cols].reverse().find((c) => c.href)?.href ?? leadHref;
   }
 }
-// Shadow mode on a snapshot of the simulation (fictional data): clients, one client, the actions.
 const shoot = async (name) => {
   await page.waitForTimeout(800);
   const h = await page.evaluate(() => (document.querySelector("main")?.scrollHeight ?? 900) + 64);
@@ -97,19 +97,6 @@ const shoot = async (name) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   console.log("saved", name);
 };
-await page.goto(`${origin}/shadow/`);
-await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
-await page.click("text=Shadow of this simulation");
-await page.waitForSelector('[data-testid="shadow-name"]', { timeout: 90000 });
-await page.waitForSelector("tr[data-reconciles]", { timeout: 90000 });
-await shoot("shadow-clients");
-await page.click("tr[data-reconciles] a");
-await page.waitForSelector("[data-campaign]", { timeout: 90000 });
-await shoot("shadow-client");
-await page.click('nav a[href$="/shadow/actions/"]');
-await page.waitForSelector("h1:has-text('the engine would launch')", { timeout: 90000 });
-await shoot("shadow-actions");
-await page.click("text=Close");
 // The distribute.you catalogue scenario: its whole public catalogue, fictional clients.
 await page.goto(`${origin}/?scenario=distribute&day=20`);
 await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 20")', { timeout: 180000 });

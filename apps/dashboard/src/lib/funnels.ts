@@ -1,17 +1,17 @@
 /**
- * A sales funnel as pages draw it: its entry, then each leg with EVERY pipe the
- * leg runs through, in the order they run (the pipes feeding a side input ride
+ * A sales funnel as pages draw it: its start outcome, then each leg with EVERY
+ * pipe the leg runs through, in the order they run (the pipes feeding a side Material ride
  * beside the pipe they feed). The funnel line and the plays list read this one
  * model, so they always describe the same pipes.
  */
 
-import { START, type Campaign, type LegPipe, type OutcomeId, type Pipe, type RankedFunnel, type SalesFunnel, type SalesPath, type Trigger } from "@gtm-factory/engine";
+import { START, type Campaign, type LegPipe, type OutcomeId, type Pipe, type RankedFunnel, type SalesFunnel, type SalesPath } from "@gtm-factory/engine";
 import type { Model } from "./model";
 
 export interface LinePart {
   /** A pipe on the chain that carries the subject. */
   pipe: Pipe;
-  /** Pipes feeding one of its inputs (or an input of those), in the order they run. */
+  /** Pipes feeding one of its Materials (or a Material of those), in the order they run. */
   side: Pipe[];
   /** What it makes. */
   output: OutcomeId;
@@ -24,8 +24,8 @@ export interface LineLeg {
 }
 
 export interface FunnelLineModel {
-  entry: OutcomeId;
-  trigger: Trigger | null;
+  /** START (the market), or the outcome a reactive campaign starts from. */
+  start: OutcomeId;
   legs: LineLeg[];
   path: SalesPath;
   /** Null while a leg has no play. */
@@ -61,32 +61,27 @@ export function partsOf(model: Model, pipes: readonly LegPipe[]): LinePart[] {
   return parts;
 }
 
-function entryTrigger(model: Model, entry: OutcomeId): Trigger | null {
-  return entry === START ? null : model.catalogue.triggers.find((t) => t.event === entry) ?? null;
-}
-
 /** The funnel a campaign runs today: its path, the play of each leg, every pipe each leg runs through. */
 export function campaignLine(model: Model, campaign: Campaign): FunnelLineModel {
   return memo(model, `line:${campaign.id}`, () => {
     const s = model.session;
-    const entry = s.entryOf(campaign);
+    const start = s.startOf(campaign);
     const pipes = s.campaignPipes(campaign);
-    const legs = campaign.line.map((to, k) => ({ from: k === 0 ? entry : campaign.line[k - 1]!, to, parts: partsOf(model, pipes[k] ?? []) }));
-    return { entry, trigger: entryTrigger(model, entry), legs, path: s.salesPathOf(campaign), funnel: s.salesFunnelOf(campaign) };
+    const legs = campaign.line.map((to, k) => ({ from: k === 0 ? start : campaign.line[k - 1]!, to, parts: partsOf(model, pipes[k] ?? []) }));
+    return { start, legs, path: s.salesPathOf(campaign), funnel: s.salesFunnelOf(campaign) };
   });
 }
 
 /** A proposed funnel (not launched): each leg through its play, read on every campaign's picks. */
 export function rankedLine(model: Model, funnel: RankedFunnel): FunnelLineModel {
-  const entry = funnel.line[0] ?? START;
+  const start = funnel.line[0] ?? START;
   const line = funnel.line.slice(1);
   const legs = funnel.legs.map((l) => ({ from: l.from, to: l.to, parts: partsOf(model, model.session.legPipes(l.pipeId, l.from, null)) }));
   return {
-    entry,
-    trigger: entryTrigger(model, entry),
+    start,
     legs,
-    path: model.catalogue.peekSalesPath(entry, line),
-    funnel: model.catalogue.peekSalesFunnel(entry, line, funnel.legs.map((l) => l.pipeId)),
+    path: model.catalogue.peekSalesPath(start, line),
+    funnel: model.catalogue.peekSalesFunnel(start, line, funnel.legs.map((l) => l.pipeId)),
   };
 }
 
@@ -95,11 +90,11 @@ export function namedLine(model: Model, funnel: SalesFunnel): FunnelLineModel | 
   const path = model.catalogue.salesPath(funnel.pathId);
   if (!path) return null;
   const legs = path.line.map((to, k) => {
-    const from = k === 0 ? path.entry : path.line[k - 1]!;
+    const from = k === 0 ? path.start : path.line[k - 1]!;
     const play = funnel.plays[k];
     return { from, to, parts: play ? partsOf(model, model.session.legPipes(play, from, null)) : [] };
   });
-  return { entry: path.entry, trigger: entryTrigger(model, path.entry), legs, path, funnel };
+  return { start: path.start, legs, path, funnel };
 }
 
 /** Every pipe a line draws, once, in the order it draws them. */

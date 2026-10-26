@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Shell } from "@/components/shell";
 import { SimProvider } from "@/lib/sim";
-import { ShadowProvider } from "@/lib/shadow";
 import { ApiShell } from "@/components/api/shell";
 import { IS_API } from "@/lib/data-source";
 import "./globals.css";
@@ -13,7 +12,7 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: "GTM Factory: revenue made easy",
-  description: "An open agentic GTM factory, live. Pick a client, ask for paid clients, and watch the engine choose every funnel, workflow, template and LLM by value per dollar.",
+  description: "An open agentic GTM factory, live. Pick a client, ask for paid clients, and watch the Supplier rating choose every funnel, script, template and LLM by value per dollar.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,9 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ApiShell>{children}</ApiShell>
         ) : (
           <SimProvider>
-            <ShadowProvider>
-              <Shell>{children}</Shell>
-            </ShadowProvider>
+            <Shell>{children}</Shell>
           </SimProvider>
         )}
       </body>
