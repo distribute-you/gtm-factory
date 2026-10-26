@@ -48,14 +48,14 @@ describe("read models", () => {
     expect(session.ledger().reconciles).toBe(true);
   });
 
-  it("lists every input choice of a campaign with beliefs and the hidden best", () => {
+  it("lists every choice of a campaign with beliefs and the hidden best", () => {
     const points = pointsOf(model, model.campaigns[0]!);
     expect(points.length).toBeGreaterThan(5);
     const graded = points.filter((p) => p.options.length > 1 && p.options.some((o) => o.isHiddenBest));
     expect(graded.length).toBeGreaterThan(5);
   });
 
-  it("shows where a provider pipe is plugged and the best script at each input", () => {
+  it("shows where a provider pipe is plugged and the best script at each Material", () => {
     const multi = model.catalogue.pipes.map((p) => pluggedAt(model, p.id)).filter((l) => l.length >= 2);
     expect(multi.length).toBeGreaterThan(0);
   });
@@ -80,14 +80,14 @@ describe("pins are configuration", () => {
     expect(DEFAULT_PINS).toHaveLength(2);
     for (const p of DEFAULT_PINS) expect(pinnedPage(model, p, null).kind).toBe(p.kind);
     // Pin an object outcome nobody pinned: it gets a menu entry and a page listing its dynasties.
-    const other = model.catalogue.outcomes.find((o) => o.subject === "object" && !DEFAULT_PINS.some((p) => p.id === o.id) && session.objectVersions(model.clients[0]!.brand.id, o.id).length > 0)!;
+    const other = model.catalogue.outcomes.find((o) => o.subject === "brand" && !DEFAULT_PINS.some((p) => p.id === o.id) && session.objectVersions(model.clients[0]!.brand.id, o.id).length > 0)!;
     const pins = togglePin(DEFAULT_PINS, { kind: "outcome", id: other.id, label: other.plural ?? other.label });
     expect(pins).toHaveLength(3);
     expect(pinHref(pins[2]!)).toContain(encodeURIComponent(`outcome:${other.id}`));
     const page = pinnedPage(model, pins[2]!, null);
     expect(page.kind === "outcome" && page.dynasties.length).toBeGreaterThan(0);
     // And a pipe: its scripts, where it is plugged, its pipe storage.
-    const pipe = model.catalogue.pipes.find((p) => p.inputs.length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
+    const pipe = model.catalogue.pipes.find((p) => p.materials.length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
     const pipePage = pinnedPage(model, { kind: "pipe", id: pipe.id, label: pipe.name }, null);
     expect(pipePage.kind === "pipe" && pipePage.dynasties.length).toBeGreaterThan(0);
   });
@@ -148,14 +148,14 @@ describe("a funnel line and its plays describe the same pipes", () => {
         expect(l.parts.at(-1)?.output).toBe(c.line[k]);
         expect(l.parts.at(-1)?.pipe.id).toBe(session.playsToday(c)[k]);
       });
-      // Every pipe whose inputs this campaign chose today is drawn.
+      // Every pipe whose Materials this campaign chose today is drawn.
       for (const p of session.choicePoints().filter((x) => x.campaignId === c.id)) {
         const consumer = model.catalogue.pipe(p.point.split("|")[0]!);
         if (!consumer) continue;
         const picked = [...session.pickSeries(p.point, c.id).values()].some((arr) => arr.slice(-7).some((n) => n > 0));
         const onLine = drawn.includes(consumer.id);
         if (picked && !onLine) {
-          // Only a pipe the leg does not run today (another option at an input) may be left out.
+          // Only a pipe the leg does not run today (another option at a Material) may be left out.
           const alternatives = session.choicePoints().filter((x) => x.campaignId === c.id && !x.point.startsWith("play:"));
           expect(alternatives.length).toBeGreaterThan(0);
         }
@@ -163,12 +163,13 @@ describe("a funnel line and its plays describe the same pipes", () => {
     }
   });
 
-  it("the follow-up campaign draws Follow-up due, the follow-up email, the reply, the reply judge, the interested lead", () => {
-    const follow = model.campaigns.find((c) => c.entry.kind === "trigger")!;
+  it("the follow-up campaign draws Message sent, the follow-up, the mailbox's replies, the reply judge, the interested lead", () => {
+    const follow = model.campaigns.find((c) => c.start !== "start")!;
     const line = campaignLine(model, follow);
-    expect(line.trigger?.id).toBe(follow.entry.kind === "trigger" ? follow.entry.triggerId : null);
+    expect(line.start).toBe("message_sent");
     expect(line.legs[0]!.parts.map((p) => [p.pipe.id, p.output])).toEqual([
-      ["follow_up", "reply_received"],
+      ["follow_up", "follow_up_queued"],
+      ["follow_up_replies", "reply_received"],
       ["reply_judging", "lead_interested"],
     ]);
     expect(linePipes(line).map((p) => p.id)).toEqual(playedPipes(model, follow).map((p) => p.id));
@@ -180,26 +181,5 @@ describe("a funnel line and its plays describe the same pipes", () => {
     expect(line.funnel?.name).toBeTruthy();
     expect(line.legs.map((l) => l.parts.at(-1)?.pipe.id)).toEqual(f.legs.map((l) => l.pipeId));
     expect(linePipes(line).length).toBeGreaterThanOrEqual(f.legs.length);
-  });
-});
-
-describe("shadow mode on a snapshot of the simulation (fictional data)", () => {
-  it("every client reconciles with its own books and shows today beside the engine", async () => {
-    const { ShadowSession, selfProduction, snapshotFromSimulation } = await import("@gtm-factory/engine");
-    const { clientRows, pointOptions } = await import("./shadow-model");
-    const { world, session } = replay(WORLD.seed, [], 20);
-    const snapshot = selfProduction(snapshotFromSimulation(session));
-    const shadow = new ShadowSession(snapshot);
-    const s = { snapshot, session: shadow, report: shadow.compute(), origin: "test" };
-    const rows = clientRows(s);
-    expect(rows.length).toBe(world.clients.length);
-    expect(rows.every((r) => r.view.reconciliation.reconciles)).toBe(true);
-    const v = rows[0]!.view.campaigns[0]!;
-    expect(v.salesPath.name).toBeTruthy();
-    for (const p of v.points) {
-      const { shown } = pointOptions(p);
-      if (p.today) expect(shown.map((o) => o.option)).toContain(p.today);
-      expect(shown.map((o) => o.option)).toContain(p.engine);
-    }
   });
 });

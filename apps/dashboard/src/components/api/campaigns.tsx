@@ -105,7 +105,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
   // Object outcomes (a template, a brand context, an LLM completion) ride beside the pipe they feed.
   const line = d.funnel
     ? [...new Set(d.funnel.legs.flatMap((l) => l.pipes.map((p) => catalogue?.pipes.find((x) => x.id === p)?.output ?? p)))].filter(
-        (o) => catalogue?.outcomes.find((x) => x.id === o)?.subject !== "object",
+        (o) => catalogue?.outcomes.find((x) => x.id === o)?.subject !== "brand",
       )
     : Object.keys(c.counts);
   return (

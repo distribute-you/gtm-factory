@@ -13,7 +13,7 @@ export interface PointGroup {
   points: { info: PointInfo; conv: PointConvergence }[];
 }
 
-/** Choice points grouped by the pipe that consumes the input (a leg's own choices together). */
+/** Choice points grouped by the pipe that consumes the Material (a leg's own choices together). */
 export function pointGroups(model: Model): PointGroup[] {
   const groups = new Map<string, PointGroup>();
   for (const conv of convergenceOf(model)) {
@@ -37,7 +37,7 @@ export function recentShare(conv: PointConvergence, days = 7): number | null {
   return p > 0 ? b / p : null;
 }
 
-/** Provider pipes plugged at two inputs or more, with the best script at each input. */
+/** Provider pipes plugged at two Materials or more, with the best script at each. */
 export function multiPlugged(model: Model): { pipeId: string; inputs: PluggedInput[] }[] {
   const out: { pipeId: string; inputs: PluggedInput[] }[] = [];
   for (const p of model.catalogue.pipes) {
@@ -53,11 +53,11 @@ export interface FactoryFigures {
   ours: boolean;
   pipes: string[];
   runs: number;
-  occurrences: number;
+  units: number;
   spendCents: number;
 }
 
-/** What each factory ran: its pipes, runs, occurrences and what it cost (our spend or an access cost). */
+/** What each factory ran: its pipes, runs, Units and what it cost (our spend or an access cost). */
 export function factoryFigures(model: Model): FactoryFigures[] {
   return model.catalogue.factories.map((f) => {
     const pipes = model.catalogue.pipes.filter((p) => p.factory === f.id).map((p) => p.id);
@@ -68,12 +68,12 @@ export function factoryFigures(model: Model): FactoryFigures[] {
       runs++;
       spend += r.spendCents;
     }
-    const occurrences = model.session.occurrences.filter((o) => o.factory === f.id).length;
-    return { id: f.id, name: f.name, ours: f.ours, pipes, runs, occurrences, spendCents: spend };
+    const units = model.session.units.filter((o) => o.factory === f.id).length;
+    return { id: f.id, name: f.name, ours: f.ours, pipes, runs, units, spendCents: spend };
   });
 }
 
-/** The occurrences consumed most often: where the reuse gain of the ledger comes from. */
+/** The Units consumed most often: where the reuse gain of the ledger comes from. */
 export function mostReused(model: Model, limit = 6): { id: string; consumptions: number; standardCents: number }[] {
   const l = model.session.ledger();
   return Object.entries(l.consumptions)

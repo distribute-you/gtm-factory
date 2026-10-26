@@ -8,19 +8,38 @@ import { REPO_URL } from "@/components/shell";
 const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
   {
     kind: "outcome",
-    title: "Outcomes",
+    title: "Outcomes and Units",
     lines: [
-      "An outcome is something reached for a subject: a lead, a company, or an object such as an ICP or a template.",
+      "An outcome is a part reference: Lead interested, Message sent, Template. A Unit is one physical piece of it: Marie, interested on day 24.",
+      "Every API call output is an outcome. A cold email is Message written, then Message queued by our send call, then Message sent and Reply received, reported by the mailbox.",
       "Lead states sit on a lead track: lead interested, then meeting booked, then meeting attended, then paid client. Tracks are never added together.",
     ],
   },
   {
     kind: "pipe",
-    title: "Pipes",
+    title: "Pipes and their Bill of materials",
     lines: [
-      "A pipe turns its inputs into one outcome. It may need several inputs: a message writer needs a verified email, the company research, a template, a brand context and an LLM completion.",
-      "An input is produced ahead (an ICP, a template) or on demand (an LLM completion): the consuming script asks the engine, the engine runs a provider script, one run makes one occurrence.",
-      "Identity is a pipe too: who a raw record is, in the one id space every pipe shares.",
+      "A pipe turns its Bill of materials into one outcome. Each line is a Material: the message writer consumes a verified email, a company researched, a template, a brand context, an LLM completion and a Rating per message.",
+      "Each pipe has two functions. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. Both open Runs: one Run is one script executed, one Unit or none.",
+      "A Specification is what a consumer asks for: the organisation of Paul's company, a brand context younger than 90 days, one of them.",
+    ],
+  },
+  {
+    kind: "campaign",
+    title: "The Campaign orders production",
+    lines: [
+      "A Campaign is a target outcome, a daily budget and a start outcome. From Start it is proactive: at each tick it pulls on its target. From any other outcome it is reactive: it pushes each Unit that lands into its first pipe.",
+      "A pull serves the most advanced Units first. Upstream makes only what downstream asked for. A Unit advances one pipe per tick, since every run takes time.",
+      "A follow-up campaign starts from Message sent. Its script waits its days since the last message, then writes. Who is never served, such as people who asked to stop, is the strategy's choice.",
+    ],
+  },
+  {
+    kind: "object",
+    title: "The ledger is the common stock",
+    lines: [
+      "Every Unit lands in one stock, whoever made it: our pipes, the client's team, the client's CRM, the organic market. Several producers feed one outcome.",
+      "A pipe serves itself from the stock when a Unit fits its Specification. When none does, it orders one from a producer it chooses. A Unit never wears out: several campaigns can consume it.",
+      "A webhook is the script of a pipe another factory calls: the CRM reports an interested lead, the mailbox reports a message sent. Its Units land in the stock and push the reactive campaigns that start from them.",
     ],
   },
   {
@@ -28,59 +47,41 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "Scripts",
     lines: [
       "A script performs a pipe. Several compete on each pipe. Each belongs to a dynasty with versions: an upgrade keeps the dynasty's stats, a fork starts from its parent's.",
-      "One run is one script. A run that does not produce its outcome is a run without it, never a fallback to another script.",
-      "A script owns its business logic (who to pick, when to pick again, what to remember) in its pipe storage. Nobody else reads that storage: data moves between pipes only through occurrences.",
-    ],
-  },
-  {
-    kind: "trigger",
-    title: "Triggers",
-    lines: [
-      "One generic trigger: when an outcome is reached, after a delay, unless another outcome is reached meanwhile. Each event is itself an occurrence.",
-      "A campaign can start from a trigger instead of the market: a follow-up campaign wakes 4 days after a message, unless a reply came.",
+      "A script owns its business logic in its pipe storage: who to pick, when to run, what to remember. The storage holds notes and references to Units, never copies.",
     ],
   },
   {
     kind: "point",
-    title: "The input choice",
+    title: "The Supplier rating",
     lines: [
-      "Every choice lives on an input: the play of a leg, the script providing an input, the occurrence to consume. One prioritizer makes them all.",
-      "Thompson sampling on value per dollar: draw a plausible rate and a plausible cost for each option, pick the best draw. Exploration comes by construction.",
-      "Beliefs pool: a script's level everywhere it is offered, then this input, then clients sharing tactics, then the client. Delayed outcomes count for the share already due. Costs are measured, with their uncertainty.",
+      "A pipe cannot judge its options from its own data: a template's replies land later, in another pipe. The Supplier rating pipe reads the ledger and the traceability and makes a Rating each tick.",
+      "The choosing pipe takes the Rating as a Material and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. The Rating's cost goes to the pipes that consume it.",
     ],
   },
   {
     kind: "play",
     title: "Credit through traceability",
     lines: [
-      "Every occurrence records what led to it: the scripts run, the occurrences consumed, at which input.",
-      "When the end of a leg lands, every input choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
+      "Every Unit records the choices that led to it, its own included, and those carried by the Units it consumed.",
+      "When the end of a leg lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
     ],
   },
   {
     kind: "strategy",
     title: "Tactics and strategies",
     lines: [
-      "A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts and leads.",
-      "A strategy is a set of conditions on tactics. Its rules attach to the inputs of one pipe: pro models at the writer's input, a 60 day recontact window at the sourcing input. A play is a pipe with a strategy; a campaign chooses one per pipe, with a default.",
-      "One split mechanism reads typed tactics: list values grouped, number thresholds found. Splits on leads propose a finer ICP; splits on scripts propose a strategy.",
+      "A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts, leads and Units.",
+      "A strategy is a set of conditions on tactics, per Material of one pipe: pro models at the writer's LLM completion, a 60 day recontact window at the identity's Lead found. Its conditions enter the Specification.",
+      "One split mechanism reads typed tactics. Splits on leads propose a finer ICP; splits on scripts propose a strategy.",
     ],
   },
   {
     kind: "factory",
     title: "Other factories and reliability",
     lines: [
-      "Every occurrence names its producer: one of our runs, or another factory (your team, your CRM, the organic market) at its access cost.",
-      "Everything is counted. Our return values only what our runs produced.",
+      "Every Unit names its producer: one of our runs, or another factory at its access cost. Our return counts only what our runs produced.",
       "Reliability is measured: a producer's agreement with the outcome's reference pipe on the same subjects.",
-    ],
-  },
-  {
-    kind: "object",
-    title: "The ledger",
-    lines: [
-      "Decisions read each pipe's own cost and yield. Reports read the every-path cost of each outcome.",
-      "An occurrence keeps the price paid to make it; reuse shows as a gain. The books reconcile to the cent.",
+      "Decisions read each pipe's own cost and yield. Reports read the every-path cost of each outcome. A Unit keeps the price paid to make it, reuse shows as a gain, and the books reconcile to the cent.",
     ],
   },
 ];
@@ -92,7 +93,7 @@ export function HowItWorksPage() {
       <Page narrow>
         <PageHeader
           title="Revenue made easy, as a factory"
-          sub="Go-to-market as a factory: outcomes, pipes that make them, scripts that compete inside each pipe, and one engine that puts every dollar where it returns the most."
+          sub="Go-to-market as a factory: Campaigns order outcomes, pipes make them from their Bill of materials, scripts compete inside each pipe, and every choice goes where a dollar returns the most."
           right={
             <a href={`${REPO_URL}/blob/main/docs/framework.md`} target="_blank" rel="noreferrer" className="k-btn">
               Read the spec

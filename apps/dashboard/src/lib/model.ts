@@ -1,6 +1,6 @@
 /**
  * Read models over the running world: every figure a page shows is computed here from the
- * engine's own outputs (runs, occurrences, input choices, beliefs). Pages divide nothing
+ * engine's own outputs (runs, Units, choices, beliefs). Pages divide nothing
  * themselves. Nothing here knows an outcome, a pipe or a script by name: everything is read
  * off the catalogue.
  */
@@ -9,7 +9,6 @@ import {
   START,
   convergence,
   hiddenBest,
-  isOnDemand,
   legConsumer,
   playPoint,
   rankFunnels,
@@ -17,7 +16,7 @@ import {
   type Catalogue,
   type ChoiceRecord,
   type HiddenOption,
-  type Occurrence,
+  type Unit,
   type OutcomeId,
   type Person,
   type Pipe,
@@ -114,10 +113,60 @@ export function factoryName(catalogue: Catalogue, id: string): string {
   return catalogue.factory(id)?.name ?? humanize(id);
 }
 
-/** A pipe in one line: its inputs, then what it makes. */
+/** A pipe in one line: its Bill of materials, then what it makes. */
 export function pipeLine(catalogue: Catalogue, pipe: Pipe): string {
-  const ins = pipe.inputs.length ? pipe.inputs.map((i) => outcomeLabel(catalogue, i)).join(" + ") : "The market";
+  const ins = pipe.materials.length ? pipe.materials.map((i) => outcomeLabel(catalogue, i)).join(" + ") : pipe.webhook ? "A webhook call" : catalogue.createsSubjects(pipe) || catalogue.outcome(pipe.output)?.subject === "lead" ? "The market" : "Nothing";
   return `${ins} → ${outcomeLabel(catalogue, pipe.output)}`;
+}
+
+/** One line of a pipe's Bill of materials: the outcome it consumes per Unit produced, who makes it, and the choice made there. */
+export interface MaterialRow {
+  material: OutcomeId;
+  label: string;
+  /** The subject Material: the Unit the pipe works on. */
+  subject: boolean;
+  /** Pipes producing it (several share one stock). */
+  producers: Pipe[];
+  /** How the pipe gets it: served from the stock or ordered (a choice among producer scripts), the Unit it is pushed. */
+  how: string;
+  /** The choice point (this pipe, this Material), when one was made. */
+  point: string | null;
+  /** The option picked most over the last 7 days, every campaign. */
+  choice: string | null;
+  picks: number;
+}
+
+/** A pipe's Bill of materials, line by line (each line a Material). */
+export function billOfMaterials(model: Model, pipe: Pipe): MaterialRow[] {
+  const c = model.catalogue;
+  const subject = c.subjectMaterial(pipe);
+  return pipe.materials.map((m) => {
+    const o = c.outcome(m);
+    const point = `${pipe.id}|${m}`;
+    const series = model.session.pickSeries(point);
+    let choice: string | null = null;
+    let best = 0;
+    let picks = 0;
+    for (const [opt, arr] of series) {
+      const recent = arr.slice(-7).reduce((x, y) => x + y, 0);
+      picks += arr.reduce((x, y) => x + y, 0);
+      if (recent > best) {
+        best = recent;
+        choice = opt;
+      }
+    }
+    const how =
+      o?.contentType === "rating"
+        ? "Today's Rating, from the stock"
+        : o?.subject === "run"
+          ? "Ordered for each run"
+          : o?.subject === "brand"
+            ? "From the stock when a Unit conforms, else ordered"
+            : m === subject
+              ? "The Unit it works on: pulled or pushed"
+              : "From the stock for this subject, else ordered";
+    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, point: series.size > 0 ? point : null, choice: choice ? optionLabel(model, point, choice) : null, picks };
+  });
 }
 
 /** The script a dynasty runs today. */
@@ -125,18 +174,18 @@ export function headScript(catalogue: Catalogue, dynasty: string): Script | unde
   return catalogue.headOf(dynasty) ?? catalogue.versionsOf(dynasty).pop();
 }
 
-export type PointKind = "play" | "script" | "occurrence";
+export type PointKind = "play" | "script" | "unit";
 
 export interface PointInfo {
   key: string;
   kind: PointKind;
   /** The consuming pipe, or null for a leg's own choice. */
   consumer: Pipe | null;
-  /** The input the choice is made at. */
-  input: OutcomeId;
+  /** The Material the choice is made at. */
+  material: OutcomeId;
   /** "Message writer · LLM completion", "Lead interested → Meeting booked". */
   title: string;
-  /** What the options are: scripts of these pipes, occurrences of an outcome, or plays. */
+  /** What the options are: scripts of these pipes, Units of an outcome, or plays. */
   sub: string;
 }
 
@@ -144,24 +193,25 @@ export interface PointInfo {
 export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
   if (key.startsWith("play:")) {
     const [from, to] = key.slice(5).split(">") as [string, string];
-    return { key, kind: "play", consumer: null, input: to, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which pipe plays the leg" };
+    return { key, kind: "play", consumer: null, material: to, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which pipe plays the leg" };
   }
-  const [consumer, input] = key.split("|") as [string, string];
-  const out = catalogue.outcome(input);
+  const [consumer, material] = key.split("|") as [string, string];
+  const out = catalogue.outcome(material);
   if (consumer.startsWith("leg:")) {
     const [from, to] = consumer.slice(4).split(">") as [string, string];
-    return { key, kind: "script", consumer: null, input, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which script performs the leg" };
+    return { key, kind: "script", consumer: null, material, title: `${outcomeLabel(catalogue, from)} → ${outcomeLabel(catalogue, to)}`, sub: "Which script performs the leg" };
   }
   const pipe = catalogue.pipe(consumer) ?? null;
-  const providers = catalogue.providersOf(input);
-  const kind: PointKind = out?.subject === "object" && !providers.some((p) => isOnDemand(p)) ? "occurrence" : "script";
+  // A brand Material is chosen among the Units in the stock (templates, ICPs); the others among producer scripts.
+  const scripted = catalogue.providersOf(material).some((p) => catalogue.dynastiesOf(p.id).some((s) => s.dynasty !== "" && out?.subject !== "brand"));
+  const kind: PointKind = out?.subject === "brand" && !scripted ? "unit" : "script";
   return {
     key,
     kind,
     consumer: pipe,
-    input,
-    title: `${pipe?.name ?? humanize(consumer)} · ${outcomeLabel(catalogue, input)}`,
-    sub: kind === "occurrence" ? `Which ${outcomeLabel(catalogue, input).toLowerCase()} to consume` : `Which script provides it`,
+    material,
+    title: `${pipe?.name ?? humanize(consumer)} · ${outcomeLabel(catalogue, material)}`,
+    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material).toLowerCase()} to serve from the stock` : `Which script produces it`,
   };
 }
 
@@ -174,8 +224,8 @@ export function optionLabel(model: Model, point: string, option: string, brandId
   const info = pointInfo(model.catalogue, point);
   const brands = brandId ? [brandId] : model.clients.map((c) => c.brand.id);
   for (const b of brands) {
-    const occ = model.session.objectHead(b, info.input, option);
-    if (occ) return occ.name ?? humanize(option);
+    const u = model.session.objectHead(b, info.material, option);
+    if (u) return u.name ?? humanize(option);
   }
   return humanize(option);
 }
@@ -193,14 +243,14 @@ export function scopedCampaigns(model: Model, brandId: string | null): Campaign[
   return model.campaigns.filter((c) => !brandId || c.brandId === brandId);
 }
 
-/** Where a campaign's funnel starts: Start, or its trigger's event. */
-export function entryOf(model: Model, campaign: Campaign): OutcomeId {
-  return campaign.entry.kind === "start" ? START : model.catalogue.trigger(campaign.entry.triggerId)?.event ?? START;
+/** Where a campaign's funnel starts: Start (it pulls), or the outcome whose Units it pushes. */
+export function startOf(_model: Model, campaign: Campaign): OutcomeId {
+  return campaign.start;
 }
 
-/** The line of a campaign's sales funnel: entry, then each lead state. */
+/** The line of a campaign's sales funnel: its start outcome, then each lead state. */
 export function lineOf(model: Model, campaign: Campaign): OutcomeId[] {
-  return [entryOf(model, campaign), ...campaign.line];
+  return [startOf(model, campaign), ...campaign.line];
 }
 
 export function targetOf(campaign: Campaign): OutcomeId {
@@ -245,7 +295,8 @@ export interface ScopeFigures {
   valueOther: number;
   attempts: number;
   dailyAttempts: number[];
-  triggerEvents: number;
+  /** Units pushed into reactive campaigns. */
+  pushes: number;
 }
 
 /** Money, value and outcomes of a set of campaigns, day by day. */
@@ -253,7 +304,7 @@ export function scopeFigures(model: Model, campaigns: readonly Campaign[]): Scop
   const ids = new Set(campaigns.map((c) => c.id));
   const n = model.day;
   const z = () => new Array<number>(n).fill(0);
-  const f: ScopeFigures = { spendCents: 0, dailySpendCents: z(), dailyOtherCents: z(), dailyOutcomes: {}, outcomes: {}, dailyValueOurs: z(), dailyValueOther: z(), valueOurs: 0, valueOther: 0, attempts: 0, dailyAttempts: z(), triggerEvents: 0 };
+  const f: ScopeFigures = { spendCents: 0, dailySpendCents: z(), dailyOtherCents: z(), dailyOutcomes: {}, outcomes: {}, dailyValueOurs: z(), dailyValueOther: z(), valueOurs: 0, valueOther: 0, attempts: 0, dailyAttempts: z(), pushes: 0 };
   for (const d of model.session.days) {
     for (const [cid, v] of Object.entries(d.spendCents)) if (ids.has(cid)) f.dailySpendCents[d.day]! += v;
     for (const [cid, v] of Object.entries(d.otherCents)) if (ids.has(cid)) f.dailyOtherCents[d.day]! += v;
@@ -268,14 +319,19 @@ export function scopeFigures(model: Model, campaigns: readonly Campaign[]): Scop
       }
     }
   }
-  // Setup and other work billed to the campaigns outside a day's runs (seed occurrences, setup).
+  // Setup and other work billed to the campaigns outside a day's runs (seed Units, setup).
   f.spendCents = campaigns.reduce((s, c) => s + model.session.spentCents(c.id), 0);
   // Setup of the brands in scope (support work, no outcome): our spend too.
   for (const r of model.session.runs) if (r.support && r.campaignId && ids.has(r.campaignId)) f.spendCents += r.spendCents;
+  // Auxiliary cost centers (the Supplier rating) of the brands in scope: our runs for no campaign, their cost reaching the campaigns through the Units consumed.
+  const brands = new Set(campaigns.map((c) => c.brandId));
+  const ours = new Set(model.catalogue.factories.filter((x) => x.ours).map((x) => x.id));
+  const runBrand = memo(model, "runBrand", () => new Map(model.session.units.map((u) => [u.runId, u.brandId])));
+  for (const r of model.session.runs) if (!r.campaignId && !r.support && ours.has(r.factory) && brands.has(runBrand.get(r.id) ?? "")) f.spendCents += r.spendCents;
   f.valueOurs = f.dailyValueOurs.reduce((s, x) => s + x, 0);
   f.valueOther = f.dailyValueOther.reduce((s, x) => s + x, 0);
   f.attempts = f.dailyAttempts.reduce((s, x) => s + x, 0);
-  f.triggerEvents = model.session.triggerEvents.filter((e) => e.campaignIds.some((c) => ids.has(c))).length;
+  f.pushes = model.session.pushes.filter((p) => ids.has(p.campaignId)).length;
   return f;
 }
 
@@ -433,7 +489,7 @@ export interface PluggedInput {
   picks: number;
 }
 
-/** Every input a pipe's scripts are offered at, and the best script at each. */
+/** Every Material a pipe's scripts are offered at, and the best script at each. */
 export function pluggedAt(model: Model, pipeId: string): PluggedInput[] {
   return memo(model, `plugged:${pipeId}`, () => {
     const dynasties = new Set(model.catalogue.scripts.filter((s) => s.pipeId === pipeId).map((s) => s.dynasty));
@@ -467,7 +523,7 @@ export function scriptFigures(model: Model, dynasty: string): ScriptFigures {
   const all = memo(model, "scriptFigures", () => {
     const byScript = new Map<string, ScriptFigures>();
     const produced = new Map<string, number>();
-    for (const o of model.session.occurrences) produced.set(o.runId, (produced.get(o.runId) ?? 0) + 1);
+    for (const o of model.session.units) produced.set(o.runId, (produced.get(o.runId) ?? 0) + 1);
     for (const r of model.session.runs) {
       if (!r.scriptId) continue;
       const s = model.catalogue.script(r.scriptId);
@@ -497,11 +553,11 @@ export interface ObjectDynasty {
   dynasty: string;
   name: string;
   parentDynasty: string | null;
-  versions: Occurrence[];
-  head: Occurrence;
-  /** Picks over every input that consumes it, every campaign of the brand. */
+  versions: Unit[];
+  head: Unit;
+  /** Picks over every Material that consumes it, every campaign of the brand. */
   picks: number;
-  /** Share of the brand's picks at those inputs over the last 7 days. */
+  /** Share of the brand's picks at those Materials over the last 7 days. */
   share: number;
 }
 
@@ -537,7 +593,7 @@ export function objectDynasties(model: Model, outcome: OutcomeId, brandId: strin
 
 /** Object outcomes of the catalogue (what a pin on an outcome can list). */
 export function objectOutcomes(catalogue: Catalogue): OutcomeId[] {
-  return catalogue.outcomes.filter((o) => o.subject === "object" && !o.retired).map((o) => o.id);
+  return catalogue.outcomes.filter((o) => o.subject === "brand" && !o.retired).map((o) => o.id);
 }
 
 /** A word diff between two texts: the parts kept, added and removed, in order. */
@@ -609,11 +665,11 @@ export function leadRows(model: Model, brandId: string | null): LeadRow[] {
   });
 }
 
-/** Everything that happened to one person (and to its company): occurrences, newest last. */
-export function timelineOf(model: Model, personId: string): Occurrence[] {
+/** Everything that happened to one person (and to its company): Units, newest last. */
+export function timelineOf(model: Model, personId: string): Unit[] {
   const p = model.session.person(personId);
   const company = p?.companyId;
-  return model.session.occurrences.filter((o) => o.subject === personId || (company && o.subject === company)).sort((a, b) => a.day - b.day || (a.id < b.id ? -1 : 1));
+  return model.session.units.filter((o) => o.subject === personId || (company && o.subject === company)).sort((a, b) => a.day - b.day || (a.id < b.id ? -1 : 1));
 }
 
 /** A fictional name for a person, drawn from its id (the same on every reload). */

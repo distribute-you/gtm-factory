@@ -1635,7 +1635,7 @@ export class SimulationSession {
   legPipes(play: string, from: OutcomeId, campaign: Campaign | null): LegPipe[] {
     const out: LegPipe[] = [];
     const seen = new Set<string>();
-    const strategic = campaign ?? ({ strategies: {}, start: START } as unknown as Campaign);
+    const strategic = campaign ?? ({ strategies: {}, start: from } as unknown as Campaign);
     const starts = this.startsOf(strategic);
     const visit = (pipeId: string, feeds: { pipe: string; material: OutcomeId } | null, main: boolean) => {
       if (seen.has(pipeId)) return;

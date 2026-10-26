@@ -89,7 +89,7 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
           <Figure value={formatCents(f.spendCents)} />
           <BarSpark className="mt-auto pt-2" values={f.dailySpendCents} />
         </StatTile>
-        <StatTile label="Leads tried" note={`${formatCount(f.triggerEvents)} trigger events`}>
+        <StatTile label="Units taken in" note={`${formatCount(f.pushes)} pushed by reactive campaigns`}>
           <Figure value={formatCount(f.attempts)} />
           <BarSpark className="mt-auto pt-2" values={f.dailyAttempts} color="var(--data-teal)" />
         </StatTile>
@@ -138,7 +138,7 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
               const brandName = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name;
               return (
                 <Link key={c.id} href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="k-hover flex items-center gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
-                  {c.entry.kind === "trigger" ? <Mark kind="trigger" id={c.entry.triggerId} size={32} /> : <Mark kind="funnel" id={c.id} size={32} />}
+                  <Mark kind="funnel" id={c.id} size={32} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{c.name}</span>
                     <span className="k-fg3 block truncate text-[12px]">
@@ -216,7 +216,7 @@ export function ReturnCard({ f, expected }: { f: ScopeFigures; expected: number 
   );
 }
 
-/** The engine's latest input choices and why: newest first. */
+/** The engine's latest choices and why: newest first. */
 export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campaignIds: Set<string>; limit?: number }) {
   const items = recentChoices(model, campaignIds, limit);
   return (

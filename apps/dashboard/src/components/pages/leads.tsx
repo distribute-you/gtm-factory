@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { confidenceOf, type Occurrence, type TacticValue } from "@gtm-factory/engine";
+import { confidenceOf, type Unit, type TacticValue } from "@gtm-factory/engine";
 import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
@@ -152,7 +152,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
   const reached = s.reachedBy(id);
   const timeline = useMemo(() => timelineOf(model, id), [model, id]);
   const reliability = useMemo(() => s.reliability(), [s, model.day]);
-  const triggers = s.triggerEvents.filter((e) => e.subject === id);
+  const pushes = s.pushes.filter((p) => p.subject === id);
   const root = s.rootOf(id) ?? "";
   const attempts = s.attemptsOf(id);
   return (
@@ -231,16 +231,16 @@ function Lead({ model, id }: { model: Model; id: string }) {
             <TacticList model={model} values={person.values} level="company" />
           </div>
           <div className="k-card h-fit p-4">
-            <p className="k-label mb-3">Trigger events</p>
-            {triggers.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No trigger fired for this lead.</p>
+            <p className="k-label mb-3">Pushed into campaigns</p>
+            {pushes.length === 0 ? (
+              <p className="k-fg3 text-[12px]">No reactive campaign took a Unit of this lead.</p>
             ) : (
               <ul className="space-y-1.5">
-                {triggers.map((e) => (
-                  <li key={e.occurrenceId} className="flex items-center gap-2 text-[13px]">
-                    <Mark kind="trigger" id={e.triggerId} size={18} />
-                    <span className="min-w-0 flex-1 truncate">{model.catalogue.trigger(e.triggerId)?.label ?? e.triggerId}</span>
-                    <span className="k-fg3 k-mono text-[12px]">Day {e.day}</span>
+                {pushes.map((p) => (
+                  <li key={`${p.campaignId}:${p.unitId}`} className="flex items-center gap-2 text-[13px]">
+                    <Mark kind="funnel" id={p.campaignId} size={18} />
+                    <span className="min-w-0 flex-1 truncate">{model.session.campaign(p.campaignId)?.name ?? p.campaignId}</span>
+                    <span className="k-fg3 k-mono text-[12px]">Day {p.day}</span>
                   </li>
                 ))}
               </ul>
@@ -266,13 +266,13 @@ function Lead({ model, id }: { model: Model; id: string }) {
   );
 }
 
-function TimelineRow({ model, occ }: { model: Model; occ: Occurrence }) {
+function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
   const [open, setOpen] = useState(false);
   const script = occ.scriptId ? model.catalogue.script(occ.scriptId) : undefined;
   const ours = model.catalogue.factory(occ.factory)?.ours ?? false;
   const campaign = occ.campaignId ? model.campaigns.find((c) => c.id === occ.campaignId) : undefined;
   const choices = occ.trace.map((d) => model.session.decisions[d]).filter((d): d is NonNullable<typeof d> => !!d);
-  const inputs = Object.entries(occ.inputs).filter(([, v]) => v);
+  const inputs = Object.entries(occ.materials).filter(([, v]) => v);
   return (
     <div className="px-4 py-3">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 text-left" aria-expanded={open}>
@@ -280,7 +280,7 @@ function TimelineRow({ model, occ }: { model: Model; occ: Occurrence }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{outcomeLabel(model.catalogue, occ.outcome)}</span>
           <span className="k-fg3 block truncate text-[12px]">
-            {occ.pipeId ? pipeName(model.catalogue, occ.pipeId) : "Trigger"}
+            {occ.pipeId ? pipeName(model.catalogue, occ.pipeId) : "Setup"}
             {script ? ` · ${script.name}` : ""}
             {campaign ? ` · ${campaign.name}` : ""}
           </span>
@@ -291,13 +291,13 @@ function TimelineRow({ model, occ }: { model: Model; occ: Occurrence }) {
       {open && (
         <div className="k-inset mt-2 space-y-2 rounded-[8px] p-3">
           <div>
-            <p className="k-label mb-1">Inputs consumed</p>
+            <p className="k-label mb-1">Materials consumed</p>
             {inputs.length === 0 ? (
               <p className="k-fg3 text-[12px]">None: it came from the market or from outside.</p>
             ) : (
               <div className="flex flex-wrap gap-1">
                 {inputs.map(([o, id]) => {
-                  const src = model.session.occurrence(id);
+                  const src = model.session.unit(id);
                   return (
                     <span key={o} className="k-chip">
                       {outcomeLabel(model.catalogue, o)}
@@ -309,9 +309,9 @@ function TimelineRow({ model, occ }: { model: Model; occ: Occurrence }) {
             )}
           </div>
           <div>
-            <p className="k-label mb-1">Traceability: the input choices that led here</p>
+            <p className="k-label mb-1">Traceability: the choices that led here</p>
             {choices.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No input choice: a single option or another factory.</p>
+              <p className="k-fg3 text-[12px]">No choice: a single option or another factory.</p>
             ) : (
               <ul className="space-y-1">
                 {choices.map((d) => (
@@ -364,13 +364,13 @@ function Companies({ model, scope }: { model: Model; scope: string | null }) {
     const research = new Map<string, number>();
     const uses = new Map<string, number>();
     const occCompany = new Map<string, string>();
-    for (const o of model.session.occurrences) {
+    for (const o of model.session.units) {
       if (!by.has(o.subject)) continue;
       occCompany.set(o.id, o.subject);
       if (model.catalogue.outcome(o.outcome)?.subject === "company") research.set(o.subject, Math.min(research.get(o.subject) ?? o.day, o.day));
     }
-    for (const o of model.session.occurrences) {
-      for (const id of Object.values(o.inputs)) {
+    for (const o of model.session.units) {
+      for (const id of Object.values(o.materials)) {
         const cid = occCompany.get(id);
         if (cid) uses.set(cid, (uses.get(cid) ?? 0) + 1);
       }

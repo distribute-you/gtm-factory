@@ -28,8 +28,8 @@ interface Draft {
   name: string;
   audienceText: string;
   target: string;
-  /** Start, or a trigger id whose events open the funnel. */
-  entry: string;
+  /** Start (the campaign pulls), or the outcome whose Units it pushes. */
+  start: string;
   value: string;
   perDay: string;
   campaignName: string;
@@ -73,7 +73,7 @@ function defaultDraft(model: Model, existing: boolean): Draft {
     name: "Brightloop Accounting",
     audienceText: "Founders of growing software companies in Europe and the United States.",
     target,
-    entry: START,
+    start: START,
     value: value ? String(value) : "1000",
     perDay: "30",
     campaignName: "",
@@ -95,10 +95,12 @@ function Flow({ model }: { model: Model }) {
   const client = d.brandId ? model.clients.find((c) => c.brand.id === d.brandId) ?? null : null;
   const offerOutcomes = client ? client.offer.outcomes : trackedOutcomes(model);
   const targets = trackedOutcomes(model).filter((o) => offerOutcomes.includes(o));
-  const entries = [{ id: START, label: "The market (Start)", event: START }, ...model.catalogue.triggers.filter((t) => !t.retired && t.event).map((t) => ({ id: t.id, label: `${t.label} (a trigger)`, event: t.event! }))];
-  const entry = entries.find((e) => e.id === d.entry) ?? entries[0]!;
+  // Start, or any lead outcome a pipe consumes as the Unit it works on: a reactive campaign pushes each one that lands.
+  const consumed = [...new Set(model.catalogue.pipes.filter((p) => !p.webhook && model.catalogue.isPipeLive(p)).map((p) => model.catalogue.subjectMaterial(p)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
+  const starts = [{ id: START, label: "The market (Start): pulls each tick" }, ...consumed.map((o) => ({ id: o, label: `${outcomeLabel(model.catalogue, o)}: pushes each one` }))];
+  const start = starts.find((e) => e.id === d.start) ?? starts[0]!;
   const value = Number(d.value) || 0;
-  const funnels = useMemo(() => (step === "funnels" && d.target ? proposeFunnels(model, offerOutcomes, d.target, value, entry.event) : []), [model, step, offerOutcomes, d.target, value, entry.event]);
+  const funnels = useMemo(() => (step === "funnels" && d.target ? proposeFunnels(model, offerOutcomes, d.target, value, start.id) : []), [model, step, offerOutcomes, d.target, value, start.id]);
   const chosen: RankedFunnel | undefined = funnels[Math.min(d.funnel, funnels.length - 1)];
   // The plays of the chosen funnel: every pipe its line draws, each with the strategy the campaign picks.
   const playable = useMemo(() => (chosen ? linePipes(rankedLine(model, chosen)) : []), [model, chosen]);
@@ -117,7 +119,7 @@ function Flow({ model }: { model: Model }) {
       brandId: base.brand.id,
       offerId: base.offer.id,
       name: d.campaignName.trim() || rankedLine(model, chosen).funnel?.name || outcomeLabel(model.catalogue, d.target),
-      entry: entry.id === START ? { kind: "start" } : { kind: "trigger", triggerId: entry.id },
+      start: start.id,
       line: chosen.line.slice(1),
       dailyBudgetCents: Math.round((Number(d.perDay) || 0) * 100),
       status: "running",
@@ -137,7 +139,7 @@ function Flow({ model }: { model: Model }) {
           const at = STEPS.findIndex((x) => x.id === step);
           return (
             <li key={s.id} className={`flex items-center gap-2 text-[13px] ${i === at ? "" : "k-fg3"}`} aria-current={i === at ? "step" : undefined}>
-              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] tabular-nums ${i < at ? "bg-[var(--run)] text-white" : i === at ? "bg-[var(--fg-1)] text-[var(--bg-surface)]" : "shadow-[inset_0_0_0_1px_var(--line)]"}`}>
+              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] tabular-nums ${i < at ? "bg-[var(--run)] text-white" : i === at ? "bg-[var(--fg-1)] text-[var(--bg-surface)]" : "ring-1 ring-inset ring-[var(--line)]"}`}>
                 {i < at ? <CheckIcon size={11} weight="bold" /> : i + 1}
               </span>
               {s.label}
@@ -172,7 +174,7 @@ function Flow({ model }: { model: Model }) {
               <Field label="Who to reach, in one sentence">
                 <textarea className="k-input w-full resize-y px-2 py-1.5 leading-6" style={{ font: "inherit", height: "auto" }} rows={2} value={d.audienceText} onChange={(e) => set({ audienceText: e.target.value })} />
               </Field>
-              <p className="k-fg3 text-[12px]">This sentence becomes the first ICP: an occurrence other ICPs compete with. A finer one comes from the data later.</p>
+              <p className="k-fg3 text-[12px]">This sentence becomes the first ICP: a Unit other ICPs compete with. A finer one comes from the data later.</p>
             </div>
           )}
           <div className="flex justify-end">
@@ -203,10 +205,10 @@ function Flow({ model }: { model: Model }) {
                 ))}
               </div>
             </Field>
-            <Field label="Where the funnel starts">
+            <Field label="Start outcome">
               <div className="flex flex-wrap gap-1">
-                {entries.map((e) => (
-                  <button key={e.id} type="button" className={`k-chip ${d.entry === e.id ? "k-chip-on" : ""}`} onClick={() => set({ entry: e.id, funnel: 0 })}>
+                {starts.map((e) => (
+                  <button key={e.id} type="button" className={`k-chip ${start.id === e.id ? "k-chip-on" : ""}`} onClick={() => set({ start: e.id, funnel: 0 })}>
                     {e.label}
                   </button>
                 ))}
@@ -251,7 +253,7 @@ function Flow({ model }: { model: Model }) {
 
           {chosen && (
             <section>
-              <SectionTitle count={playable.length} right={<span>A strategy states conditions per input. The default lets every script compete.</span>}>
+              <SectionTitle count={playable.length} right={<span>A strategy states conditions per Material. The default lets every script compete.</span>}>
                 Plays
               </SectionTitle>
               <div className="k-card divide-y divide-[var(--line-subtle)]">
@@ -277,7 +279,7 @@ function Flow({ model }: { model: Model }) {
                         {s && s.rules.length + (s.subject?.length ?? 0) > 0 && (
                           <span className="k-fg3 mt-1 block text-[12px]">
                             {[
-                              ...s.rules.map((r) => `${r.input ? `At ${outcomeLabel(model.catalogue, r.input).toLowerCase()}: ` : ""}${r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}`),
+                              ...s.rules.map((r) => `${r.material ? `At ${outcomeLabel(model.catalogue, r.material).toLowerCase()}: ` : ""}${r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}`),
                               ...(s.subject ?? []).map((c) => describeCondition(c, model.catalogue)),
                             ].join(" · ")}
                           </span>

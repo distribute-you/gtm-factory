@@ -34,7 +34,7 @@ export function ApiPinnedPage() {
 }
 
 // ---------------------------------------------------------------------------
-// An outcome pin: the dynasties of its object occurrences (templates, ICPs...)
+// An outcome pin: the dynasties of its object Units (templates, ICPs...)
 // ---------------------------------------------------------------------------
 
 function ObjectsPage({ pin }: { pin: Pin }) {
@@ -161,7 +161,7 @@ function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; 
             ? "The new version runs from now on. The dynasty keeps its history and its belief."
             : mode === "fork"
               ? "A new dynasty that competes with its parent. It starts from the parent's belief."
-              : "A new dynasty that competes with the others at every input it is offered."}{" "}
+              : "A new dynasty that competes with the others at every Material it is offered."}{" "}
           Variables are written {"{{like_this}}"}.
         </p>
         <Field label="Name">
@@ -211,7 +211,7 @@ function ScriptsPage({ pin }: { pin: Pin }) {
           <Read read={read}>
             {(scripts) => (
               <>
-                <PageHeader title={`${plural(scripts.length, "script", "scripts")} on ${pipeTitle(o?.catalogue, pin.id)}`} sub="Scripts compete on this pipe. Each input it feeds picks its own best one." />
+                <PageHeader title={`${plural(scripts.length, "script", "scripts")} on ${pipeTitle(o?.catalogue, pin.id)}`} sub="Scripts compete on this pipe. Each pipe consuming its output picks its own best one." />
                 {scripts.length === 0 ? (
                   <div className="k-card">
                     <EmptyNote>No script yet.</EmptyNote>
@@ -277,7 +277,7 @@ function ScriptCard({ s }: { s: ApiScriptStats }) {
         <div className="k-scroll overflow-x-auto"><table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b border-t">
-              <th className={`${TH} w-full`}>Input</th>
+              <th className={`${TH} w-full`}>Material</th>
               <th className={`${TH} text-right`}>Rate</th>
               <th className={`${TH} text-right`}>Cost to leg end</th>
               <th className={`${TH} text-right`}>Picks</th>

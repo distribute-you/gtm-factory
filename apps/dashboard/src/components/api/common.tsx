@@ -303,7 +303,7 @@ export function ChoicesTable({ choices, empty = "No choice made yet." }: { choic
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
-          <th className={TH}>Input</th>
+          <th className={TH}>Material</th>
           <th className={TH}>Chosen</th>
           <th className={`${TH} w-full`}>Why</th>
           <th className={TH}>Credited</th>
@@ -369,7 +369,7 @@ export function PointsList({ points, empty = "No choice point yet." }: { points:
     <div className="space-y-3">
       {points.map((p) => {
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.options.length)} options at this input`}>
+          <CardTable key={p.id} footer={`${formatCount(p.options.length)} options at this Material`}>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>

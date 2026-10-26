@@ -1,6 +1,6 @@
 /**
  * Where the dashboard reads from, fixed at BUILD time:
- *  - "sim" (default): the simulator and shadow mode, in the browser (the GitHub Pages build);
+ *  - "sim" (default): the simulator, in the browser (the GitHub Pages build);
  *  - "api": a running factory serving the factory API (packages/engine/src/factory-api.ts)
  *    under NEXT_PUBLIC_FACTORY_API_URL (default "/api", same origin).
  */

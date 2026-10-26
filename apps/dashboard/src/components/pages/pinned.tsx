@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PushPinIcon, PushPinSlashIcon } from "@phosphor-icons/react";
-import { ProviderLogo, ScriptCard, VersionEditor } from "@/components/catalogue-bits";
+import { BillOfMaterials, ProviderLogo, ScriptCard, VersionEditor } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
@@ -62,11 +62,11 @@ function OutcomePage({ model, data }: { model: Model; data: Extract<PageData, { 
     <>
       <PageHeader
         title={<>{plural(data.dynasties.length, "dynasty", "dynasties")} of {data.title.toLowerCase()}</>}
-        sub={data.description ?? "Each dynasty competes at the inputs that consume it; an edit is a new version of the same dynasty."}
+        sub={data.description ?? "Each dynasty competes at the Materials that consume it; an edit is a new version of the same dynasty."}
       />
       {data.dynasties.length === 0 ? (
         <div className="k-card">
-          <EmptyNote>No occurrence of this outcome yet.</EmptyNote>
+          <EmptyNote>No Unit of this outcome yet.</EmptyNote>
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -133,7 +133,7 @@ function PathPage({ model, data }: { model: Model; data: Extract<PageData, { kin
       <PageHeader title={data.title} sub={`A sales path: a straight line of lead states. ${plural(data.funnels.length, "sales funnel plays it", "sales funnels play it")}, ${plural(running, "campaign runs", "campaigns run")} one today.`} />
       <div className="k-card mb-6 px-4 py-3">
         <p className="k-label mb-1.5">Lead states</p>
-        <p className="text-[13px]">{[data.path.entry, ...data.path.line].map((o) => outcomeLabel(model.catalogue, o)).join(" → ")}</p>
+        <p className="text-[13px]">{[data.path.start, ...data.path.line].map((o) => outcomeLabel(model.catalogue, o)).join(" → ")}</p>
       </div>
       <SectionTitle count={data.funnels.length}>Sales funnels</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
@@ -204,6 +204,11 @@ function PipePage({ model, data }: { model: Model; data: Extract<PageData, { kin
         right={<span className="k-fg3">{data.line}</span>}
       />
       <section className="mb-8">
+        <SectionTitle count={pipe.materials.length} right={<span>What it consumes per Unit produced, one Material per line.</span>}>Bill of materials</SectionTitle>
+        <BillOfMaterials model={model} pipe={pipe} />
+      </section>
+
+      <section className="mb-8">
         <SectionTitle count={data.dynasties.length}>Scripts</SectionTitle>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.dynasties.map((d) => (
@@ -213,13 +218,13 @@ function PipePage({ model, data }: { model: Model; data: Extract<PageData, { kin
       </section>
 
       <section className="mb-8">
-        <SectionTitle count={data.plugged.length} right={<span>The choice lives on the input: each one has its own best script.</span>}>
+        <SectionTitle count={data.plugged.length} right={<span>The choice lives on the Material: each one has its own best script.</span>}>
           Where it is plugged
         </SectionTitle>
         <CardTable>
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Input</th>
+              <th className={TH}>Material</th>
               <th className={TH}>Best script there</th>
               <th className={`${TH} text-right`}>Picks</th>
             </tr>
@@ -251,7 +256,7 @@ function PipePage({ model, data }: { model: Model; data: Extract<PageData, { kin
             {data.plugged.length === 0 && (
               <tr>
                 <td colSpan={3}>
-                  <EmptyNote>{pipe.triggerId ? "No script asked for this pipe yet." : "This pipe is not an input choice anywhere yet."}</EmptyNote>
+                  <EmptyNote>{"No pipe has chosen this pipe's scripts at a Material yet."}</EmptyNote>
                 </td>
               </tr>
             )}

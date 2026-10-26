@@ -1,7 +1,7 @@
 /**
  * What a pinned page shows, for ANY outcome or pipe: pinning is configuration, the page is
  * the same code for every pin. An outcome lists its dynasties (versions, picks); a pipe lists
- * its scripts, the inputs it is plugged at with the best script at each, and its pipe storage.
+ * its scripts, the Materials it is plugged at with the best script at each, and its pipe storage.
  */
 
 import type { Campaign, ContentType, SalesFunnel, SalesPath, StorageReport } from "@gtm-factory/engine";

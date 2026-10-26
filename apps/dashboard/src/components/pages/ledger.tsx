@@ -30,14 +30,14 @@ function Ledger({ model }: { model: Model }) {
     <>
       <PageHeader
         title={<>{l.reconciles ? "The books reconcile to the cent" : "The books do not reconcile"}</>}
-        sub="Every run is a production order: it consumes occurrences, produces occurrences, and costs money. The ledger is the common conveyor belt every run writes to."
+        sub="Every run is a production order: it consumes Units, produces Units, and costs money. The ledger is the common conveyor belt every run writes to."
         right={<span>{formatCount(model.session.runs.length)} runs</span>}
       />
 
       <div className="k-card px-4 py-4">
         <p className="k-label mb-2">Reconciliation</p>
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[15px] tabular-nums">
-          <span title="Each occurrence's standard cost, charged once per consumption">{formatCentsExact(l.standardChargedCents)}</span>
+          <span title="Each unit's standard cost, charged once per consumption">{formatCentsExact(l.standardChargedCents)}</span>
           <span className="k-fg3">standard cost charged</span>
           <span className="k-fg2">−</span>
           <span>{formatCentsExact(l.reuseGainCents)}</span>
@@ -69,12 +69,12 @@ function Ledger({ model }: { model: Model }) {
       <div className="mt-8 grid gap-6 xl:grid-cols-2">
         <section>
           <SectionTitle right={<span>What choices read</span>}>Decide: each pipe's own cost</SectionTitle>
-          <CardTable footer="Inputs bought from other pipes are not in a pipe's price: the funnel adds them, never twice.">
+          <CardTable footer="Materials bought from other pipes are not in a pipe's price: the funnel adds them, never twice.">
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={TH}>Pipe</th>
-                <th className={`${TH} text-right`}>Inputs</th>
-                <th className={`${TH} text-right`}>$ per input</th>
+                <th className={`${TH} text-right`}>Units consumed</th>
+                <th className={`${TH} text-right`}>$ per Unit consumed</th>
                 <th className={`${TH} text-right`}>Yield</th>
                 <th className={`${TH} text-right`}>$ per outcome</th>
               </tr>
@@ -101,13 +101,13 @@ function Ledger({ model }: { model: Model }) {
         </section>
         <section>
           <SectionTitle right={<span>What reports and prices read</span>}>Report: every-path unit cost</SectionTitle>
-          <CardTable footer="Own production plus inputs at their own unit cost, normal loss absorbed, cycles solved.">
+          <CardTable footer="Own production plus Materials at their own unit cost, normal loss absorbed, cycles solved.">
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={TH}>Outcome</th>
                 <th className={`${TH} text-right`}>Produced</th>
                 <th className={`${TH} text-right`}>Own production</th>
-                <th className={`${TH} text-right`}>Inputs</th>
+                <th className={`${TH} text-right`}>Units consumed</th>
                 <th className={`${TH} text-right`}>Unit cost</th>
               </tr>
             </thead>
@@ -137,12 +137,12 @@ function Ledger({ model }: { model: Model }) {
       <section className="mt-8">
         <SectionTitle right={<span>Paid once, consumed many times</span>}>Where the reuse gain comes from</SectionTitle>
         {reused.length === 0 ? (
-          <EmptyNote>No occurrence consumed twice yet.</EmptyNote>
+          <EmptyNote>No Unit consumed twice yet.</EmptyNote>
         ) : (
-          <CardTable footer="An occurrence keeps the price paid to make it; each consumption charges that price. A second consumption is a gain on the books.">
+          <CardTable footer="A Unit keeps the price paid to make it; each consumption charges that price. A second consumption is a gain on the books.">
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={TH}>Occurrence</th>
+                <th className={TH}>Unit</th>
                 <th className={TH}>Made by</th>
                 <th className={`${TH} text-right`}>Consumed</th>
                 <th className={`${TH} text-right`}>Standard cost</th>
@@ -151,7 +151,7 @@ function Ledger({ model }: { model: Model }) {
             </thead>
             <tbody>
               {reused.map((r) => {
-                const occ = model.session.occurrence(r.id);
+                const occ = model.session.unit(r.id);
                 return (
                   <tr key={r.id} className="k-row k-line-subtle border-b last:border-0">
                     <td className={TD}>

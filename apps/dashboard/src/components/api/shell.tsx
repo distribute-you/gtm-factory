@@ -32,7 +32,7 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
           {open && <div className="fixed inset-0 z-40 bg-[#10101247] lg:hidden" onClick={() => setOpen(false)} />}
           <div
             className={`fixed inset-y-0 left-0 z-50 flex bg-[var(--bg-canvas)] transition-transform duration-200 ease-[cubic-bezier(.23,1,.32,1)] lg:static lg:z-auto lg:translate-x-0 ${
-              open ? "translate-x-0 shadow-xl" : "-translate-x-full"
+              open ? "translate-x-0 ring-1 ring-[var(--line)]" : "-translate-x-full"
             }`}
           >
             <Suspense fallback={<aside className="w-[248px]" />}>
