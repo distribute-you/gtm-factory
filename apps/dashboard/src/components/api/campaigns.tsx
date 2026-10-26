@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { ApiCampaign, ApiCampaignDetail, CatalogueData } from "@gtm-factory/engine";
+import { START, type ApiCampaign, type ApiCampaignDetail, type CatalogueData } from "@gtm-factory/engine";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
@@ -128,6 +128,18 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
           <CampaignStatusButton campaign={c} />
           <BudgetButton campaign={c} />
         </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3" data-testid="campaign-order">
+        <StatTile label="Start outcome" note={c.start === START ? "Pulls on its target at each tick" : "Pushes each Unit that lands into its first pipe"}>
+          <Figure value={outcomeName(catalogue, c.start)} />
+        </StatTile>
+        <StatTile label="Target" note="What the campaign orders">
+          <Figure value={outcomeName(catalogue, c.target)} />
+        </StatTile>
+        <StatTile label="Daily budget" note={c.volume ? `At most ${formatCount(c.volume.units)} new subjects per ${plural(c.volume.periodDays, "day", "days")}` : "No volume limit"}>
+          <Figure value={formatCents(c.dailyBudgetCents)} />
+        </StatTile>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
