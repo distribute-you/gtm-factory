@@ -1,6 +1,6 @@
 {
   "name": "distribute.you catalogue",
-  "description": "distribute.you's whole public catalogue (every channel, leg, step and trigger), four fictional clients, fictional numbers.",
+  "description": "distribute.you's whole public catalogue (every channel, leg and step), four fictional clients, fictional numbers.",
   "seed": 7,
   "catalogue": {
     "leadTracks": [
@@ -20,7 +20,7 @@
         "id": "ad_shown",
         "label": "Ad shown",
         "plural": "Ads shown",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "text",
         "icon": "megaphone",
         "description": "One paid ad impression served to someone on an ads network (Google Ads, and any future Meta or LinkedIn ads channel). The money for it is already charged by the network; a share of impressions turn into a website visit."
@@ -29,7 +29,7 @@
         "id": "audience_built",
         "label": "Audience built",
         "plural": "Audiences built",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "audience",
         "icon": "users-three",
         "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead."
@@ -46,7 +46,7 @@
         "id": "company_researched",
         "label": "Company researched",
         "plural": "Companies researched",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "text",
         "icon": "magnifying-glass",
         "description": "A prospect's company website read, reused for every lead of that company. Every research run feeds a message."
@@ -79,7 +79,7 @@
         "id": "industry_update_video",
         "label": "Industry update video",
         "plural": "Industry update videos",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "text",
         "icon": "video-camera",
         "description": "A person engages with our daily industry update video (likes, comments or reposts it)."
@@ -188,7 +188,7 @@
         "id": "post_published",
         "label": "Post published",
         "plural": "Posts published",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "text",
         "icon": "megaphone",
         "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote."
@@ -205,7 +205,7 @@
         "id": "template_written",
         "label": "Template",
         "plural": "Templates",
-        "subject": "object",
+        "subject": "brand",
         "contentType": "text_with_variables",
         "icon": "note-pencil",
         "description": "A message model with variables a writer fills for each lead."
@@ -214,234 +214,54 @@
         "id": "llm_completion",
         "label": "LLM completion",
         "plural": "LLM completions",
-        "subject": "object",
+        "subject": "run",
         "contentType": "text",
         "icon": "sparkle",
-        "description": "One answer of a language model, asked for by the script that needs it."
+        "description": "One answer of a language model to the run that asked: no other run is ever served it."
       },
       {
-        "id": "event:positive_reply_received",
-        "label": "Positive reply",
-        "subject": "event",
-        "icon": "thumbs-up",
-        "description": "A prospect replied with interest."
+        "id": "rating",
+        "label": "Rating",
+        "plural": "Ratings",
+        "subject": "brand",
+        "contentType": "rating",
+        "icon": "chart-bar",
+        "description": "Per option at each choice point, what the ledger says about value per dollar. Made each tick by the Supplier rating."
       },
       {
-        "id": "event:website_visited",
-        "label": "Website visit",
-        "subject": "event",
-        "icon": "cursor-click",
-        "description": "A prospect clicked through to your site."
-      },
-      {
-        "id": "event:booking_call_started",
-        "label": "Booking call",
-        "subject": "event",
-        "icon": "phone-call",
-        "description": "A prospect was put on a call with your sales rep."
-      },
-      {
-        "id": "event:meeting_booked",
-        "label": "Meeting booked",
-        "subject": "event",
-        "icon": "calendar-check",
-        "description": "A prospect booked a meeting."
-      },
-      {
-        "id": "event:meeting_attended",
-        "label": "Meeting attended",
-        "subject": "event",
-        "icon": "handshake",
-        "description": "A booked meeting was held."
-      },
-      {
-        "id": "event:signed_up",
-        "label": "Signup",
-        "subject": "event",
-        "icon": "user-plus",
-        "description": "A prospect created an account."
-      },
-      {
-        "id": "event:form_submitted",
-        "label": "Form submitted",
-        "subject": "event",
-        "icon": "clipboard-text",
-        "description": "A prospect filled in a form."
-      },
-      {
-        "id": "event:purchase_made",
-        "label": "Direct purchase",
-        "subject": "event",
-        "icon": "shopping-cart",
-        "description": "A prospect bought on your site."
-      },
-      {
-        "id": "event:lead_found",
-        "label": "Lead",
-        "subject": "event",
-        "icon": "identification-card",
-        "description": "A person matching your target was found."
-      },
-      {
-        "id": "event:paid_client",
-        "label": "Paid client",
-        "subject": "event",
-        "icon": "currency-dollar",
-        "description": "A prospect became a paying client."
-      },
-      {
-        "id": "event:email_pushed_via_api",
+        "id": "fact:email_pushed_via_api",
         "label": "Email Pushed Via API",
-        "subject": "event",
+        "subject": "lead",
         "icon": "code",
         "description": "You pushed an email you wrote, to send as written."
       },
       {
-        "id": "event:follow_up_due",
+        "id": "fact:follow_up_due",
         "label": "Follow-up Due",
-        "subject": "event",
+        "subject": "lead",
         "icon": "bell-ringing",
         "description": "A follow-up planned for one person is due."
       },
       {
-        "id": "event:github_issue_in_prod",
+        "id": "fact:github_issue_in_prod",
         "label": "GitHub Issue In Prod",
-        "subject": "event",
+        "subject": "lead",
         "icon": "github-logo",
         "description": "A GitHub issue this campaign waits on reached production."
       },
       {
-        "id": "event:website_visit_no_signup_30_min",
-        "label": "Visit Without Signup In 30 Min",
-        "subject": "event",
-        "icon": "timer",
-        "description": "A person visited your site and did not sign up within 30 minutes."
-      },
-      {
-        "id": "event:lead_event",
-        "label": "Lead event",
-        "subject": "event",
-        "icon": "pulse",
-        "description": "Anything happens with a person: a reply, a visit, a signup, a meeting, a payment."
-      },
-      {
-        "id": "event:signup_not_paid_30_min",
-        "label": "Signup Not Paid In 30 Min",
-        "subject": "event",
-        "icon": "hourglass-medium",
-        "description": "A person signed up and did not pay within 30 minutes."
-      },
-      {
-        "id": "event:signup_not_paid_24_hours",
-        "label": "Signup Not Paid In 24 Hours",
-        "subject": "event",
-        "icon": "clock-countdown",
-        "description": "A person signed up and did not pay within 24 hours."
-      },
-      {
-        "id": "event:whatsapp_number_given",
-        "label": "WhatsApp Number Given",
-        "subject": "event",
-        "icon": "whatsapp-logo",
-        "description": "A person gave us their WhatsApp number."
-      },
-      {
-        "id": "event:hot_lead",
+        "id": "fact:hot_lead",
         "label": "Hot Lead",
-        "subject": "event",
+        "subject": "lead",
         "icon": "fire",
         "description": "A lead wrote to the brand and wants to do business with it."
       },
       {
-        "id": "event:account_event",
-        "label": "Account Event",
-        "subject": "event",
-        "icon": "wallet",
-        "description": "Something happened on a client account with us, like their credit running out or coming back."
-      },
-      {
-        "id": "event:industry_update_video",
-        "label": "Industry update video",
-        "subject": "event",
-        "icon": "video-camera",
-        "description": "A person engages with our daily industry update video (likes, comments or reposts it)."
-      },
-      {
-        "id": "event:email_sent",
-        "label": "Email sent",
-        "subject": "event",
-        "icon": "paper-plane-tilt",
-        "description": "An email you wrote is sent to the person, from our domains and inboxes."
-      },
-      {
-        "id": "event:message_sent",
-        "label": "Message sent",
-        "subject": "event",
-        "icon": "paper-plane-tilt",
-        "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days)."
-      },
-      {
-        "id": "event:message_written",
-        "label": "Message written",
-        "subject": "event",
-        "icon": "pencil-simple-line",
-        "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days)."
-      },
-      {
-        "id": "event:company_researched",
-        "label": "Company researched",
-        "subject": "event",
-        "icon": "magnifying-glass",
-        "description": "A prospect's company website read, reused for every lead of that company. Every research run feeds a message."
-      },
-      {
-        "id": "event:email_checked",
-        "label": "Email checked",
-        "subject": "event",
-        "icon": "seal-check",
-        "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days)."
-      },
-      {
-        "id": "event:email_found",
-        "label": "Email found",
-        "subject": "event",
-        "icon": "at",
-        "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days)."
-      },
-      {
-        "id": "event:phone_found",
-        "label": "Phone found",
-        "subject": "event",
-        "icon": "phone",
-        "description": "A phone number found for a person. Every reveal runs inside a serve."
-      },
-      {
-        "id": "event:lead_identified",
-        "label": "Lead identified",
-        "subject": "event",
-        "icon": "user-focus",
-        "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days)."
-      },
-      {
-        "id": "event:audience_built",
-        "label": "Audience built",
-        "subject": "event",
-        "icon": "users-three",
-        "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead."
-      },
-      {
-        "id": "event:ad_shown",
-        "label": "Ad shown",
-        "subject": "event",
-        "icon": "megaphone",
-        "description": "One paid ad impression served to someone on an ads network (Google Ads, and any future Meta or LinkedIn ads channel). The money for it is already charged by the network; a share of impressions turn into a website visit."
-      },
-      {
-        "id": "event:post_published",
-        "label": "Post published",
-        "subject": "event",
-        "icon": "megaphone",
-        "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote."
+        "id": "fact:whatsapp_number_given",
+        "label": "WhatsApp Number Given",
+        "subject": "lead",
+        "icon": "whatsapp-logo",
+        "description": "A person gave us their WhatsApp number."
       }
     ],
     "factories": [
@@ -456,16 +276,23 @@
         "name": "Your team",
         "ours": false,
         "description": "The client's own people."
+      },
+      {
+        "id": "other_systems",
+        "name": "Other systems",
+        "ours": false,
+        "description": "Systems that report a fact through a webhook."
       }
     ],
     "pipes": [
       {
         "id": "lead_found>lead_interested",
         "name": "Lead to lead interested",
-        "inputs": [
+        "materials": [
           "lead_found",
           "template_written",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_interested",
         "factory": "ours",
@@ -481,10 +308,11 @@
       {
         "id": "lead_found>lead_visited",
         "name": "Lead to lead visited",
-        "inputs": [
+        "materials": [
           "lead_found",
           "template_written",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_visited",
         "factory": "ours",
@@ -498,17 +326,16 @@
         "description": "Channels: Sales Cold Email Outreach, Cold SMS Outreach, Cold WhatsApp Outreach, Cold LinkedIn Outreach, Cold X Outreach, Cold Instagram Outreach, Cold Reddit Outreach."
       },
       {
-        "id": "lead_interested>paid_client@signup_not_paid_24_hours",
-        "name": "Lead interested to paid client on signup not paid in 24 hours",
-        "inputs": [
-          "event:signup_not_paid_24_hours",
+        "id": "lead_interested>paid_client",
+        "name": "Lead interested to paid client",
+        "materials": [
           "lead_interested",
           "template_written",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
-        "triggerId": "signup_not_paid_24_hours",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -516,19 +343,19 @@
           "horizonDays": 0
         },
         "icon": "currency-dollar",
-        "description": "Channels: Cold WhatsApp Outreach."
+        "description": "Channels: Cold WhatsApp Outreach, Managed Signup Conversion."
       },
       {
-        "id": "start>lead_interested@whatsapp_number_given",
-        "name": "Start to lead interested on whatsapp number given",
-        "inputs": [
-          "event:whatsapp_number_given",
+        "id": "start>lead_interested@fact:whatsapp_number_given",
+        "name": "Start to lead interested after whatsapp number given",
+        "materials": [
+          "fact:whatsapp_number_given",
           "template_written",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_interested",
         "factory": "ours",
-        "triggerId": "whatsapp_number_given",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -541,7 +368,9 @@
       {
         "id": "start>lead_visited",
         "name": "Start to lead visited",
-        "inputs": [],
+        "materials": [
+          "rating"
+        ],
         "output": "lead_visited",
         "factory": "ours",
         "maturity": {
@@ -556,7 +385,9 @@
       {
         "id": "start>lead_interested",
         "name": "Start to lead interested",
-        "inputs": [],
+        "materials": [
+          "rating"
+        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -571,7 +402,9 @@
       {
         "id": "start>meeting_booked",
         "name": "Start to meeting booked",
-        "inputs": [],
+        "materials": [
+          "rating"
+        ],
         "output": "meeting_booked",
         "factory": "ours",
         "maturity": {
@@ -586,9 +419,10 @@
       {
         "id": "lead_interested>meeting_booked",
         "name": "Lead interested to meeting booked",
-        "inputs": [
+        "materials": [
           "lead_interested",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "meeting_booked",
         "factory": "ours",
@@ -604,8 +438,9 @@
       {
         "id": "lead_visited>meeting_booked",
         "name": "Lead visited to meeting booked",
-        "inputs": [
-          "lead_visited"
+        "materials": [
+          "lead_visited",
+          "rating"
         ],
         "output": "meeting_booked",
         "factory": "ours",
@@ -621,7 +456,7 @@
       {
         "id": "team:lead_interested>meeting_booked",
         "name": "Your team: Lead interested to meeting booked",
-        "inputs": [
+        "materials": [
           "lead_interested"
         ],
         "output": "meeting_booked",
@@ -638,7 +473,7 @@
       {
         "id": "team:lead_visited>meeting_booked",
         "name": "Your team: Lead visited to meeting booked",
-        "inputs": [
+        "materials": [
           "lead_visited"
         ],
         "output": "meeting_booked",
@@ -655,8 +490,9 @@
       {
         "id": "meeting_booked>meeting_attended",
         "name": "Meeting booked to meeting attended",
-        "inputs": [
-          "meeting_booked"
+        "materials": [
+          "meeting_booked",
+          "rating"
         ],
         "output": "meeting_attended",
         "factory": "ours",
@@ -672,7 +508,7 @@
       {
         "id": "team:meeting_booked>meeting_attended",
         "name": "Your team: Meeting booked to meeting attended",
-        "inputs": [
+        "materials": [
           "meeting_booked"
         ],
         "output": "meeting_attended",
@@ -689,8 +525,9 @@
       {
         "id": "meeting_attended>paid_client",
         "name": "Meeting attended to paid client",
-        "inputs": [
-          "meeting_attended"
+        "materials": [
+          "meeting_attended",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
@@ -706,7 +543,7 @@
       {
         "id": "team:meeting_attended>paid_client",
         "name": "Your team: Meeting attended to paid client",
-        "inputs": [
+        "materials": [
           "meeting_attended"
         ],
         "output": "paid_client",
@@ -723,7 +560,7 @@
       {
         "id": "team:lead_found>paid_client",
         "name": "Your team: Lead to paid client",
-        "inputs": [
+        "materials": [
           "lead_found"
         ],
         "output": "paid_client",
@@ -738,14 +575,13 @@
         "description": "Channels: Your Team Closing Calls."
       },
       {
-        "id": "team:industry_update_video>paid_client@on_demand",
+        "id": "team:industry_update_video>paid_client",
         "name": "Your team: Industry update video to paid client",
-        "inputs": [
+        "materials": [
           "industry_update_video"
         ],
         "output": "paid_client",
         "factory": "client_team",
-        "triggerId": "on_demand",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -756,26 +592,9 @@
         "description": "Channels: Your Team Closing Calls."
       },
       {
-        "id": "lead_interested>paid_client",
-        "name": "Lead interested to paid client",
-        "inputs": [
-          "lead_interested"
-        ],
-        "output": "paid_client",
-        "factory": "ours",
-        "maturity": {
-          "durationDays": 0,
-          "outcomesRequired": 10,
-          "delayMeanDays": 0,
-          "horizonDays": 0
-        },
-        "icon": "currency-dollar",
-        "description": "Channels: Managed Signup Conversion."
-      },
-      {
         "id": "team:lead_interested>paid_client",
         "name": "Your team: Lead interested to paid client",
-        "inputs": [
+        "materials": [
           "lead_interested"
         ],
         "output": "paid_client",
@@ -792,9 +611,10 @@
       {
         "id": "lead_interested>booking_call",
         "name": "Lead interested to booking call",
-        "inputs": [
+        "materials": [
           "lead_interested",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "booking_call",
         "factory": "ours",
@@ -810,7 +630,7 @@
       {
         "id": "team:booking_call>meeting_booked",
         "name": "Your team: Booking call to meeting booked",
-        "inputs": [
+        "materials": [
           "booking_call"
         ],
         "output": "meeting_booked",
@@ -827,7 +647,7 @@
       {
         "id": "team:lead_visited>lead_interested",
         "name": "Your team: Lead visited to lead interested",
-        "inputs": [
+        "materials": [
           "lead_visited"
         ],
         "output": "lead_interested",
@@ -844,7 +664,7 @@
       {
         "id": "team:lead_visited>purchase",
         "name": "Your team: Lead visited to direct purchase",
-        "inputs": [
+        "materials": [
           "lead_visited"
         ],
         "output": "purchase",
@@ -861,7 +681,7 @@
       {
         "id": "team:purchase>paid_client",
         "name": "Your team: Direct purchase to paid client",
-        "inputs": [
+        "materials": [
           "purchase"
         ],
         "output": "paid_client",
@@ -876,16 +696,16 @@
         "description": "Channels: Your Team Order Delivery."
       },
       {
-        "id": "lead_interested>paid_client@follow_up_due",
-        "name": "Lead interested to paid client on follow-up due",
-        "inputs": [
-          "event:follow_up_due",
+        "id": "lead_interested>paid_client@fact:follow_up_due",
+        "name": "Lead interested to paid client after follow-up due",
+        "materials": [
+          "fact:follow_up_due",
           "lead_interested",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
-        "triggerId": "follow_up_due",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -896,16 +716,16 @@
         "description": "Channels: AI Follow-up Email."
       },
       {
-        "id": "lead_interested>paid_client@github_issue_in_prod",
-        "name": "Lead interested to paid client on github issue in prod",
-        "inputs": [
-          "event:github_issue_in_prod",
+        "id": "lead_interested>paid_client@fact:github_issue_in_prod",
+        "name": "Lead interested to paid client after github issue in prod",
+        "materials": [
+          "fact:github_issue_in_prod",
           "lead_interested",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
-        "triggerId": "github_issue_in_prod",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -916,15 +736,15 @@
         "description": "Channels: AI Follow-up Email."
       },
       {
-        "id": "start>lead_interested@follow_up_due",
-        "name": "Start to lead interested on follow-up due",
-        "inputs": [
-          "event:follow_up_due",
-          "llm_completion"
+        "id": "start>lead_interested@fact:follow_up_due",
+        "name": "Start to lead interested after follow-up due",
+        "materials": [
+          "fact:follow_up_due",
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_interested",
         "factory": "ours",
-        "triggerId": "follow_up_due",
         "maturity": {
           "durationDays": 21,
           "outcomesRequired": 1,
@@ -935,16 +755,15 @@
         "description": "Channels: AI Follow-up Email."
       },
       {
-        "id": "lead_visited>lead_interested@website_visit_no_signup_30_min",
-        "name": "Lead visited to lead interested on visit without signup in 30 min",
-        "inputs": [
-          "event:website_visit_no_signup_30_min",
+        "id": "lead_visited>lead_interested",
+        "name": "Lead visited to lead interested",
+        "materials": [
           "lead_visited",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_interested",
         "factory": "ours",
-        "triggerId": "website_visit_no_signup_30_min",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -955,15 +774,15 @@
         "description": "Channels: AI Follow-up Email."
       },
       {
-        "id": "start>paid_client@signup_not_paid_30_min",
-        "name": "Start to paid client on signup not paid in 30 min",
-        "inputs": [
-          "event:signup_not_paid_30_min",
-          "llm_completion"
+        "id": "start>paid_client@lead_interested",
+        "name": "Start to paid client after lead interested",
+        "materials": [
+          "lead_interested",
+          "llm_completion",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
-        "triggerId": "signup_not_paid_30_min",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -976,8 +795,9 @@
       {
         "id": "start>lead_found",
         "name": "Start to lead",
-        "inputs": [
-          "audience_built"
+        "materials": [
+          "audience_built",
+          "rating"
         ],
         "output": "lead_found",
         "factory": "ours",
@@ -993,7 +813,9 @@
       {
         "id": "start>industry_update_video",
         "name": "Start to industry update video",
-        "inputs": [],
+        "materials": [
+          "rating"
+        ],
         "output": "industry_update_video",
         "factory": "ours",
         "maturity": {
@@ -1006,16 +828,16 @@
         "description": "Channels: Social post."
       },
       {
-        "id": "start>lead_interested@email_pushed_via_api",
-        "name": "Start to lead interested on email pushed via api",
-        "inputs": [
-          "event:email_pushed_via_api",
+        "id": "start>lead_interested@fact:email_pushed_via_api",
+        "name": "Start to lead interested after email pushed via api",
+        "materials": [
+          "fact:email_pushed_via_api",
           "template_written",
-          "llm_completion"
+          "llm_completion",
+          "rating"
         ],
         "output": "lead_interested",
         "factory": "ours",
-        "triggerId": "email_pushed_via_api",
         "maturity": {
           "durationDays": 21,
           "outcomesRequired": 1,
@@ -1026,15 +848,15 @@
         "description": "Channels: Email Sending."
       },
       {
-        "id": "start>paid_client@hot_lead",
-        "name": "Start to paid client on hot lead",
-        "inputs": [
-          "event:hot_lead",
-          "llm_completion"
+        "id": "start>paid_client@fact:hot_lead",
+        "name": "Start to paid client after hot lead",
+        "materials": [
+          "fact:hot_lead",
+          "llm_completion",
+          "rating"
         ],
         "output": "paid_client",
         "factory": "ours",
-        "triggerId": "hot_lead",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
@@ -1047,7 +869,7 @@
       {
         "id": "icp_client",
         "name": "ICP from the client",
-        "inputs": [],
+        "materials": [],
         "output": "audience_built",
         "factory": "client_team",
         "maturity": {
@@ -1062,7 +884,7 @@
       {
         "id": "icp_finder",
         "name": "ICP finder",
-        "inputs": [],
+        "materials": [],
         "output": "audience_built",
         "factory": "ours",
         "maturity": {
@@ -1077,7 +899,7 @@
       {
         "id": "template_writing",
         "name": "Template writing",
-        "inputs": [],
+        "materials": [],
         "output": "template_written",
         "factory": "ours",
         "maturity": {
@@ -1092,18 +914,112 @@
       {
         "id": "llm",
         "name": "LLM",
-        "inputs": [],
+        "materials": [],
         "output": "llm_completion",
         "factory": "ours",
-        "triggerId": "on_demand",
         "maturity": {
           "durationDays": 0,
           "outcomesRequired": 10,
           "delayMeanDays": 0,
           "horizonDays": 0
         },
-        "description": "A language model, asked on demand by the script that needs it.",
+        "description": "A language model: each run answers the run that ordered it.",
         "icon": "sparkle"
+      },
+      {
+        "id": "supplier_rating",
+        "name": "Supplier rating",
+        "materials": [],
+        "output": "rating",
+        "factory": "ours",
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing pipe consumes.",
+        "icon": "chart-bar"
+      },
+      {
+        "id": "webhook:email_pushed_via_api",
+        "name": "Email Pushed Via API (webhook)",
+        "materials": [],
+        "output": "fact:email_pushed_via_api",
+        "factory": "other_systems",
+        "webhook": true,
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "A webhook: api-service reports it.",
+        "icon": "code"
+      },
+      {
+        "id": "webhook:follow_up_due",
+        "name": "Follow-up Due (webhook)",
+        "materials": [],
+        "output": "fact:follow_up_due",
+        "factory": "other_systems",
+        "webhook": true,
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "A webhook: another system reports it.",
+        "icon": "bell-ringing"
+      },
+      {
+        "id": "webhook:github_issue_in_prod",
+        "name": "GitHub Issue In Prod (webhook)",
+        "materials": [],
+        "output": "fact:github_issue_in_prod",
+        "factory": "other_systems",
+        "webhook": true,
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "A webhook: another system reports it.",
+        "icon": "github-logo"
+      },
+      {
+        "id": "webhook:hot_lead",
+        "name": "Hot Lead (webhook)",
+        "materials": [],
+        "output": "fact:hot_lead",
+        "factory": "other_systems",
+        "webhook": true,
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "A webhook: lead-service reports it.",
+        "icon": "fire"
+      },
+      {
+        "id": "webhook:whatsapp_number_given",
+        "name": "WhatsApp Number Given (webhook)",
+        "materials": [],
+        "output": "fact:whatsapp_number_given",
+        "factory": "other_systems",
+        "webhook": true,
+        "maturity": {
+          "durationDays": 0,
+          "outcomesRequired": 10,
+          "delayMeanDays": 0,
+          "horizonDays": 0
+        },
+        "description": "A webhook: crm-service reports it.",
+        "icon": "whatsapp-logo"
       }
     ],
     "scripts": [
@@ -1217,6 +1133,19 @@
         "kind": "ai",
         "tactics": {},
         "costCents": 200,
+        "status": "active"
+      },
+      {
+        "id": "rating_pooled",
+        "pipeId": "supplier_rating",
+        "dynasty": "rating_pooled",
+        "version": 1,
+        "name": "Pooled Thompson rating",
+        "kind": "rules",
+        "tactics": {
+          "reads_evidence": true
+        },
+        "costCents": 1,
         "status": "active"
       },
       {
@@ -1430,13 +1359,14 @@
       },
       {
         "id": "cold-whatsapp-outreach|signup_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client@signup_not_paid_24_hours",
+        "pipeId": "lead_interested>paid_client",
         "dynasty": "cold-whatsapp-outreach|signup_to_paid_client#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
         "kind": "ai",
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
+          "wait_days": 1,
           "personalized": false
         },
         "costCents": 12,
@@ -1444,13 +1374,14 @@
       },
       {
         "id": "cold-whatsapp-outreach|signup_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client@signup_not_paid_24_hours",
+        "pipeId": "lead_interested>paid_client",
         "dynasty": "cold-whatsapp-outreach|signup_to_paid_client#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
         "kind": "ai",
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
+          "wait_days": 1,
           "personalized": true
         },
         "costCents": 18,
@@ -1458,7 +1389,7 @@
       },
       {
         "id": "cold-whatsapp-outreach|start_to_signup#short",
-        "pipeId": "start>lead_interested@whatsapp_number_given",
+        "pipeId": "start>lead_interested@fact:whatsapp_number_given",
         "dynasty": "cold-whatsapp-outreach|start_to_signup#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
@@ -1472,7 +1403,7 @@
       },
       {
         "id": "cold-whatsapp-outreach|start_to_signup#research",
-        "pipeId": "start>lead_interested@whatsapp_number_given",
+        "pipeId": "start>lead_interested@fact:whatsapp_number_given",
         "dynasty": "cold-whatsapp-outreach|start_to_signup#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
@@ -2861,7 +2792,7 @@
       },
       {
         "id": "your-team-closing-calls|industry_update_video_to_paid_client#team",
-        "pipeId": "team:industry_update_video>paid_client@on_demand",
+        "pipeId": "team:industry_update_video>paid_client",
         "dynasty": "your-team-closing-calls|industry_update_video_to_paid_client#team",
         "version": 1,
         "name": "Your Team Closing Calls",
@@ -3060,7 +2991,7 @@
       },
       {
         "id": "ai-follow-up-email|signup_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client@follow_up_due",
+        "pipeId": "lead_interested>paid_client@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|signup_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
@@ -3074,7 +3005,7 @@
       },
       {
         "id": "ai-follow-up-email|signup_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client@follow_up_due",
+        "pipeId": "lead_interested>paid_client@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|signup_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
@@ -3088,7 +3019,7 @@
       },
       {
         "id": "ai-follow-up-email|conversation_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client@github_issue_in_prod",
+        "pipeId": "lead_interested>paid_client@fact:github_issue_in_prod",
         "dynasty": "ai-follow-up-email|conversation_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
@@ -3102,7 +3033,7 @@
       },
       {
         "id": "ai-follow-up-email|conversation_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client@github_issue_in_prod",
+        "pipeId": "lead_interested>paid_client@fact:github_issue_in_prod",
         "dynasty": "ai-follow-up-email|conversation_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
@@ -3144,7 +3075,7 @@
       },
       {
         "id": "ai-follow-up-email|start_to_conversation#short",
-        "pipeId": "start>lead_interested@follow_up_due",
+        "pipeId": "start>lead_interested@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|start_to_conversation#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
@@ -3158,7 +3089,7 @@
       },
       {
         "id": "ai-follow-up-email|start_to_conversation#research",
-        "pipeId": "start>lead_interested@follow_up_due",
+        "pipeId": "start>lead_interested@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|start_to_conversation#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
@@ -3172,13 +3103,14 @@
       },
       {
         "id": "ai-follow-up-email|website_visit_to_signup#short",
-        "pipeId": "lead_visited>lead_interested@website_visit_no_signup_30_min",
+        "pipeId": "lead_visited>lead_interested",
         "dynasty": "ai-follow-up-email|website_visit_to_signup#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
         "tactics": {
           "channel": "AI Follow-up Email",
+          "wait_days": 0.0208,
           "personalized": false
         },
         "costCents": 6,
@@ -3186,13 +3118,14 @@
       },
       {
         "id": "ai-follow-up-email|website_visit_to_signup#research",
-        "pipeId": "lead_visited>lead_interested@website_visit_no_signup_30_min",
+        "pipeId": "lead_visited>lead_interested",
         "dynasty": "ai-follow-up-email|website_visit_to_signup#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
         "tactics": {
           "channel": "AI Follow-up Email",
+          "wait_days": 0.0208,
           "personalized": true
         },
         "costCents": 29,
@@ -3200,13 +3133,14 @@
       },
       {
         "id": "ai-follow-up-email|start_to_paid_client#short",
-        "pipeId": "start>paid_client@signup_not_paid_30_min",
+        "pipeId": "start>paid_client@lead_interested",
         "dynasty": "ai-follow-up-email|start_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
         "tactics": {
           "channel": "AI Follow-up Email",
+          "wait_days": 0.0208,
           "personalized": false
         },
         "costCents": 19,
@@ -3214,13 +3148,14 @@
       },
       {
         "id": "ai-follow-up-email|start_to_paid_client#research",
-        "pipeId": "start>paid_client@signup_not_paid_30_min",
+        "pipeId": "start>paid_client@lead_interested",
         "dynasty": "ai-follow-up-email|start_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
         "tactics": {
           "channel": "AI Follow-up Email",
+          "wait_days": 0.0208,
           "personalized": true
         },
         "costCents": 18,
@@ -3396,7 +3331,7 @@
       },
       {
         "id": "email-sending|start_to_conversation#short",
-        "pipeId": "start>lead_interested@email_pushed_via_api",
+        "pipeId": "start>lead_interested@fact:email_pushed_via_api",
         "dynasty": "email-sending|start_to_conversation#short",
         "version": 1,
         "name": "Email Sending, short and direct",
@@ -3410,7 +3345,7 @@
       },
       {
         "id": "email-sending|start_to_conversation#research",
-        "pipeId": "start>lead_interested@email_pushed_via_api",
+        "pipeId": "start>lead_interested@fact:email_pushed_via_api",
         "dynasty": "email-sending|start_to_conversation#research",
         "version": 1,
         "name": "Email Sending, researches first",
@@ -3424,7 +3359,7 @@
       },
       {
         "id": "ai-lead-proposal|start_to_paid_client#short",
-        "pipeId": "start>paid_client@hot_lead",
+        "pipeId": "start>paid_client@fact:hot_lead",
         "dynasty": "ai-lead-proposal|start_to_paid_client#short",
         "version": 1,
         "name": "AI Lead Proposal, short and direct",
@@ -3438,7 +3373,7 @@
       },
       {
         "id": "ai-lead-proposal|start_to_paid_client#research",
-        "pipeId": "start>paid_client@hot_lead",
+        "pipeId": "start>paid_client@fact:hot_lead",
         "dynasty": "ai-lead-proposal|start_to_paid_client#research",
         "version": 1,
         "name": "AI Lead Proposal, researches first",
@@ -3449,386 +3384,6 @@
         },
         "costCents": 22,
         "status": "active"
-      }
-    ],
-    "triggers": [
-      {
-        "id": "on_demand",
-        "label": "On demand",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "description": "A consuming script asks the engine for this input."
-      },
-      {
-        "id": "positive_reply_received",
-        "label": "Positive reply",
-        "when": [
-          "lead_interested"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:positive_reply_received",
-        "description": "A prospect replied with interest."
-      },
-      {
-        "id": "website_visited",
-        "label": "Website visit",
-        "when": [
-          "lead_visited"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:website_visited",
-        "description": "A prospect clicked through to your site."
-      },
-      {
-        "id": "booking_call_started",
-        "label": "Booking call",
-        "when": [
-          "booking_call"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:booking_call_started",
-        "description": "A prospect was put on a call with your sales rep."
-      },
-      {
-        "id": "meeting_booked",
-        "label": "Meeting booked",
-        "when": [
-          "meeting_booked"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:meeting_booked",
-        "description": "A prospect booked a meeting."
-      },
-      {
-        "id": "meeting_attended",
-        "label": "Meeting attended",
-        "when": [
-          "meeting_attended"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:meeting_attended",
-        "description": "A booked meeting was held."
-      },
-      {
-        "id": "signed_up",
-        "label": "Signup",
-        "when": [
-          "lead_interested"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:signed_up",
-        "description": "A prospect created an account."
-      },
-      {
-        "id": "form_submitted",
-        "label": "Form submitted",
-        "when": [
-          "lead_interested"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:form_submitted",
-        "description": "A prospect filled in a form."
-      },
-      {
-        "id": "purchase_made",
-        "label": "Direct purchase",
-        "when": [
-          "purchase"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:purchase_made",
-        "description": "A prospect bought on your site."
-      },
-      {
-        "id": "lead_found",
-        "label": "Lead",
-        "when": [
-          "lead_found"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:lead_found",
-        "description": "A person matching your target was found."
-      },
-      {
-        "id": "paid_client",
-        "label": "Paid client",
-        "when": [
-          "paid_client"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:paid_client",
-        "description": "A prospect became a paying client."
-      },
-      {
-        "id": "email_pushed_via_api",
-        "label": "Email Pushed Via API",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:email_pushed_via_api",
-        "description": "You pushed an email you wrote, to send as written."
-      },
-      {
-        "id": "follow_up_due",
-        "label": "Follow-up Due",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:follow_up_due",
-        "description": "A follow-up planned for one person is due."
-      },
-      {
-        "id": "github_issue_in_prod",
-        "label": "GitHub Issue In Prod",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:github_issue_in_prod",
-        "description": "A GitHub issue this campaign waits on reached production."
-      },
-      {
-        "id": "website_visit_no_signup_30_min",
-        "label": "Visit Without Signup In 30 Min",
-        "when": [
-          "lead_visited"
-        ],
-        "delayDays": 0.021,
-        "unless": [
-          "lead_interested"
-        ],
-        "event": "event:website_visit_no_signup_30_min",
-        "description": "A person visited your site and did not sign up within 30 minutes."
-      },
-      {
-        "id": "lead_event",
-        "label": "Lead event",
-        "when": [
-          "lead_interested",
-          "lead_visited",
-          "booking_call",
-          "meeting_booked",
-          "meeting_attended",
-          "purchase",
-          "paid_client",
-          "industry_update_video",
-          "message_sent",
-          "message_written",
-          "company_researched",
-          "email_checked",
-          "email_found",
-          "phone_found",
-          "lead_identified",
-          "audience_built",
-          "ad_shown",
-          "post_published"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:lead_event",
-        "description": "Anything happens with a person: a reply, a visit, a signup, a meeting, a payment."
-      },
-      {
-        "id": "signup_not_paid_30_min",
-        "label": "Signup Not Paid In 30 Min",
-        "when": [
-          "lead_interested"
-        ],
-        "delayDays": 0.021,
-        "unless": [
-          "paid_client"
-        ],
-        "event": "event:signup_not_paid_30_min",
-        "description": "A person signed up and did not pay within 30 minutes."
-      },
-      {
-        "id": "signup_not_paid_24_hours",
-        "label": "Signup Not Paid In 24 Hours",
-        "when": [
-          "lead_interested"
-        ],
-        "delayDays": 1,
-        "unless": [
-          "paid_client"
-        ],
-        "event": "event:signup_not_paid_24_hours",
-        "description": "A person signed up and did not pay within 24 hours."
-      },
-      {
-        "id": "whatsapp_number_given",
-        "label": "WhatsApp Number Given",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:whatsapp_number_given",
-        "description": "A person gave us their WhatsApp number."
-      },
-      {
-        "id": "hot_lead",
-        "label": "Hot Lead",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:hot_lead",
-        "description": "A lead wrote to the brand and wants to do business with it."
-      },
-      {
-        "id": "account_event",
-        "label": "Account Event",
-        "when": [],
-        "delayDays": 0,
-        "unless": [],
-        "reported": true,
-        "event": "event:account_event",
-        "description": "Something happened on a client account with us, like their credit running out or coming back."
-      },
-      {
-        "id": "industry_update_video",
-        "label": "Industry update video",
-        "when": [
-          "industry_update_video"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:industry_update_video",
-        "description": "A person engages with our daily industry update video (likes, comments or reposts it)."
-      },
-      {
-        "id": "email_sent",
-        "label": "Email sent",
-        "when": [
-          "email_sent"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:email_sent",
-        "description": "An email you wrote is sent to the person, from our domains and inboxes."
-      },
-      {
-        "id": "message_sent",
-        "label": "Message sent",
-        "when": [
-          "message_sent"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:message_sent",
-        "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days)."
-      },
-      {
-        "id": "message_written",
-        "label": "Message written",
-        "when": [
-          "message_written"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:message_written",
-        "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days)."
-      },
-      {
-        "id": "company_researched",
-        "label": "Company researched",
-        "when": [
-          "company_researched"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:company_researched",
-        "description": "A prospect's company website read, reused for every lead of that company. Every research run feeds a message."
-      },
-      {
-        "id": "email_checked",
-        "label": "Email checked",
-        "when": [
-          "email_checked"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:email_checked",
-        "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days)."
-      },
-      {
-        "id": "email_found",
-        "label": "Email found",
-        "when": [
-          "email_found"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:email_found",
-        "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days)."
-      },
-      {
-        "id": "phone_found",
-        "label": "Phone found",
-        "when": [
-          "phone_found"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:phone_found",
-        "description": "A phone number found for a person. Every reveal runs inside a serve."
-      },
-      {
-        "id": "lead_identified",
-        "label": "Lead identified",
-        "when": [
-          "lead_identified"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:lead_identified",
-        "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days)."
-      },
-      {
-        "id": "audience_built",
-        "label": "Audience built",
-        "when": [
-          "audience_built"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:audience_built",
-        "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead."
-      },
-      {
-        "id": "ad_shown",
-        "label": "Ad shown",
-        "when": [
-          "ad_shown"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:ad_shown",
-        "description": "One paid ad impression served to someone on an ads network (Google Ads, and any future Meta or LinkedIn ads channel). The money for it is already charged by the network; a share of impressions turn into a website visit."
-      },
-      {
-        "id": "post_published",
-        "label": "Post published",
-        "when": [
-          "post_published"
-        ],
-        "delayDays": 0,
-        "unless": [],
-        "event": "event:post_published",
-        "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote."
       }
     ],
     "tactics": [
@@ -3898,6 +3453,44 @@
         ],
         "source": "data",
         "description": "The channel a script works on: a pipe is a leg, and scripts of every channel compete on it."
+      },
+      {
+        "id": "wait_days",
+        "name": "Days since last message",
+        "type": {
+          "kind": "number",
+          "unit": "days"
+        },
+        "describes": [
+          "script"
+        ],
+        "source": "data",
+        "description": "A script waits this many days after the Unit it consumes landed before it runs."
+      },
+      {
+        "id": "age_days",
+        "name": "Age",
+        "type": {
+          "kind": "number",
+          "unit": "days"
+        },
+        "describes": [
+          "unit"
+        ],
+        "source": "data",
+        "description": "Days since a Unit landed in the stock."
+      },
+      {
+        "id": "reads_evidence",
+        "name": "Reads the ledger",
+        "type": {
+          "kind": "yesno"
+        },
+        "describes": [
+          "script"
+        ],
+        "source": "data",
+        "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every option its prior."
       },
       {
         "id": "country",
@@ -4075,9 +3668,7 @@
           "brandId": "brand-1",
           "offerId": "offer-1",
           "name": "Paid clients from cold outreach",
-          "entry": {
-            "kind": "start"
-          },
+          "start": "start",
           "line": [
             "lead_interested",
             "meeting_booked",
@@ -4190,9 +3781,7 @@
           "brandId": "brand-2",
           "offerId": "offer-2",
           "name": "Signups from the website",
-          "entry": {
-            "kind": "start"
-          },
+          "start": "start",
           "line": [
             "lead_visited",
             "lead_interested",
@@ -4206,11 +3795,8 @@
           "id": "campaign-2f",
           "brandId": "brand-2",
           "offerId": "offer-2",
-          "name": "Visits that did not sign up",
-          "entry": {
-            "kind": "trigger",
-            "triggerId": "website_visit_no_signup_30_min"
-          },
+          "name": "Follow-ups after each website visit",
+          "start": "lead_visited",
           "line": [
             "lead_interested"
           ],
@@ -4317,9 +3903,7 @@
           "brandId": "brand-3",
           "offerId": "offer-3",
           "name": "Replies closed by the team",
-          "entry": {
-            "kind": "start"
-          },
+          "start": "start",
           "line": [
             "lead_interested",
             "paid_client"
@@ -4430,9 +4014,7 @@
           "brandId": "brand-4",
           "offerId": "offer-4",
           "name": "Meetings from cold email",
-          "entry": {
-            "kind": "start"
-          },
+          "start": "start",
           "line": [
             "lead_interested",
             "meeting_booked"
@@ -4583,13 +4165,13 @@
         "delayMeanDays": 3.5,
         "horizonDays": 21
       },
-      "lead_interested>paid_client@signup_not_paid_24_hours": {
-        "base": 0.136,
+      "lead_interested>paid_client": {
+        "base": 0.125,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "start>lead_interested@whatsapp_number_given": {
-        "base": 0.012,
+      "start>lead_interested@fact:whatsapp_number_given": {
+        "base": 0.016,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -4653,13 +4235,8 @@
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "team:industry_update_video>paid_client@on_demand": {
-        "base": 0.123,
-        "delayMeanDays": 0,
-        "horizonDays": 0
-      },
-      "lead_interested>paid_client": {
-        "base": 0.125,
+      "team:industry_update_video>paid_client": {
+        "base": 0.122,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -4693,28 +4270,28 @@
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "lead_interested>paid_client@follow_up_due": {
-        "base": 0.104,
+      "lead_interested>paid_client@fact:follow_up_due": {
+        "base": 0.119,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "lead_interested>paid_client@github_issue_in_prod": {
-        "base": 0.112,
+      "lead_interested>paid_client@fact:github_issue_in_prod": {
+        "base": 0.094,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "start>lead_interested@follow_up_due": {
-        "base": 0.019,
+      "start>lead_interested@fact:follow_up_due": {
+        "base": 0.012,
         "delayMeanDays": 3.5,
         "horizonDays": 21
       },
-      "lead_visited>lead_interested@website_visit_no_signup_30_min": {
-        "base": 0.06,
+      "lead_visited>lead_interested": {
+        "base": 0.109,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "start>paid_client@signup_not_paid_30_min": {
-        "base": 0.102,
+      "start>paid_client@lead_interested": {
+        "base": 0.116,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -4728,13 +4305,13 @@
         "delayMeanDays": 0,
         "horizonDays": 0
       },
-      "start>lead_interested@email_pushed_via_api": {
-        "base": 0.011,
+      "start>lead_interested@fact:email_pushed_via_api": {
+        "base": 0.019,
         "delayMeanDays": 3.5,
         "horizonDays": 21
       },
-      "start>paid_client@hot_lead": {
-        "base": 0.055,
+      "start>paid_client@fact:hot_lead": {
+        "base": 0.135,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -4755,6 +4332,36 @@
       },
       "llm": {
         "base": 0.211,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "supplier_rating": {
+        "base": 0.461,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "webhook:email_pushed_via_api": {
+        "base": 0.316,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "webhook:follow_up_due": {
+        "base": 0.421,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "webhook:github_issue_in_prod": {
+        "base": 0.239,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "webhook:hot_lead": {
+        "base": 0.592,
+        "delayMeanDays": 0,
+        "horizonDays": 0
+      },
+      "webhook:whatsapp_number_given": {
+        "base": 0.374,
         "delayMeanDays": 0,
         "horizonDays": 0
       }
@@ -4787,6 +4394,9 @@
       },
       "icp_ai": {
         "costCents": 200
+      },
+      "rating_pooled": {
+        "costCents": 1
       },
       "sales-cold-email-outreach|lead_found_to_conversation#short": {
         "costCents": 38,

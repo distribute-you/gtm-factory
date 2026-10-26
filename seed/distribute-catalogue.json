@@ -309,7 +309,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sales-cold-email-outreach|lead_found_to_conversation",
             "name": "Dotterel",
@@ -322,7 +323,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sales-cold-email-outreach|lead_found_to_website_visit",
             "name": "Killdeer",
@@ -349,7 +351,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "feedback-request-cold-email-outreach|lead_found_to_conversation",
             "name": "Vireo",
@@ -376,7 +379,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-call-outreach|lead_found_to_conversation",
             "name": "Grebe",
@@ -403,7 +407,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-sms-outreach|lead_found_to_conversation",
             "name": "Gull",
@@ -416,7 +421,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-sms-outreach|lead_found_to_website_visit",
             "name": "Swallow",
@@ -443,7 +449,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-whatsapp-outreach|lead_found_to_conversation",
             "name": "Petrel",
@@ -456,7 +463,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-whatsapp-outreach|lead_found_to_website_visit",
             "name": "Nuthatch",
@@ -469,7 +477,10 @@
           "from": "signup",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "signup_not_paid_24_hours",
+          "consumes": [
+            "signup"
+          ],
+          "waitDays": 1.0,
           "pipe": {
             "id": "cold-whatsapp-outreach|signup_to_paid_client",
             "name": "Cuckoo",
@@ -482,7 +493,10 @@
           "from": null,
           "to": "signup",
           "mode": "reactive",
-          "triggerId": "whatsapp_number_given",
+          "consumes": [
+            "fact:whatsapp_number_given"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "cold-whatsapp-outreach|start_to_signup",
             "name": "Turaco",
@@ -509,7 +523,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-linkedin-outreach|lead_found_to_conversation",
             "name": "Loon",
@@ -522,7 +537,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-linkedin-outreach|lead_found_to_website_visit",
             "name": "Coot",
@@ -549,7 +565,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-x-outreach|lead_found_to_conversation",
             "name": "Shearwater",
@@ -562,7 +579,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-x-outreach|lead_found_to_website_visit",
             "name": "Treecreeper",
@@ -589,7 +607,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-instagram-outreach|lead_found_to_conversation",
             "name": "Thrush",
@@ -602,7 +621,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-instagram-outreach|lead_found_to_website_visit",
             "name": "Puffin",
@@ -629,7 +649,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-reddit-outreach|lead_found_to_conversation",
             "name": "Gannet",
@@ -642,7 +663,8 @@
           "from": "lead_found",
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "cold-reddit-outreach|lead_found_to_website_visit",
             "name": "Tern",
@@ -669,7 +691,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "google-ads|start_to_website_visit",
             "name": "Avocet",
@@ -682,7 +705,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "google-ads|start_to_form_submitted",
             "name": "Bittern",
@@ -709,7 +733,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "meta-ads|start_to_website_visit",
             "name": "Lapwing",
@@ -722,7 +747,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "meta-ads|start_to_form_submitted",
             "name": "Turnstone",
@@ -735,7 +761,8 @@
           "from": null,
           "to": "meeting_booked",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "meta-ads|start_to_meeting_booked",
             "name": "Oystercatcher",
@@ -762,7 +789,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "linkedin-ads|start_to_website_visit",
             "name": "Dunlin",
@@ -775,7 +803,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "linkedin-ads|start_to_form_submitted",
             "name": "Curlew",
@@ -788,7 +817,8 @@
           "from": null,
           "to": "meeting_booked",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "linkedin-ads|start_to_meeting_booked",
             "name": "Godwit",
@@ -815,7 +845,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "tiktok-ads|start_to_website_visit",
             "name": "Bullfinch",
@@ -828,7 +859,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "tiktok-ads|start_to_form_submitted",
             "name": "Bushtit",
@@ -855,7 +887,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "youtube-ads|start_to_website_visit",
             "name": "Serin",
@@ -868,7 +901,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "youtube-ads|start_to_form_submitted",
             "name": "Dipper",
@@ -895,7 +929,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "x-ads|start_to_website_visit",
             "name": "Hawfinch",
@@ -922,7 +957,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "reddit-ads|start_to_website_visit",
             "name": "Goldfinch",
@@ -935,7 +971,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "reddit-ads|start_to_form_submitted",
             "name": "Chickadee",
@@ -962,7 +999,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "bing-ads|start_to_website_visit",
             "name": "Stork",
@@ -975,7 +1013,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "bing-ads|start_to_form_submitted",
             "name": "Ibis",
@@ -1002,7 +1041,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "quora-ads|start_to_website_visit",
             "name": "Chaffinch",
@@ -1015,7 +1055,8 @@
           "from": null,
           "to": "form_submitted",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "quora-ads|start_to_form_submitted",
             "name": "Titmouse",
@@ -1042,7 +1083,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "newsletter-sponsorships|start_to_website_visit",
             "name": "Gnatcatcher",
@@ -1069,7 +1111,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "podcast-sponsorships|start_to_website_visit",
             "name": "Pipit",
@@ -1096,7 +1139,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "creator-sponsorships|start_to_website_visit",
             "name": "Kinglet",
@@ -1123,7 +1167,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "paid-directory-listings|start_to_website_visit",
             "name": "Catbird",
@@ -1150,7 +1195,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "seo-content|start_to_website_visit",
             "name": "Greenfinch",
@@ -1177,7 +1223,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "press-placements|start_to_website_visit",
             "name": "Dunnock",
@@ -1204,7 +1251,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "podcast-guesting|start_to_website_visit",
             "name": "Thrasher",
@@ -1231,7 +1279,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "affiliate-programme|start_to_website_visit",
             "name": "Warbler",
@@ -1258,7 +1307,8 @@
           "from": null,
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-linkedin-publishing|start_to_conversation",
             "name": "Waxwing",
@@ -1271,7 +1321,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-linkedin-publishing|start_to_website_visit",
             "name": "Shrike",
@@ -1298,7 +1349,8 @@
           "from": null,
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-x-publishing|start_to_conversation",
             "name": "Kingbird",
@@ -1311,7 +1363,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-x-publishing|start_to_website_visit",
             "name": "Starling",
@@ -1338,7 +1391,8 @@
           "from": null,
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-reddit-publishing|start_to_conversation",
             "name": "Phoebe",
@@ -1351,7 +1405,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-reddit-publishing|start_to_website_visit",
             "name": "Bluebird",
@@ -1378,7 +1433,8 @@
           "from": null,
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-youtube-publishing|start_to_conversation",
             "name": "Flycatcher",
@@ -1391,7 +1447,8 @@
           "from": null,
           "to": "website_visit",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "organic-youtube-publishing|start_to_website_visit",
             "name": "Mockingbird",
@@ -1418,7 +1475,10 @@
           "from": "conversation",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "positive_reply_received",
+          "consumes": [
+            "conversation"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-meeting-booking|conversation_to_meeting_booked",
             "name": "Auk",
@@ -1431,7 +1491,10 @@
           "from": "form_submitted",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "form_submitted",
+          "consumes": [
+            "form_submitted"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-meeting-booking|form_submitted_to_meeting_booked",
             "name": "Quetzal",
@@ -1458,7 +1521,10 @@
           "from": "conversation",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "positive_reply_received",
+          "consumes": [
+            "conversation"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-meeting-booking|conversation_to_meeting_booked",
             "name": "Finch",
@@ -1471,7 +1537,10 @@
           "from": "website_visit",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "website_visited",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-meeting-booking|website_visit_to_meeting_booked",
             "name": "Plover",
@@ -1498,7 +1567,10 @@
           "from": "conversation",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "positive_reply_received",
+          "consumes": [
+            "conversation"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-meeting-booking|conversation_to_meeting_booked",
             "name": "Tanager",
@@ -1511,7 +1583,10 @@
           "from": "website_visit",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "website_visited",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-meeting-booking|website_visit_to_meeting_booked",
             "name": "Grosbeak",
@@ -1524,7 +1599,10 @@
           "from": "form_submitted",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "form_submitted",
+          "consumes": [
+            "form_submitted"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-meeting-booking|form_submitted_to_meeting_booked",
             "name": "Trogon",
@@ -1551,7 +1629,10 @@
           "from": "meeting_booked",
           "to": "meeting_attended",
           "mode": "reactive",
-          "triggerId": "meeting_booked",
+          "consumes": [
+            "meeting_booked"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-meeting-attendance|meeting_booked_to_meeting_attended",
             "name": "Robin",
@@ -1578,7 +1659,10 @@
           "from": "meeting_booked",
           "to": "meeting_attended",
           "mode": "reactive",
-          "triggerId": "meeting_booked",
+          "consumes": [
+            "meeting_booked"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-meeting-attendance|meeting_booked_to_meeting_attended",
             "name": "Oriole",
@@ -1605,7 +1689,10 @@
           "from": "meeting_attended",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "meeting_attended",
+          "consumes": [
+            "meeting_attended"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-closing-calls|meeting_attended_to_paid_client",
             "name": "Sparrow",
@@ -1632,7 +1719,10 @@
           "from": "meeting_attended",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "meeting_attended",
+          "consumes": [
+            "meeting_attended"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-closing-calls|meeting_attended_to_paid_client",
             "name": "Bobolink",
@@ -1645,7 +1735,8 @@
           "from": "lead_found",
           "to": "paid_client",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-closing-calls|lead_found_to_paid_client",
             "name": "Motmot",
@@ -1658,7 +1749,8 @@
           "from": "industry_update_video",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "on_demand",
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-closing-calls|industry_update_video_to_paid_client",
             "name": "Puffbird",
@@ -1685,7 +1777,10 @@
           "from": "signup",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "signed_up",
+          "consumes": [
+            "signup"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-signup-conversion|signup_to_paid_client",
             "name": "Egret",
@@ -1698,7 +1793,10 @@
           "from": "form_submitted",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "form_submitted",
+          "consumes": [
+            "form_submitted"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "managed-signup-conversion|form_submitted_to_paid_client",
             "name": "Sandpiper",
@@ -1725,7 +1823,10 @@
           "from": "signup",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "signed_up",
+          "consumes": [
+            "signup"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-signup-conversion|signup_to_paid_client",
             "name": "Junco",
@@ -1738,7 +1839,10 @@
           "from": "form_submitted",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "form_submitted",
+          "consumes": [
+            "form_submitted"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-signup-conversion|form_submitted_to_paid_client",
             "name": "Bunting",
@@ -1765,7 +1869,10 @@
           "from": "conversation",
           "to": "booking_call",
           "mode": "reactive",
-          "triggerId": "positive_reply_received",
+          "consumes": [
+            "conversation"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-instant-call|conversation_to_booking_call",
             "name": "Fulmar",
@@ -1778,7 +1885,10 @@
           "from": "form_submitted",
           "to": "booking_call",
           "mode": "reactive",
-          "triggerId": "form_submitted",
+          "consumes": [
+            "form_submitted"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-instant-call|form_submitted_to_booking_call",
             "name": "Roadrunner",
@@ -1805,7 +1915,10 @@
           "from": "booking_call",
           "to": "meeting_booked",
           "mode": "reactive",
-          "triggerId": "booking_call_started",
+          "consumes": [
+            "booking_call"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-booking-calls|booking_call_to_meeting_booked",
             "name": "Canary",
@@ -1832,7 +1945,10 @@
           "from": "conversation",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "positive_reply_received",
+          "consumes": [
+            "conversation"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-reply-closing|conversation_to_paid_client",
             "name": "Cockatoo",
@@ -1859,7 +1975,10 @@
           "from": "website_visit",
           "to": "signup",
           "mode": "reactive",
-          "triggerId": "website_visited",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-website|website_visit_to_signup",
             "name": "Parakeet",
@@ -1872,7 +1991,10 @@
           "from": "website_visit",
           "to": "form_submitted",
           "mode": "reactive",
-          "triggerId": "website_visited",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-website|website_visit_to_form_submitted",
             "name": "Lorikeet",
@@ -1885,7 +2007,10 @@
           "from": "website_visit",
           "to": "purchase",
           "mode": "reactive",
-          "triggerId": "website_visited",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-website|website_visit_to_purchase",
             "name": "Parrot",
@@ -1912,7 +2037,10 @@
           "from": "purchase",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "purchase_made",
+          "consumes": [
+            "purchase"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "your-team-order-delivery|purchase_to_paid_client",
             "name": "Macaw",
@@ -1939,7 +2067,10 @@
           "from": "signup",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "follow_up_due",
+          "consumes": [
+            "fact:follow_up_due"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-follow-up-email|signup_to_paid_client",
             "name": "Hornbill",
@@ -1952,7 +2083,10 @@
           "from": "conversation",
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "github_issue_in_prod",
+          "consumes": [
+            "fact:github_issue_in_prod"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-follow-up-email|conversation_to_paid_client",
             "name": "Hoopoe",
@@ -1965,7 +2099,8 @@
           "from": "lead_found",
           "to": "conversation",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "ai-follow-up-email|lead_found_to_conversation",
             "name": "Woodpecker",
@@ -1978,7 +2113,10 @@
           "from": null,
           "to": "conversation",
           "mode": "reactive",
-          "triggerId": "follow_up_due",
+          "consumes": [
+            "fact:follow_up_due"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-follow-up-email|start_to_conversation",
             "name": "Flicker",
@@ -1991,7 +2129,10 @@
           "from": "website_visit",
           "to": "signup",
           "mode": "reactive",
-          "triggerId": "website_visit_no_signup_30_min",
+          "consumes": [
+            "website_visit"
+          ],
+          "waitDays": 0.0208,
           "pipe": {
             "id": "ai-follow-up-email|website_visit_to_signup",
             "name": "Sapsucker",
@@ -2004,7 +2145,10 @@
           "from": null,
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "signup_not_paid_30_min",
+          "consumes": [
+            "signup"
+          ],
+          "waitDays": 0.0208,
           "pipe": {
             "id": "ai-follow-up-email|start_to_paid_client",
             "name": "Wryneck",
@@ -2031,7 +2175,8 @@
           "from": null,
           "to": "lead_found",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "lead-sourcing|start_to_lead_found",
             "name": "Toucan",
@@ -2058,7 +2203,8 @@
           "from": null,
           "to": "lead_found",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sourcing-apollo-cold-filters|start_to_lead_found",
             "name": "Siskin",
@@ -2085,7 +2231,8 @@
           "from": null,
           "to": "lead_found",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sourcing-apollo-buying-signals|start_to_lead_found",
             "name": "Towhee",
@@ -2112,7 +2259,8 @@
           "from": null,
           "to": "lead_found",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sourcing-linkedin-engagement-signals|start_to_lead_found",
             "name": "Redpoll",
@@ -2139,7 +2287,8 @@
           "from": null,
           "to": "lead_found",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "sourcing-crm-contacts|start_to_lead_found",
             "name": "Linnet",
@@ -2166,7 +2315,8 @@
           "from": null,
           "to": "industry_update_video",
           "mode": "proactive",
-          "triggerId": null,
+          "consumes": [],
+          "waitDays": null,
           "pipe": {
             "id": "social-post|start_to_industry_update_video",
             "name": "Jacamar",
@@ -2193,7 +2343,10 @@
           "from": null,
           "to": "conversation",
           "mode": "reactive",
-          "triggerId": "email_pushed_via_api",
+          "consumes": [
+            "fact:email_pushed_via_api"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "email-sending|start_to_conversation",
             "name": "Honeyguide",
@@ -2220,7 +2373,10 @@
           "from": null,
           "to": "paid_client",
           "mode": "reactive",
-          "triggerId": "hot_lead",
+          "consumes": [
+            "fact:hot_lead"
+          ],
+          "waitDays": null,
           "pipe": {
             "id": "ai-lead-proposal|start_to_paid_client",
             "name": "Owl",
@@ -2688,439 +2844,41 @@
       ]
     }
   ],
-  "triggers": [
+  "facts": [
     {
-      "id": "positive_reply_received",
-      "label": "Positive reply",
-      "description": "A prospect replied with interest.",
-      "icon": "thumbs-up",
-      "fromStep": "conversation",
-      "firedBy": "instantly-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "conversation",
-      "params": null
-    },
-    {
-      "id": "website_visited",
-      "label": "Website visit",
-      "description": "A prospect clicked through to your site.",
-      "icon": "cursor-click",
-      "fromStep": "website_visit",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "website_visit",
-      "params": null
-    },
-    {
-      "id": "booking_call_started",
-      "label": "Booking call",
-      "description": "A prospect was put on a call with your sales rep.",
-      "icon": "phone-call",
-      "fromStep": "booking_call",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "booking_call",
-      "params": null
-    },
-    {
-      "id": "meeting_booked",
-      "label": "Meeting booked",
-      "description": "A prospect booked a meeting.",
-      "icon": "calendar-check",
-      "fromStep": "meeting_booked",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "meeting_booked",
-      "params": null
-    },
-    {
-      "id": "meeting_attended",
-      "label": "Meeting attended",
-      "description": "A booked meeting was held.",
-      "icon": "handshake",
-      "fromStep": "meeting_attended",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "meeting_attended",
-      "params": null
-    },
-    {
-      "id": "signed_up",
-      "label": "Signup",
-      "description": "A prospect created an account.",
-      "icon": "user-plus",
-      "fromStep": "signup",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "signup",
-      "params": null
-    },
-    {
-      "id": "form_submitted",
-      "label": "Form submitted",
-      "description": "A prospect filled in a form.",
-      "icon": "clipboard-text",
-      "fromStep": "form_submitted",
-      "firedBy": "crm-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "form_submitted",
-      "params": null
-    },
-    {
-      "id": "purchase_made",
-      "label": "Direct purchase",
-      "description": "A prospect bought on your site.",
-      "icon": "shopping-cart",
-      "fromStep": "purchase",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "purchase",
-      "params": null
-    },
-    {
-      "id": "lead_found",
-      "label": "Lead",
-      "description": "A person matching your target was found.",
-      "icon": "identification-card",
-      "fromStep": "lead_found",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "lead_found",
-      "params": null
-    },
-    {
-      "id": "paid_client",
-      "label": "Paid client",
-      "description": "A prospect became a paying client.",
-      "icon": "currency-dollar",
-      "fromStep": "paid_client",
-      "firedBy": "lead-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "paid_client",
-      "params": null
-    },
-    {
-      "id": "email_pushed_via_api",
+      "id": "fact:email_pushed_via_api",
       "label": "Email Pushed Via API",
       "description": "You pushed an email you wrote, to send as written.",
       "icon": "code",
-      "fromStep": null,
-      "firedBy": "campaign-service",
-      "kind": "reported",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "reportedBy": "api-service"
-      }
+      "reportedBy": "api-service"
     },
     {
-      "id": "follow_up_due",
+      "id": "fact:follow_up_due",
       "label": "Follow-up Due",
       "description": "A follow-up planned for one person is due.",
       "icon": "bell-ringing",
-      "fromStep": null,
-      "firedBy": "campaign-service",
-      "kind": "reported",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": null
+      "reportedBy": null
     },
     {
-      "id": "github_issue_in_prod",
+      "id": "fact:github_issue_in_prod",
       "label": "GitHub Issue In Prod",
       "description": "A GitHub issue this campaign waits on reached production.",
       "icon": "github-logo",
-      "fromStep": null,
-      "firedBy": "campaign-service",
-      "kind": "github_issue_in_prod",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": null
+      "reportedBy": null
     },
     {
-      "id": "website_visit_no_signup_30_min",
-      "label": "Visit Without Signup In 30 Min",
-      "description": "A person visited your site and did not sign up within 30 minutes.",
-      "icon": "timer",
-      "fromStep": "website_visit",
-      "firedBy": "campaign-service",
-      "kind": "delay",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "minutes": 30,
-        "afterStep": "website_visit",
-        "unlessStep": "signup"
-      }
-    },
-    {
-      "id": "lead_event",
-      "label": "Lead event",
-      "description": "Anything happens with a person: a reply, a visit, a signup, a meeting, a payment.",
-      "icon": "pulse",
-      "fromStep": null,
-      "firedBy": "campaign-service",
-      "kind": "any_of",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "memberTriggerIds": [
-          "positive_reply_received",
-          "website_visited",
-          "booking_call_started",
-          "meeting_booked",
-          "meeting_attended",
-          "signed_up",
-          "form_submitted",
-          "purchase_made",
-          "paid_client",
-          "website_visit_no_signup_30_min",
-          "signup_not_paid_30_min",
-          "signup_not_paid_24_hours",
-          "whatsapp_number_given",
-          "hot_lead",
-          "account_event",
-          "industry_update_video",
-          "message_sent",
-          "message_written",
-          "company_researched",
-          "email_checked",
-          "email_found",
-          "phone_found",
-          "lead_identified",
-          "audience_built",
-          "ad_shown",
-          "post_published"
-        ]
-      }
-    },
-    {
-      "id": "signup_not_paid_30_min",
-      "label": "Signup Not Paid In 30 Min",
-      "description": "A person signed up and did not pay within 30 minutes.",
-      "icon": "hourglass-medium",
-      "fromStep": "signup",
-      "firedBy": "campaign-service",
-      "kind": "delay",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "minutes": 30,
-        "afterStep": "signup",
-        "unlessStep": "paid_client"
-      }
-    },
-    {
-      "id": "signup_not_paid_24_hours",
-      "label": "Signup Not Paid In 24 Hours",
-      "description": "A person signed up and did not pay within 24 hours.",
-      "icon": "clock-countdown",
-      "fromStep": "signup",
-      "firedBy": "campaign-service",
-      "kind": "delay",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "minutes": 1440,
-        "afterStep": "signup",
-        "unlessStep": "paid_client"
-      }
-    },
-    {
-      "id": "whatsapp_number_given",
-      "label": "WhatsApp Number Given",
-      "description": "A person gave us their WhatsApp number.",
-      "icon": "whatsapp-logo",
-      "fromStep": "lead_found",
-      "firedBy": "campaign-service",
-      "kind": "reported",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "reportedBy": "crm-service"
-      }
-    },
-    {
-      "id": "hot_lead",
+      "id": "fact:hot_lead",
       "label": "Hot Lead",
       "description": "A lead wrote to the brand and wants to do business with it.",
       "icon": "fire",
-      "fromStep": "conversation",
-      "firedBy": "campaign-service",
-      "kind": "reported",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "reportedBy": "lead-service"
-      }
+      "reportedBy": "lead-service"
     },
     {
-      "id": "account_event",
-      "label": "Account Event",
-      "description": "Something happened on a client account with us, like their credit running out or coming back.",
-      "icon": "wallet",
-      "fromStep": null,
-      "firedBy": "campaign-service",
-      "kind": "reported",
-      "type": "condition",
-      "outcomeKey": null,
-      "params": {
-        "reportedBy": "crm-service"
-      }
-    },
-    {
-      "id": "industry_update_video",
-      "label": "Industry update video",
-      "description": "A person engages with our daily industry update video (likes, comments or reposts it).",
-      "icon": "video-camera",
-      "fromStep": "industry_update_video",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "industry_update_video",
-      "params": null
-    },
-    {
-      "id": "email_sent",
-      "label": "Email sent",
-      "description": "An email you wrote is sent to the person, from our domains and inboxes.",
-      "icon": "paper-plane-tilt",
-      "fromStep": "email_sent",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "email_sent",
-      "params": null
-    },
-    {
-      "id": "message_sent",
-      "label": "Message sent",
-      "description": "A message we sent one person, on any channel; each follow-up is one more. Rate measured: 29 positive repliers over 27,603 cold email sends (90 days).",
-      "icon": "paper-plane-tilt",
-      "fromStep": "message_sent",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "message_sent",
-      "params": null
-    },
-    {
-      "id": "message_written",
-      "label": "Message written",
-      "description": "A message written for one person, on any channel. Rate measured: 27,603 sends over 30,558 writing runs (90 days).",
-      "icon": "pencil-simple-line",
-      "fromStep": "message_written",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "message_written",
-      "params": null
-    },
-    {
-      "id": "company_researched",
-      "label": "Company researched",
-      "description": "A prospect's company website read, reused for every lead of that company. Every research run feeds a message.",
-      "icon": "magnifying-glass",
-      "fromStep": "company_researched",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "company_researched",
-      "params": null
-    },
-    {
-      "id": "email_checked",
-      "label": "Email checked",
-      "description": "A verifier's verdict on an email (valid, catch-all or unknown kept; invalid is a loss carried by the kept ones). Rate measured: 33,498 leads served over 39,941 kept verdicts (90 days).",
-      "icon": "seal-check",
-      "fromStep": "email_checked",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "email_checked",
-      "params": null
-    },
-    {
-      "id": "email_found",
-      "label": "Email found",
-      "description": "A work email found for a person. Rate measured: 39,941 kept over 44,679 verdicts (90 days).",
-      "icon": "at",
-      "fromStep": "email_found",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "email_found",
-      "params": null
-    },
-    {
-      "id": "phone_found",
-      "label": "Phone found",
-      "description": "A phone number found for a person. Every reveal runs inside a serve.",
-      "icon": "phone",
-      "fromStep": "phone_found",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "phone_found",
-      "params": null
-    },
-    {
-      "id": "lead_identified",
-      "label": "Lead identified",
-      "description": "A person who fits the target, with no way to reach them yet. Rate measured: 28,098 emails over 28,445 enrichments (90 days).",
-      "icon": "user-focus",
-      "fromStep": "lead_identified",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "lead_identified",
-      "params": null
-    },
-    {
-      "id": "audience_built",
-      "label": "Audience built",
-      "description": "A target list built for a client: an audience, or a new source (buying signal, competitor posts) added to one. Rate measured: 157 of 807 lists built in 90 days reached at least one lead.",
-      "icon": "users-three",
-      "fromStep": "audience_built",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "audience_built",
-      "params": null
-    },
-    {
-      "id": "ad_shown",
-      "label": "Ad shown",
-      "description": "One paid ad impression served to someone on an ads network (Google Ads, and any future Meta or LinkedIn ads channel). The money for it is already charged by the network; a share of impressions turn into a website visit.",
-      "icon": "megaphone",
-      "fromStep": "ad_shown",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "ad_shown",
-      "params": null
-    },
-    {
-      "id": "post_published",
-      "label": "Post published",
-      "description": "One post, quote, reshare or comment published on X or LinkedIn, by the daily industry presence or the Social post channel. Produced by social-service; the subject is its record of that publication. Toward rate measured 2026-10-25: 55 of 84 published items (2026-10-02 to 10-24) drew at least one like, reply, repost or quote.",
-      "icon": "megaphone",
-      "fromStep": "post_published",
-      "firedBy": "campaign-service",
-      "kind": "event",
-      "type": "outcome",
-      "outcomeKey": "post_published",
-      "params": null
+      "id": "fact:whatsapp_number_given",
+      "label": "WhatsApp Number Given",
+      "description": "A person gave us their WhatsApp number.",
+      "icon": "whatsapp-logo",
+      "reportedBy": "crm-service"
     }
   ],
   "legKeyCorrespondence": [
