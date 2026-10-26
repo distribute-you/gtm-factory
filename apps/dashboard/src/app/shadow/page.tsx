@@ -1,10 +1,8 @@
 import { Suspense } from "react";
 import { ShadowHomePage } from "@/components/pages/shadow";
+import { NotHere } from "@/components/api/elsewhere";
+import { IS_API } from "@/lib/data-source";
 
 export default function Page() {
-  return (
-    <Suspense>
-      <ShadowHomePage />
-    </Suspense>
-  );
+  return <Suspense>{IS_API ? <NotHere api /> : <ShadowHomePage />}</Suspense>;
 }
