@@ -101,9 +101,12 @@ export function ApiCampaignPage() {
 
 function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: CatalogueData | undefined }) {
   const c = d.campaign;
-  // Every outcome the funnel's pipes make, in the order they run (entry left out).
+  // Every outcome about a subject the funnel's pipes make, in the order they run (entry left out).
+  // Object outcomes (a template, a brand context, an LLM completion) ride beside the pipe they feed.
   const line = d.funnel
-    ? [...new Set(d.funnel.legs.flatMap((l) => l.pipes.map((p) => catalogue?.pipes.find((x) => x.id === p)?.output ?? p)))]
+    ? [...new Set(d.funnel.legs.flatMap((l) => l.pipes.map((p) => catalogue?.pipes.find((x) => x.id === p)?.output ?? p)))].filter(
+        (o) => catalogue?.outcomes.find((x) => x.id === o)?.subject !== "object",
+      )
     : Object.keys(c.counts);
   return (
     <>
