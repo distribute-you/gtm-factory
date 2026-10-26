@@ -133,7 +133,7 @@ function Flow({ model }: { model: Model }) {
 
   return (
     <>
-      <PageHeader title="New campaign" sub="Say who it is for and what you want. The engine ranks the sales funnels by value per dollar." />
+      <PageHeader title="New campaign" sub="Say who it is for and what you want. The sales funnels are ranked by value per dollar." />
       <ol className="mb-6 flex flex-wrap gap-2" aria-label="Steps">
         {STEPS.map((s, i) => {
           const at = STEPS.findIndex((x) => x.id === step);

@@ -281,7 +281,7 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
       <Plays model={model} campaign={campaign} />
 
       <section className="mb-8">
-        <SectionTitle count={points.length} right={<span>In the order the engine decides them for each subject</span>}>
+        <SectionTitle count={points.length} right={<span>In the order they are made for each subject</span>}>
           Choices at each Material
         </SectionTitle>
         {points.length === 0 ? (

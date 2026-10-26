@@ -115,7 +115,7 @@ function Today({ o }: { o: ApiOverview }) {
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={o.recentChoices.length}>Why the engine chose</SectionTitle>
+        <SectionTitle count={o.recentChoices.length}>Why each choice was made</SectionTitle>
         <ChoicesTable choices={o.recentChoices} empty="No choice yet. Launch a campaign and the first tick makes them." />
       </section>
 

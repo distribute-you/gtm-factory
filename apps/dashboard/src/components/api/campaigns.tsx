@@ -159,7 +159,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.recentChoices.length}>Why the engine chose</SectionTitle>
+        <SectionTitle count={d.recentChoices.length}>Why each choice was made</SectionTitle>
         <ChoicesTable choices={d.recentChoices} />
       </section>
 

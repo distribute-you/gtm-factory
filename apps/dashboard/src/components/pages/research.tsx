@@ -43,7 +43,7 @@ function Research({ model }: { model: Model }) {
             {converged} of {big} choice points back their hidden best
           </>
         }
-        sub="Every choice, made by one prioritizer. The world hides the true best option at each Material; here is how fast the engine finds it."
+        sub="Every choice, made by one prioritizer. The world hides the true best option at each Material; here is how fast the Supplier rating finds it."
         right={<span>Day {model.day}</span>}
       />
 
@@ -111,7 +111,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
         <StatTile label="On the hidden best" note="last 7 days">
           <Figure value={formatRatePct(share)} tone={share != null && share >= 0.8 ? "run" : undefined} />
         </StatTile>
-        <StatTile label="First 10 days" note="the engine knew nothing">
+        <StatTile label="First 10 days" note="nothing was known yet">
           <Figure value={formatRatePct(first && first.p > 0 ? first.b / first.p : null)} tone="muted" />
         </StatTile>
         <StatTile label="Picks" note={`${campaigns.length} campaigns`}>
@@ -131,7 +131,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
             <SectionTitle count={row.options.length} right={<span>{brand}</span>}>
               {c.name}
             </SectionTitle>
-            <CardTable footer="Belief = what the engine reads today. Hidden truth = what the world really does, never read by the engine.">
+            <CardTable footer="Belief = what the Rating reads today. Hidden truth = what the world really does, never read by any choice.">
               <thead>
                 <tr className="k-line-subtle border-b">
                   <th className={TH}>Option</th>

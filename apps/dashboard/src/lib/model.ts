@@ -115,7 +115,7 @@ export function factoryName(catalogue: Catalogue, id: string): string {
 
 /** A pipe in one line: its Bill of materials, then what it makes. */
 export function pipeLine(catalogue: Catalogue, pipe: Pipe): string {
-  const ins = pipe.materials.length ? pipe.materials.map((i) => outcomeLabel(catalogue, i)).join(" + ") : pipe.webhook ? "A webhook call" : catalogue.createsSubjects(pipe) || catalogue.outcome(pipe.output)?.subject === "lead" ? "The market" : "Nothing";
+  const ins = pipe.materials.length ? pipe.materials.map((i) => outcomeLabel(catalogue, i)).join(" + ") : pipe.webhook ? "A webhook call" : catalogue.createsSubjects(pipe) || catalogue.outcome(pipe.output)?.subject === "lead" ? "The market" : "An order";
   return `${ins} → ${outcomeLabel(catalogue, pipe.output)}`;
 }
 
@@ -165,7 +165,7 @@ export function billOfMaterials(model: Model, pipe: Pipe): MaterialRow[] {
             : m === subject
               ? "The Unit it works on: pulled or pushed"
               : "From the stock for this subject, else ordered";
-    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, point: series.size > 0 ? point : null, choice: choice ? optionLabel(model, point, choice) : null, picks };
+    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, point: series.size > 0 && choice ? point : null, choice: choice ? optionLabel(model, point, choice) : null, picks };
   });
 }
 

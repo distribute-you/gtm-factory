@@ -221,7 +221,7 @@ export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campa
   const items = recentChoices(model, campaignIds, limit);
   return (
     <section>
-      <SectionTitle right={<span>Newest first</span>}>Why the engine chose</SectionTitle>
+      <SectionTitle right={<span>Newest first</span>}>Why each choice was made</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
         {items.length === 0 && <EmptyNote>No choice yet. Press play.</EmptyNote>}
         {items.map((c, i) => {
