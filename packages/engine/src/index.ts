@@ -23,3 +23,4 @@ import { loadWorld as load, type WorldData, type WorldSpec } from "./world";
 export function worldFromData(data: WorldData, seed?: number | string): WorldSpec {
   return load(data, { Catalogue, ...(seed !== undefined ? { seed } : {}) });
 }
+export * from "./factory-api";
