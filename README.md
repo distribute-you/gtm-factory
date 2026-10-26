@@ -64,6 +64,7 @@ Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Pla
 | Shadow | Open a snapshot of an observed factory (a file kept in the tab, or a snapshot of the simulation): every client reconciled with production, today beside what the engine would do, and the actions it would launch. Read only. |
 | Ledger | Every-path unit costs beside each pipe's own cost, our spend beside other factories', reconciled to the cent. |
 | How it works | The framework's core ideas, linked to the spec. |
+| Api data source | Build with `NEXT_PUBLIC_DATA_SOURCE=api` and the same dashboard runs a real factory through the factory API: brands, campaigns with a daily cap, leads, templates, LLMs, research and the ledger. See [docs/api.md](docs/api.md). |
 
 Run it locally:
 

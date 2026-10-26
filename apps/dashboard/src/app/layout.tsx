@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Shell } from "@/components/shell";
 import { SimProvider } from "@/lib/sim";
 import { ShadowProvider } from "@/lib/shadow";
+import { ApiShell } from "@/components/api/shell";
+import { IS_API } from "@/lib/data-source";
 import "./globals.css";
 import "./keel.css";
 
@@ -18,11 +20,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>
-        <SimProvider>
-          <ShadowProvider>
-            <Shell>{children}</Shell>
-          </ShadowProvider>
-        </SimProvider>
+        {IS_API ? (
+          <ApiShell>{children}</ApiShell>
+        ) : (
+          <SimProvider>
+            <ShadowProvider>
+              <Shell>{children}</Shell>
+            </ShadowProvider>
+          </SimProvider>
+        )}
       </body>
     </html>
   );
