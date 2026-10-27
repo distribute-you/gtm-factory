@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiChoicePoint } from "@gtm-factory/core";
+import type { ApiCandidates } from "@gtm-factory/core";
 import { Page, PageHeader, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
@@ -8,7 +8,7 @@ import { plural } from "@/lib/format";
 import { PointsList, Read } from "./common";
 
 export function ApiResearchPage() {
-  const read = useApi<ApiChoicePoint[]>("/research");
+  const read = useApi<ApiCandidates[]>("/research");
   const { data: o } = useOverview();
   return (
     <>
@@ -18,8 +18,8 @@ export function ApiResearchPage() {
           {(points) => (
             <>
               <PageHeader
-                title={plural(points.length, "choice point", "choice points")}
-                sub="At every Material where several candidates compete, the belief the Supplier rating holds about each one. The choosing script picks by value per dollar, with one Thompson draw."
+                title={plural(points.length, "candidate place", "candidate places")}
+                sub="At every Material where several candidates compete, the belief the Supplier rating holds about each one. The picking script picks by value per dollar, with one Thompson draw."
               />
               <PointsList points={points} catalogue={o?.catalogue} />
             </>

@@ -15,7 +15,7 @@ const TEAM = "Client's team";
 /**
  * Done by your team: the scripts a person of the client's team performs (a closing call,
  * a copywriter's template). They cost us nothing; their limit is their capacity, typed
- * here. A script full for today leaves today's choices; the Plan routes around it until
+ * here. A script full for today leaves today's picks; the Plan routes around it until
  * tomorrow.
  */
 export function TeamPage() {

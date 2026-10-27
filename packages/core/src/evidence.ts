@@ -1,6 +1,6 @@
 /**
  * The evidence book: what the ledger and the traceability show at every
- * choice point, and the beliefs the Supplier rating reads from it (the
+ * candidate place, and the beliefs the Supplier rating reads from it (the
  * pooling, the delay censoring and the milestone estimates).
  *
  * Evidence is kept in cells: per (point, candidate, client) and per day of the
@@ -135,7 +135,7 @@ export class EvidenceBook {
     bumpCell(this.cohorts, EvidenceBook.cellKey(point, candidate, brandId), day, field, by);
   }
 
-  /** A choice point offered these candidates, with this delay from the decision to its milestone (`fixed` days of it certain). */
+  /** A candidate place offered these candidates, with this delay from the decision to its milestone (`fixed` days of it certain). */
   offer(point: string, candidates: readonly string[], remDelay: number, horizon = 0, fixed = 0): void {
     if (!this.pointDelay.has(point)) this.pointDelay.set(point, { mean: remDelay, horizon: Math.max(horizon, Math.ceil(remDelay * 4)), fixed });
     let ps = this.pointCandidates.get(point);

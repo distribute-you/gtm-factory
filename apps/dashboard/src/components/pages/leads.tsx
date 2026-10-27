@@ -271,7 +271,7 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
   const script = occ.scriptId ? model.catalogue.script(occ.scriptId) : undefined;
   const ours = occ.performedBy === OURS;
   const campaign = occ.campaignId ? model.campaigns.find((c) => c.id === occ.campaignId) : undefined;
-  const choices = occ.trace.map((d) => model.session.decisions[d]).filter((d): d is NonNullable<typeof d> => !!d);
+  const picks = occ.trace.map((d) => model.session.decisions[d]).filter((d): d is NonNullable<typeof d> => !!d);
   const inputs = Object.entries(occ.materials).filter(([, v]) => v);
   return (
     <div className="px-4 py-3">
@@ -309,12 +309,12 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
             )}
           </div>
           <div>
-            <p className="k-label mb-1">Traceability: the choices that led here</p>
-            {choices.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No choice: a single candidate or another party.</p>
+            <p className="k-label mb-1">Traceability: the picks that led here</p>
+            {picks.length === 0 ? (
+              <p className="k-fg3 text-[12px]">No pick: a single candidate or another party.</p>
             ) : (
               <ul className="space-y-1">
-                {choices.map((d) => (
+                {picks.map((d) => (
                   <li key={d.id} className="flex items-baseline gap-2 text-[12px]">
                     <span className="k-fg3 min-w-0 flex-1 truncate">{pointInfo(model.catalogue, d.point).title}</span>
                     <span className="truncate font-medium">{candidateLabel(model, d.point, d.candidate, d.brandId)}</span>

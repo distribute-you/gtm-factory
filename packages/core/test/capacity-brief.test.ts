@@ -11,7 +11,7 @@ beforeAll(() => {
 const outcomeOf = (scriptId: string | null | undefined) => (scriptId ? s.catalogue.script(scriptId)?.outcome : undefined);
 
 describe("capacity", () => {
-  it("a script out of capacity today leaves today's choices; the order waits for tomorrow, nothing is lost", () => {
+  it("a script out of capacity today leaves today's picks; the order waits for tomorrow, nothing is lost", () => {
     const call = s.catalogue.script("cl_call")!;
     expect(call.capacity?.perDay).toBe(6);
     const perDay = new Map<number, number>();

@@ -63,7 +63,7 @@ export type ScriptKind = "rules" | "ai" | "human";
 /**
  * What a script can do in one day, and what one Unit takes. Measured for code
  * and AI scripts (runs, vendor quotas); typed by a person for the scripts a
- * person performs. A script out of capacity for today leaves today's choices.
+ * person performs. A script out of capacity for today leaves today's picks.
  */
 export interface Capacity {
   /** Most Units it makes per day (unset: no limit). */
@@ -190,7 +190,7 @@ export function isOurs(script: Pick<Script, "tactics">): boolean {
 /**
  * A mutable catalogue. Lists keep insertion order, so every read is
  * deterministic. Retiring keeps the object for history and takes it out of
- * every choice.
+ * every pick.
  */
 export class Catalogue {
   private readonly data: CatalogueData;
@@ -352,7 +352,7 @@ export class Catalogue {
     return this;
   }
 
-  /** Retire an object: kept for history, out of every choice. */
+  /** Retire an object: kept for history, out of every pick. */
   retire(kind: Kind, id: string): this {
     this.memo.clear();
     const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);

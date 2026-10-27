@@ -1,15 +1,15 @@
 /**
- * Read models of the campaign pages: which milestone each of its choice points serves, and
+ * Read models of the campaign pages: which milestone each of its candidate places serves, and
  * its milestones with attempts and cost per Target. Read off the catalogue and the simulator.
  */
 
 import { isOurs, targetBreakdown, type Campaign, type OutcomeId, type WorldClient } from "@gtm-factory/core";
 import type { Model } from "./model";
 
-/** The milestone each choice point of a campaign is scored on. */
+/** The milestone each candidate place of a campaign is scored on. */
 export function milestoneOfPoints(model: Model, campaign: Campaign): Map<string, OutcomeId> {
   const out = new Map<string, OutcomeId>();
-  for (const p of model.session.choicePoints()) {
+  for (const p of model.session.candidatePlaces()) {
     if (p.campaignId !== campaign.id) continue;
     const m = model.session.milestoneOfPoint(p.point, campaign.id);
     if (m) out.set(p.point, m);

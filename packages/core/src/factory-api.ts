@@ -359,7 +359,7 @@ export interface ApiObjectVersion {
   name: string;
   content: string;
   createdAt: string;
-  /** Head of its dynasty: what a Material choosing this dynasty consumes now. */
+  /** Head of its dynasty: what a Material picking this dynasty consumes now. */
   head: boolean;
 }
 

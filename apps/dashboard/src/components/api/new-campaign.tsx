@@ -7,7 +7,7 @@ import { START, type ApiCampaign, type ApiNewCampaign, type ApiPlanPreview, type
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, SectionTitle, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
-import { useOverview } from "@/lib/api/overview";
+import { useOverview, useScope } from "@/lib/api/overview";
 import { engineTitle, outcomeName, outcomePluralName } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi, roiIsGood } from "@/lib/format";
 import { Field, ShimmerRows } from "./common";
@@ -18,10 +18,9 @@ export function ApiNewCampaignPage() {
   const { data: overview } = useOverview();
   const catalogue = overview?.catalogue;
   const brands = overview?.brands ?? [];
-  const [brandId, setBrandId] = useState<string | null>(search.get("brand"));
-  useEffect(() => {
-    if (!brandId && brands.length > 0) setBrandId(brands[0]!.id);
-  }, [brandId, brands]);
+  const { scope } = useScope();
+  const brandId = scope.brandId;
+  const offerId = scope.offerId;
   const plans = useApi<ApiPlanPreview[]>(brandId ? `/brands/${encodeURIComponent(brandId)}/plans` : null, 0);
   const [target, setTarget] = useState<string | null>(null);
   useEffect(() => {
@@ -33,7 +32,7 @@ export function ApiNewCampaignPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dollars = Number(budget);
-  const valid = brandId && target && start !== target && Number.isFinite(dollars) && dollars > 0;
+  const valid = brandId && offerId && target && start !== target && Number.isFinite(dollars) && dollars > 0;
   // A reactive campaign starts from an outcome about a person: each Unit of it that lands is pushed up.
   const starts = [START, ...(catalogue?.outcomes.filter((o) => (o.subject === "lead" || o.subject === "company") && !o.retired && o.id !== target).map((o) => o.id) ?? [])];
 
@@ -41,7 +40,7 @@ export function ApiNewCampaignPage() {
     if (!valid) return;
     setBusy(true);
     setError(null);
-    const body: ApiNewCampaign = { brandId: brandId!, start, target: target!, dailyBudgetCents: Math.round(dollars * 100), ...(brief.trim() ? { brief: brief.trim() } : {}) };
+    const body: ApiNewCampaign = { brandId: brandId!, offerId: offerId!, start, target: target!, dailyBudgetCents: Math.round(dollars * 100), ...(brief.trim() ? { brief: brief.trim() } : {}) };
     try {
       const c = await apiSend<ApiCampaign>("POST", "/campaigns", body);
       router.push(`/campaigns/view/?id=${encodeURIComponent(c.id)}`);
@@ -64,16 +63,10 @@ export function ApiNewCampaignPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <Field label="Brand">
-              <select className="k-input w-full max-w-[360px] px-1.5" style={{ font: "inherit" }} value={brandId ?? ""} onChange={(e) => setBrandId(e.target.value)}>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                    {b.test ? " (staff test)" : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <p className="k-fg2 text-[13px]">
+              For <span className="font-medium">{brands.find((b) => b.id === brandId)?.name ?? "the brand picked above"}</span>
+              {brands.find((b) => b.id === brandId)?.offers.find((x) => x.id === offerId) ? `, offer ${brands.find((b) => b.id === brandId)!.offers.find((x) => x.id === offerId)!.name}` : ""}. Change it in the selector at the top left.
+            </p>
 
             <section>
               <SectionTitle count={plans.data?.length}>Targets this brand can order today</SectionTitle>

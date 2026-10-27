@@ -23,7 +23,7 @@ describe("one seed, one history", () => {
   it("is byte identical on a rerun with the same seed, different with another", () => {
     const again = new SimulationSession(defaultWorld());
     again.run(60);
-    const digest = (x: SimulationSession) => JSON.stringify({ days: x.days, choices: x.choices, ledger: x.ledger().standardCents, decisions: x.decisions.length });
+    const digest = (x: SimulationSession) => JSON.stringify({ days: x.days, picks: x.pickLog, ledger: x.ledger().standardCents, decisions: x.decisions.length });
     expect(digest(again)).toBe(digest(s));
     const other = new SimulationSession(defaultWorld(12));
     other.run(5);
@@ -47,13 +47,13 @@ describe("expected and measured return", () => {
 });
 
 describe("credit through traceability", () => {
-  it("every Unit at a milestone carries the choices that led to it", () => {
+  it("every Unit at a milestone carries the picks that led to it", () => {
     const reply = s.units.find((u) => u.outcome === "reply_received" && u.scriptId === "mb_replies" && u.campaignId === "campaign-outbound")!;
     const points = reply.trace.map((d) => s.decisions[d]!.point);
     for (const p of ["lead_interested|reply_received", "lead_found|audience_built", "message_written|template_written", "message_written|llm_completion", "message_written|email_found"]) expect(points).toContain(p);
   });
 
-  it("a template that only changes the reply wins the template choice", () => {
+  it("a template that only changes the reply wins the template pick", () => {
     // Every template lets the writer write (same yield); only the reply changes.
     const pc = conv.filter((x) => x.point.endsWith("|template_written")).sort((a, b) => b.picks - a.picks)[0]!;
     for (const best of Object.values(pc.bestByCampaign)) expect(best).toBe("tpl-story");
@@ -82,7 +82,7 @@ describe("credit through traceability", () => {
     expect(ran).not.toContain("gemini_flash");
   }, 120_000);
 
-  it("brand Units have dynasties too: an edit is a new version, the choice keeps the dynasty and serves its head", () => {
+  it("brand Units have dynasties too: an edit is a new version, the pick keeps the dynasty and serves its head", () => {
     const fresh = new SimulationSession(defaultWorld());
     fresh.run(10);
     const brand = fresh.clients[0]!.brand.id;
@@ -101,7 +101,7 @@ describe("credit through traceability", () => {
 });
 
 describe("one script per run", () => {
-  it("a choice is made once per order and point: a failed run ends that order, never a fallback", () => {
+  it("a pick is made once per order and point: a failed run ends that order, never a fallback", () => {
     const seen = new Set<string>();
     for (const d of s.decisions) {
       const k = `${d.orderId}|${d.point}`;
@@ -137,7 +137,7 @@ describe("ICPs and strategies are proposed from splits", () => {
   });
 });
 
-describe("the choice lives on the Material", () => {
+describe("the pick lives on the Material", () => {
   it("the same LLM Engine called by two scripts converges to two different scripts", () => {
     const writer = conv.find((x) => x.point === "reply_received|llm_completion")!;
     const judge = conv.find((x) => x.point === "lead_interested|llm_completion")!;
@@ -147,7 +147,7 @@ describe("the choice lives on the Material", () => {
 });
 
 describe("the Supplier rating", () => {
-  it("makes a Rating each day that every choosing script consumes, and the Rating drives the choice", () => {
+  it("makes a Rating each day that every picking script consumes, and the Rating drives the pick", () => {
     const brand = s.clients[0]!.brand.id;
     expect(s.units.filter((u) => u.outcome === "rating" && u.brandId === brand).length).toBe(60);
     const data = worldData();

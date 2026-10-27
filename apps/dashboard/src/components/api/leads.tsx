@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/core";
+import type { ApiPick, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/core";
 import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { outcomeName, performerTitle } from "@/lib/api/labels";
 import { plural } from "@/lib/format";
-import { ChoicesTable, Read, RunsTable, formatTime, timeAgo } from "./common";
+import { PicksTable, Read, RunsTable, formatTime, timeAgo } from "./common";
 
 export function ApiLeadsPage() {
   const search = useSearchParams();
@@ -132,7 +132,7 @@ export function ApiLeadPage() {
 function Lead({ d, catalogue, campaignName }: { d: ApiLeadDetail; catalogue: CatalogueData | undefined; campaignName: string | null }) {
   const l = d.lead;
   const paid = l.reached.includes("paid_client");
-  const choiceById = new Map(d.choices.map((c) => [c.id, c]));
+  const pickById = new Map(d.picks.map((c) => [c.id, c]));
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0">
@@ -160,15 +160,15 @@ function Lead({ d, catalogue, campaignName }: { d: ApiLeadDetail; catalogue: Cat
           ) : (
             <ol className="space-y-2">
               {d.units.map((oc) => (
-                <UnitCard key={oc.id} oc={oc} catalogue={catalogue} choiceById={choiceById} />
+                <UnitCard key={oc.id} oc={oc} catalogue={catalogue} pickById={pickById} />
               ))}
             </ol>
           )}
         </section>
 
         <section className="mt-8">
-          <SectionTitle count={d.choices.length}>Choices made for this person</SectionTitle>
-          <ChoicesTable choices={d.choices} />
+          <SectionTitle count={d.picks.length}>Picks made for this person</SectionTitle>
+          <PicksTable picks={d.picks} />
         </section>
 
         <section className="mt-8">
@@ -237,7 +237,7 @@ function ReportPaid({ leadId, done }: { leadId: string; done: boolean }) {
   );
 }
 
-function UnitCard({ oc, catalogue, choiceById }: { oc: ApiUnit; catalogue: CatalogueData | undefined; choiceById: Map<string, ApiChoice> }) {
+function UnitCard({ oc, catalogue, pickById }: { oc: ApiUnit; catalogue: CatalogueData | undefined; pickById: Map<string, ApiPick> }) {
   return (
     <li className="k-card p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -251,10 +251,10 @@ function UnitCard({ oc, catalogue, choiceById }: { oc: ApiUnit; catalogue: Catal
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="k-label">Traceability</span>
           {oc.traceability.map((cid) => {
-            const c = choiceById.get(cid);
+            const c = pickById.get(cid);
             return (
               <span key={cid} className="k-chip" title={c ? c.reason : cid}>
-                {c ? `${c.pointLabel}: ${c.chosenLabel}` : cid}
+                {c ? `${c.placeLabel}: ${c.pickedLabel}` : cid}
               </span>
             );
           })}

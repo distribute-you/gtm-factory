@@ -1,6 +1,6 @@
 /**
  * Read models over the running world: every figure a page shows is computed here from the
- * engine's own outputs (runs, Units, choices, beliefs). Pages divide nothing
+ * engine's own outputs (runs, Units, picks, beliefs). Pages divide nothing
  * themselves. Nothing here knows an outcome or a script by name: everything is read off
  * the catalogue.
  */
@@ -12,7 +12,7 @@ import {
   hiddenBest,
   type Campaign,
   type Catalogue,
-  type ChoiceRecord,
+  type PickRecord,
   type HiddenCandidate,
   type Unit,
   type OutcomeId,
@@ -130,7 +130,7 @@ export function engineLine(catalogue: Catalogue, outcome: OutcomeId): string {
   return callers.length > 0 ? `Called by ${callers.map((c) => outcomeLabel(catalogue, c)).join(", ")}` : `Made for the brand`;
 }
 
-/** One outcome a script calls: its Provider, and the choice made there. */
+/** One outcome a script calls: its Provider, and the pick made there. */
 export interface MaterialRow {
   material: OutcomeId;
   label: string;
@@ -138,10 +138,10 @@ export interface MaterialRow {
   subject: boolean;
   /** How the Provider serves it. */
   how: string;
-  /** The choice point (this Engine, this Material), when one was made. */
+  /** The candidate place (this Engine, this Material), when one was made. */
   point: string | null;
   /** The candidate picked most over the last 7 days, every campaign. */
-  choice: string | null;
+  pick: string | null;
   picks: number;
 }
 
@@ -155,7 +155,7 @@ export function materialsOfScript(model: Model, script: Script): { rows: Materia
     const o = c.outcome(m);
     const point = `${script.outcome}|${m}`;
     const series = model.session.pickSeries(point);
-    let choice: string | null = null;
+    let pick: string | null = null;
     let best = 0;
     let picks = 0;
     for (const [cand, arr] of series) {
@@ -163,7 +163,7 @@ export function materialsOfScript(model: Model, script: Script): { rows: Materia
       picks += arr.reduce((x, y) => x + y, 0);
       if (recent > best) {
         best = recent;
-        choice = cand;
+        pick = cand;
       }
     }
     const how =
@@ -176,7 +176,7 @@ export function materialsOfScript(model: Model, script: Script): { rows: Materia
             : m === subject
               ? "The Unit it works on: pulled or pushed"
               : "From the stock for this subject, else made";
-    return { material: m, label: outcomeLabel(c, m), subject: m === subject, how, point: series.size > 0 && choice ? point : null, choice: choice ? candidateLabel(model, point, choice) : null, picks };
+    return { material: m, label: outcomeLabel(c, m), subject: m === subject, how, point: series.size > 0 && pick ? point : null, pick: pick ? candidateLabel(model, point, pick) : null, picks };
   });
   return { rows, label: measured ? "measured" : "judged" };
 }
@@ -201,11 +201,11 @@ export interface PointInfo {
   sub: string;
 }
 
-/** What a choice point is, in words, from its key `consumer|material`. */
+/** What a candidate place is, in words, from its key `consumer|material`. */
 export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
   const [consumer, material] = key.split("|") as [string, string];
   const out = catalogue.outcome(material);
-  // A brand outcome (a template, an ICP) is chosen among the brand's Units; every other among its Engine's scripts.
+  // A brand outcome (a template, an ICP) is picked among the brand's Units; every other among its Engine's scripts.
   const kind: PointKind = out?.subject === "brand" ? "unit" : "script";
   const asker = consumer === "campaign" ? "the campaign" : engineName(catalogue, consumer);
   return {
@@ -218,12 +218,12 @@ export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
   };
 }
 
-/** The word a choice card's first column says: what competes there. */
+/** The word a pick card's first column says: what competes there. */
 export function candidateWord(kind: PointKind): string {
   return kind === "unit" ? "Unit" : "Script";
 }
 
-/** A candidate of a choice point in words: a script dynasty or a brand Unit dynasty. */
+/** A candidate of a candidate place in words: a script dynasty or a brand Unit dynasty. */
 export function candidateLabel(model: Model, point: string, candidate: string, brandId?: string): string {
   const s = headScript(model.catalogue, candidate);
   if (s) return s.name;
@@ -245,8 +245,8 @@ export function clientOf(model: Model, campaignId: string): WorldClient | undefi
 }
 
 /** Campaigns in scope: one brand, or every client. */
-export function scopedCampaigns(model: Model, brandId: string | null): Campaign[] {
-  return model.campaigns.filter((c) => !brandId || c.brandId === brandId);
+export function scopedCampaigns(model: Model, brandId: string | null, offerId: string | null = null): Campaign[] {
+  return model.campaigns.filter((c) => (!brandId || c.brandId === brandId) && (!offerId || c.offerId === offerId));
 }
 
 /** Where a campaign starts: Start (it pulls), or the outcome whose Units it pushes. */
@@ -350,7 +350,7 @@ export function scopeReturn(model: Model, campaigns: readonly Campaign[]): { mea
 }
 
 // ---------------------------------------------------------------------------
-// Choice points: beliefs, picks, hidden truth
+// Candidate places: beliefs, picks, hidden truth
 // ---------------------------------------------------------------------------
 
 export interface CandidateRow {
@@ -384,11 +384,11 @@ export function hiddenOf(model: Model, campaign: Campaign): Map<string, { best: 
   return memo(model, `hidden:${campaign.id}`, () => hiddenBest(model.session, campaign));
 }
 
-/** Every choice point a campaign used, in the order its decisions are made. */
+/** Every candidate place a campaign used, in the order its decisions are made. */
 export function pointsOf(model: Model, campaign: Campaign): PointRow[] {
   return memo(model, `points:${campaign.id}`, () => {
     const hidden = hiddenOf(model, campaign);
-    const keys = model.session.choicePoints().filter((p) => p.campaignId === campaign.id).map((p) => p.point);
+    const keys = model.session.candidatePlaces().filter((p) => p.campaignId === campaign.id).map((p) => p.point);
     const ordered = [...hidden.keys(), ...keys.filter((k) => !hidden.has(k))].filter((k) => keys.includes(k));
     return ordered.map((key) => pointRow(model, campaign, key, hidden.get(key) ?? null));
   });
@@ -429,7 +429,7 @@ export function pointRow(model: Model, campaign: Campaign, key: string, hidden: 
   return { info, campaignId: campaign.id, candidates, picks: all };
 }
 
-/** Convergence of every choice point toward its hidden best (cached per day). */
+/** Convergence of every candidate place toward its hidden best (cached per day). */
 export function convergenceOf(model: Model): PointConvergence[] {
   return memo(model, "convergence", () => convergence(model.session));
 }
@@ -439,22 +439,22 @@ export function shareSeries(pc: PointConvergence): (number | null)[] {
   return pc.daily.map((d) => (d.picks > 0 ? d.onBest / d.picks : null));
 }
 
-/** The latest choice records of a set of campaigns, newest first. */
-export function recentChoices(model: Model, campaignIds: Set<string>, limit: number): ChoiceRecord[] {
-  const out: ChoiceRecord[] = [];
-  const all = model.session.choices;
+/** The latest pick records of a set of campaigns, newest first. */
+export function recentChoices(model: Model, campaignIds: Set<string>, limit: number): PickRecord[] {
+  const out: PickRecord[] = [];
+  const all = model.session.pickLog;
   for (let i = all.length - 1; i >= 0 && out.length < limit; i--) if (campaignIds.has(all[i]!.campaignId)) out.push(all[i]!);
   return out;
 }
 
-/** Why a choice went the way it did, in plain words. */
-export function explainChoice(model: Model, c: ChoiceRecord): string {
+/** Why a pick went the way it did, in plain words. */
+export function explainChoice(model: Model, c: PickRecord): string {
   const brandId = model.campaigns.find((x) => x.id === c.campaignId)?.brandId;
-  const chosen = candidateLabel(model, c.point, c.chosenId, brandId);
+  const picked = candidateLabel(model, c.point, c.pickedId, brandId);
   const total = c.candidates.reduce((s, o) => s + o.picks, 0);
-  const share = total > 0 ? Math.round((100 * (c.candidates.find((o) => o.id === c.chosenId)?.picks ?? 0)) / total) : 0;
-  if (c.chosenId === c.bestId) return `${chosen} took ${share}% of picks: the best expected value per dollar.`;
-  return `${chosen} took ${share}% of picks while ${candidateLabel(model, c.point, c.bestId, brandId)} leads on expected value: still exploring.`;
+  const share = total > 0 ? Math.round((100 * (c.candidates.find((o) => o.id === c.pickedId)?.picks ?? 0)) / total) : 0;
+  if (c.pickedId === c.bestId) return `${picked} took ${share}% of picks: the best expected value per dollar.`;
+  return `${picked} took ${share}% of picks while ${candidateLabel(model, c.point, c.bestId, brandId)} leads on expected value: still exploring.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ export interface PluggedInput {
 export function pluggedAt(model: Model, outcome: OutcomeId): PluggedInput[] {
   return memo(model, `plugged:${outcome}`, () => {
     const dynasties = new Set(model.catalogue.scripts.filter((s) => s.outcome === outcome).map((s) => s.dynasty));
-    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`) && model.session.candidatesAt(p).some((o) => dynasties.has(o)));
+    const points = [...new Set(model.session.candidatePlaces().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`) && model.session.candidatesAt(p).some((o) => dynasties.has(o)));
     return points.map((point) => {
       const score = new Map<string, number>();
       let picks = 0;
@@ -543,7 +543,7 @@ export interface ObjectDynasty {
 
 /** Every dynasty of an object outcome, per brand (scope = one brand or all). */
 export function objectDynasties(model: Model, outcome: OutcomeId, brandId: string | null): ObjectDynasty[] {
-  const consumerPoints = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`));
+  const consumerPoints = [...new Set(model.session.candidatePlaces().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`));
   const out: ObjectDynasty[] = [];
   for (const client of model.clients) {
     if (brandId && client.brand.id !== brandId) continue;

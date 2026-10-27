@@ -10,7 +10,7 @@ import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { engineTitle, outcomeName, outcomePluralName, scriptTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
-import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
+import { BudgetButton, CampaignStatusButton, CapBar, PicksTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
 
 export function ApiCampaignsPage() {
   const read = useApi<ApiCampaign[]>("/campaigns");
@@ -268,13 +268,13 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.points.length}>Choices</SectionTitle>
-        <PointsList points={d.points} catalogue={catalogue} empty={other ? `No choice read from ${other} yet.` : "No choice made yet. Launch the campaign and the first tick makes them."} />
+        <SectionTitle count={d.candidates.length}>Picks</SectionTitle>
+        <PointsList points={d.candidates} catalogue={catalogue} empty={other ? `No pick read from ${other} yet.` : "No pick made yet. Launch the campaign and the first tick makes them."} />
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.recentChoices.length}>Why each choice was made</SectionTitle>
-        <ChoicesTable choices={d.recentChoices} />
+        <SectionTitle count={d.recentPicks.length}>Why each pick was made</SectionTitle>
+        <PicksTable picks={d.recentPicks} />
       </section>
 
       <section className="mt-8">

@@ -7,7 +7,7 @@ import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile,
 import { useOverview } from "@/lib/api/overview";
 import { outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCount, plural } from "@/lib/format";
-import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, Read, RunsTable, timeAgo } from "./common";
+import { BudgetButton, CampaignStatusButton, CapBar, PicksTable, Read, RunsTable, timeAgo } from "./common";
 
 export function ApiTodayPage() {
   const read = useOverview();
@@ -31,7 +31,7 @@ function Today({ o }: { o: ApiOverview }) {
     <>
       <PageHeader
         title={`${live} of ${plural(o.campaigns.length, "campaign", "campaigns")} live`}
-        sub="Every script runs for real here. Each choice and each cent is below."
+        sub="Every script runs for real here. Each pick and each cent is below."
         right={
           o.scheduler.running ? (
             <span className="inline-flex items-center gap-1.5">
@@ -115,8 +115,8 @@ function Today({ o }: { o: ApiOverview }) {
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={o.recentChoices.length}>Why each choice was made</SectionTitle>
-        <ChoicesTable choices={o.recentChoices} empty="No choice yet. Launch a campaign and the first tick makes them." />
+        <SectionTitle count={o.recentPicks.length}>Why each pick was made</SectionTitle>
+        <PicksTable picks={o.recentPicks} empty="No pick yet. Launch a campaign and the first tick makes them." />
       </section>
 
       <section className="mt-8">

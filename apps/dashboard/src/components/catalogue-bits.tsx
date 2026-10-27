@@ -16,7 +16,7 @@ import { diffWords, headScript, materialsOfScript, scriptFigures, variablesOf, t
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 
 /**
- * The outcomes a script's code calls, one line each with its Provider and the choice made
+ * The outcomes a script's code calls, one line each with its Provider and the pick made
  * there: read from the code by a judge, then what the ledger measured each run consumed.
  */
 export function ScriptMaterials({ model, script }: { model: Model; script: Script }) {
@@ -38,11 +38,11 @@ export function ScriptMaterials({ model, script }: { model: Model; script: Scrip
             </div>
             {r.point ? (
               <Link href={`/research/?point=${encodeURIComponent(r.point)}`} className="shrink-0 text-right hover:underline">
-                <span className="k-fg3 block text-[11px]">Chosen</span>
-                <span className="block max-w-[160px] truncate text-[12px] font-medium">{r.choice ?? "—"}</span>
+                <span className="k-fg3 block text-[11px]">Picked</span>
+                <span className="block max-w-[160px] truncate text-[12px] font-medium">{r.pick ?? "—"}</span>
               </Link>
             ) : (
-              <span className="k-fg4 shrink-0 text-[12px]">No choice</span>
+              <span className="k-fg4 shrink-0 text-[12px]">No pick</span>
             )}
           </div>
         ))}
@@ -221,7 +221,7 @@ export function VersionDiff({ from, to }: { from: string; to: string }) {
 
 /**
  * Read, edit and compare the versions of one object dynasty. Saving an edit makes a new
- * version: the choices keep the dynasty and serve its new head from the next run.
+ * version: the picks keep the dynasty and serve its new head from the next run.
  */
 export function VersionEditor({
   model,

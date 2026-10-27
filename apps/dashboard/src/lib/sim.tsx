@@ -23,6 +23,7 @@ interface Saved {
   day: number;
   actions: LoggedAction[];
   scope: string | null;
+  offer?: string | null;
 }
 
 interface SimContextValue {
@@ -33,9 +34,12 @@ interface SimContextValue {
   setPins: (pins: Pin[]) => void;
   playing: boolean;
   speed: Speed;
+  /** The brand the pages show (null before the first pick). */
   scope: string | null;
+  /** The offer of that brand the pages show. */
+  offer: string | null;
   actions: LoggedAction[];
-  setScope: (brandId: string | null) => void;
+  setScope: (brandId: string | null, offerId?: string | null) => void;
   run: () => void;
   pause: () => void;
   stepDay: () => void;
@@ -73,7 +77,12 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
   const [actions, setActions] = useState<LoggedAction[]>([]);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>(2);
-  const [scope, setScope] = useState<string | null>(null);
+  const [scope, setScopeState] = useState<string | null>(null);
+  const [offer, setOffer] = useState<string | null>(null);
+  const setScope = useCallback((brandId: string | null, offerId: string | null = null) => {
+    setScopeState(brandId);
+    setOffer(offerId);
+  }, []);
 
   const load = useCallback((sd: number, acts: LoggedAction[], day: number) => {
     const { world, session, applied } = replay(sd, acts, day);
@@ -89,7 +98,7 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
     setPinsState(readPins());
     const saved = readSaved();
     if (saved) {
-      setScope(saved.scope);
+      setScope(saved.scope, saved.offer ?? null);
       load(saved.seed, saved.actions, saved.day);
     } else load(WORLD.seed, [], FIRST_VISIT_DAY);
   }, [load]);
@@ -102,13 +111,13 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
   // Keep the history so a reload lands on the same day.
   useEffect(() => {
     if (!model) return;
-    const saved: Saved = { seed, day: model.day, actions, scope };
+    const saved: Saved = { seed, day: model.day, actions, scope, offer };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     } catch {
       /* storage full or blocked: the session still runs */
     }
-  }, [model, seed, actions, scope]);
+  }, [model, seed, actions, scope, offer]);
 
   const stepDay = useCallback(() => {
     const s = sessionRef.current;
@@ -148,6 +157,7 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
     playing,
     speed,
     scope,
+    offer,
     actions,
     setScope,
     run: () => setPlaying(true),

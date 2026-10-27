@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   ArrowCounterClockwiseIcon,
   BookOpenIcon,
@@ -26,7 +26,9 @@ import {
 import { NavContext } from "./nav-context";
 import { Mark } from "./mark";
 import { useSim, SPEEDS, type Speed } from "@/lib/sim";
-import { leadRows } from "@/lib/model";
+import { ScopeSelector } from "./scope-selector";
+import { resolveScope, type ScopeOrg } from "@/lib/scope";
+import { leadRows, scopedCampaigns } from "@/lib/model";
 import { formatCount } from "@/lib/format";
 import { pinHref, pinKey } from "@/lib/pins";
 
@@ -93,9 +95,9 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
-  const { model, scope, pins } = useSim();
+  const { model, scope, offer, pins } = useSim();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
-  const campaigns = model ? model.campaigns.filter((c) => !scope || c.brandId === scope) : [];
+  const campaigns = model ? scopedCampaigns(model, scope, offer) : [];
   const campaignId = search.get("id");
   const pinned = search.get("pin");
   const leadsInScope = model ? leadRows(model, scope).length : null;
@@ -184,42 +186,24 @@ function Sidebar() {
   );
 }
 
-/** Which client the pages show: one brand, or every client. */
+/** Which organization, brand and offer the pages show, like distribute.you. */
 function ScopeSwitcher() {
-  const { model, scope, setScope } = useSim();
-  const [open, setOpen] = useState(false);
-  const current = model?.clients.find((c) => c.brand.id === scope);
-  const brands = model ? model.clients.map((c) => c.brand) : [];
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex h-9 w-full items-center gap-2 rounded-[8px] px-2 text-left hover:bg-[var(--bg-hover)]" aria-expanded={open}>
-        <Mark kind="audience" id={current?.brand.id ?? "all"} size={22} quiet={!current} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium">{current?.brand.name ?? "All clients"}</span>
-          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory v6 · fictional data</span>
-        </span>
-        <CaretDownIcon size={12} className="k-fg3" />
-      </button>
-      {open && (
-        <div className="k-popover absolute left-0 right-0 top-10 z-30 p-1" onMouseLeave={() => setOpen(false)}>
-          {[{ id: null as string | null, name: "All clients" }, ...brands.map((b) => ({ id: b.id as string | null, name: b.name }))].map((b) => (
-            <button
-              key={b.id ?? "all"}
-              type="button"
-              onClick={() => {
-                setScope(b.id);
-                setOpen(false);
-              }}
-              className={`flex h-8 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] hover:bg-[var(--bg-hover)] ${b.id === scope ? "k-selected" : ""}`}
-            >
-              <Mark kind="audience" id={b.id ?? "all"} size={18} quiet={!b.id} />
-              <span className="truncate">{b.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const { model, scope, offer, setScope } = useSim();
+  const orgs = useMemo<ScopeOrg[]>(() => {
+    const out: ScopeOrg[] = [];
+    for (const c of model?.clients ?? []) {
+      let org = out.find((o) => o.id === c.org.id);
+      if (!org) out.push((org = { id: c.org.id, name: c.org.name, brands: [] }));
+      org.brands.push({ id: c.brand.id, name: c.brand.name, offers: [{ id: c.offer.id, name: c.offer.name }] });
+    }
+    return out;
+  }, [model?.clients]);
+  const value = resolveScope(orgs, { orgId: null, brandId: scope, offerId: offer });
+  // The pages always show one brand: the first one until another is picked.
+  useEffect(() => {
+    if (model && (value.brandId !== scope || value.offerId !== offer)) setScope(value.brandId, value.offerId);
+  }, [model, value.brandId, value.offerId, scope, offer, setScope]);
+  return <ScopeSelector orgs={orgs} value={value} onChange={(v) => setScope(v.brandId, v.offerId)} note="GTM Factory v7 · fictional data" />;
 }
 
 /** The simulator, always in reach above every page: the day, run / pause / one day / speed, reset on a seed. */

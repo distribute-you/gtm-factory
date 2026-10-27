@@ -40,19 +40,19 @@ function Research({ model }: { model: Model }) {
       <PageHeader
         title={
           <>
-            {converged} of {big} choice points back their hidden best
+            {converged} of {big} candidate places back their hidden best
           </>
         }
-        sub="Every choice, made by one prioritizer. The world hides the true best candidate at each Material; here is how fast the Supplier rating finds it."
+        sub="Every pick, made by one prioritizer. The world hides the true best candidate at each Material; here is how fast the Supplier rating finds it."
         right={<span>Day {model.day}</span>}
       />
 
       {all.length === 0 ? (
-        <EmptyNote>No choice yet. Press Run.</EmptyNote>
+        <EmptyNote>No pick yet. Press Run.</EmptyNote>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section>
-            <SectionTitle count={all.length}>Choice points</SectionTitle>
+            <SectionTitle count={all.length}>Candidate places</SectionTitle>
             <div className="space-y-4">
               {groups.map((g) => (
                 <div key={g.key}>
@@ -131,7 +131,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
             <SectionTitle count={row.candidates.length} right={<span>{brand}</span>}>
               {c.name}
             </SectionTitle>
-            <CardTable footer="Belief = what the Rating reads today. Hidden truth = what the world really does, never read by any choice.">
+            <CardTable footer="Belief = what the Rating reads today. Hidden truth = what the world really does, never read by any pick.">
               <thead>
                 <tr className="k-line-subtle border-b">
                   <th className={TH}>Candidate</th>
@@ -181,13 +181,13 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
   );
 }
 
-/** One Engine called by two Engines: each caller has its own choice, so its own best script. */
+/** One Engine called by two Engines: each caller has its own pick, so its own best script. */
 function MultiPlugged({ model }: { model: Model }) {
   const rows = useMemo(() => multiPlugged(model), [model]);
   if (rows.length === 0) return null;
   return (
     <section className="mt-10">
-      <SectionTitle right={<span>The choice lives on the Material, never on the Engine</span>}>One Engine, several callers</SectionTitle>
+      <SectionTitle right={<span>The pick lives on the Material, never on the Engine</span>}>One Engine, several callers</SectionTitle>
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((r) => (
           <div key={r.outcome} className="k-card p-4">

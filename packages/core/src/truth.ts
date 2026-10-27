@@ -1,9 +1,9 @@
 /**
  * The hidden truth, read the way a decision reads the world: for each candidate
- * at a choice point, the true chance a decision there reaches its milestone and
- * the true cost from the decision to it, the other choice points set at their
+ * at a candidate place, the true chance a decision there reaches its milestone and
+ * the true cost from the decision to it, the other candidate places set at their
  * own hidden best. Used to grade the Supplier rating (the Research page, the
- * regret test), never by the choices.
+ * regret test), never by the picks.
  */
 
 import { START, type OutcomeId, type Script } from "./catalogue";
@@ -52,7 +52,7 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, final: boolean): bo
   for (const i of subj ? [subj, ...bill.filter((m) => m !== subj)] : bill) {
     const before = c.ops.length;
     if (!planObtain(c, script, i)) return false;
-    // Recall at an attesting script comes from the scripts chosen at its Materials.
+    // Recall at an attesting script comes from the scripts picked at its Materials.
     for (const st of c.ops.slice(before)) {
       if (st.kind !== "decide" || st.point !== pointKey(script.outcome, i)) continue;
       const t = s.candidateTruthAt(st.point, c.assign.get(st.point) ?? st.candidates[0]!);
@@ -78,7 +78,7 @@ function planObtain(c: Ctx, consumer: Script, i: OutcomeId): boolean {
     return planProduce(c, consumer.outcome, i, false);
   }
   if (out.subject === "run") return planProduce(c, consumer.outcome, i, false);
-  // A brand Unit: chosen among the ones the brand holds, else made by its Engine.
+  // A brand Unit: picked among the ones the brand holds, else made by its Engine.
   const point = pointKey(consumer.outcome, i);
   const candidates = s.objectDynasties(c.brandId, i);
   if (candidates.length === 0) return planProduce(c, consumer.outcome, i, false);
@@ -147,7 +147,7 @@ export interface HiddenCandidate {
 }
 
 /**
- * Hidden truth of every choice point credited at one milestone of a
+ * Hidden truth of every candidate place credited at one milestone of a
  * campaign: per point, each candidate's true rate and cost, the other points
  * at their own hidden best (found by coordinate ascent).
  */
@@ -191,7 +191,7 @@ export function hiddenTruth(s: SimulationSession, campaign: Campaign, consumer: 
     out.set(
       st.point,
       st.candidates.map((o) => {
-        // Each candidate graded with the choices under it at their own best.
+        // Each candidate graded with the picks under it at their own best.
         const mine = optimize(new Map(assign).set(st.point, o), new Set([st.point]));
         const c = plan(s, campaign, consumer, milestone, from, mine);
         const r = c ? fromPoint(c, st.point) : null;
@@ -204,7 +204,7 @@ export function hiddenTruth(s: SimulationSession, campaign: Campaign, consumer: 
   return out;
 }
 
-/** The hidden best candidate at every choice point of a campaign. */
+/** The hidden best candidate at every candidate place of a campaign. */
 export function hiddenBest(s: SimulationSession, campaign: Campaign): Map<string, { best: string; candidates: HiddenCandidate[] }> {
   const out = new Map<string, { best: string; candidates: HiddenCandidate[] }>();
   for (const { consumer, milestone, from } of milestonesOf(s, campaign)) {
@@ -255,7 +255,7 @@ export function runGraded(s: SimulationSession, days: number, log: TruthLog = ne
 /**
  * Regret: per day, the share of each dollar's value the picks lost against
  * always picking the hidden best (1 - its value per dollar / the best's),
- * weighted by picks, over every choice point of every campaign. Each day is
+ * weighted by picks, over every candidate place of every campaign. Each day is
  * graded against that day's truth when a log is given, else today's.
  */
 export function regretByDay(s: SimulationSession, log?: TruthLog): (number | null)[] {
@@ -302,7 +302,7 @@ export interface PointConvergence {
 }
 
 /**
- * How the prioritizer converged at every choice point: per day, the share of
+ * How the prioritizer converged at every candidate place: per day, the share of
  * picks that went to the hidden best candidate (today's truth), over every
  * campaign that chose there.
  */

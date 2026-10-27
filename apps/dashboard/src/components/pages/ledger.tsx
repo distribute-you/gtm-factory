@@ -68,7 +68,7 @@ function Ledger({ model }: { model: Model }) {
 
       <div className="mt-8 grid gap-6 xl:grid-cols-2">
         <section>
-          <SectionTitle right={<span>What choices read</span>}>Decide: each Engine's own cost</SectionTitle>
+          <SectionTitle right={<span>What picks read</span>}>Decide: each Engine's own cost</SectionTitle>
           <CardTable footer="Materials made by other Engines are not in an Engine's price: the Plan adds them, never twice.">
             <thead>
               <tr className="k-line-subtle border-b">

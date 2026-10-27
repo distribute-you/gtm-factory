@@ -12,7 +12,7 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: "GTM Factory: revenue made easy",
-  description: "An open agentic GTM factory, live. Pick a client, ask for paid clients, and watch the Supplier rating choose every funnel, script, template and LLM by value per dollar.",
+  description: "An open agentic GTM factory, live. Pick a client, ask for paid clients, and watch the Supplier rating pick every funnel, script, template and LLM by value per dollar.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

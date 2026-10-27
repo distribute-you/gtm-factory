@@ -23,7 +23,7 @@ export const campaignHref = (id: string) => `/campaigns/view/?id=${encodeURIComp
 // ---------------------------------------------------------------------------
 
 export function CampaignsPage() {
-  const { model, scope } = useSim();
+  const { model, scope, offer } = useSim();
   return (
     <>
       <TopBar crumbs={[{ label: "Campaigns" }]} />
@@ -33,7 +33,8 @@ export function CampaignsPage() {
 }
 
 function CampaignList({ model, scope }: { model: Model; scope: string | null }) {
-  const campaigns = scopedCampaigns(model, scope);
+  const { offer } = useSim();
+  const campaigns = scopedCampaigns(model, scope, offer);
   const running = campaigns.filter((c) => c.status === "running").length;
   const reactive = campaigns.filter((c) => c.start !== START).length;
   return (
@@ -289,11 +290,11 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
 
       <section className="mb-8">
         <SectionTitle count={points.length} right={<span>In the order they are made for each subject</span>}>
-          Choices
+          Picks
         </SectionTitle>
         {points.length === 0 ? (
           <div className="k-card">
-            <EmptyNote>No choice yet. Press Run.</EmptyNote>
+            <EmptyNote>No pick yet. Press Run.</EmptyNote>
           </div>
         ) : (
           <div className="space-y-3">
@@ -518,7 +519,7 @@ function VerdictCard({ model, campaign, outcome, part }: { model: Model; campaig
   const { dispatch } = useSim();
   const strategies = model.catalogue.strategiesOf(outcome);
   const verdict = campaign.verdicts?.[outcome];
-  const chosen = verdict && verdict !== "none" ? model.catalogue.strategy(verdict) : undefined;
+  const picked = verdict && verdict !== "none" ? model.catalogue.strategy(verdict) : undefined;
   const [error, setError] = useState<string | null>(null);
   const cap = campaign.caps?.[outcome];
   return (
@@ -551,22 +552,22 @@ function VerdictCard({ model, campaign, outcome, part }: { model: Model; campaig
       </label>
       {error && <p className="mt-1 text-[12px] text-[var(--data-rose)]">{error}</p>}
       <div className="mt-2 space-y-1 text-[12px]">
-        {chosen && chosen.conditions.length > 0 && <p>{chosen.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}</p>}
-        {chosen && (chosen.subject ?? []).length > 0 && (
+        {picked && picked.conditions.length > 0 && <p>{picked.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}</p>}
+        {picked && (picked.subject ?? []).length > 0 && (
           <p>
             <span className="k-fg3">Serves: </span>
-            {chosen.subject!.map((c) => describeCondition(c, model.catalogue)).join(", ")}
+            {picked.subject!.map((c) => describeCondition(c, model.catalogue)).join(", ")}
           </p>
         )}
         {cap !== undefined && <p className="k-fg2">At most {formatCount(cap)} a day, as the brief says.</p>}
-        {chosen?.proposed && <p className="k-fg3">Proposed by a split on day {chosen.proposed.day}: {chosen.proposed.reason}.</p>}
-        {!chosen && verdict !== "none" && cap === undefined && <p className="k-fg3">Every script of this Engine competes.</p>}
+        {picked?.proposed && <p className="k-fg3">Proposed by a split on day {picked.proposed.day}: {picked.proposed.reason}.</p>}
+        {!picked && verdict !== "none" && cap === undefined && <p className="k-fg3">Every script of this Engine competes.</p>}
       </div>
     </div>
   );
 }
 
-/** One choice point: its candidates, their share of picks, the engine's belief, the hidden best. */
+/** One candidate place: its candidates, their share of picks, the engine's belief, the hidden best. */
 function PointCard({ model, campaign, point }: { model: Model; campaign: Campaign; point: PointRow }) {
   const milestone = milestoneOfPoints(model, campaign).get(point.info.key) ?? targetOf(campaign);
   const sorted = useMemo(() => [...point.candidates].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.candidates]);
@@ -637,7 +638,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
   );
 }
 
-/** A choice card's uniform title: "<Engine> · its script" or "<Engine> · Material <outcome>", one glyph per object type. */
+/** A pick card's uniform title: "<Engine> · its script" or "<Engine> · Material <outcome>", one glyph per object type. */
 export function PointTitle({ model, info }: { model: Model; info: PointInfo }) {
   const unit = info.kind === "unit";
   const engine = unit ? info.consumer : info.material;
