@@ -17,7 +17,8 @@ import {
 } from "@phosphor-icons/react";
 import { NavContext } from "@/components/nav-context";
 import { Mark } from "@/components/mark";
-import { OverviewProvider, useOverview } from "@/lib/api/overview";
+import { OverviewProvider, useOverview, useScope } from "@/lib/api/overview";
+import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
 import { timeAgo } from "./common";
 
@@ -87,21 +88,14 @@ function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
   const { data, error } = useOverview();
+  const { orgs, scope, setScope } = useScope();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
   const id = search.get("id");
   const brandName = (bid: string) => data?.brands.find((b) => b.id === bid)?.name ?? "";
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
-        <div className="flex h-9 items-center gap-2 px-2">
-          <Mark kind="performer" id="gtm" size={22} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">GTM Factory v6</span>
-            <span className="k-fg3 block truncate text-[11px] leading-3">
-              {error ? "Server unreachable" : data?.scheduler.lastTickAt ? `Last tick ${timeAgo(data.scheduler.lastTickAt)}` : "Running for real"}
-            </span>
-          </span>
-        </div>
+        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory v7 · ${error ? "server unreachable" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
         <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
           <PlusIcon size={14} weight="bold" />
           New campaign

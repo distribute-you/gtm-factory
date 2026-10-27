@@ -1,6 +1,6 @@
 # The api data source
 
-The dashboard reads one of two data sources, chosen at build time:
+The dashboard reads one of two data sources, picked at build time:
 
 - **simulator** (default): the fictional world, computed in the browser. This is the GitHub Pages build.
 - **api**: a running GTM Factory. The dashboard reads and writes its backend over JSON: brands, campaigns (start, Target, brief, launch, pause, daily cap, volume; their Plan, Routing and milestones), leads and their Units with their traceability, brand dynasties (templates, ICPs), scripts with their code, materials and capacity, the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
@@ -28,12 +28,12 @@ Put the API on the same origin under `/api` (a reverse proxy routing `/api/*` to
 
 | Method | Path | Answer |
 |---|---|---|
-| GET | `/overview` | `ApiOverview`: catalogue, brands, campaigns, totals, recent choices and runs, scheduler, pins |
+| GET | `/overview` | `ApiOverview`: catalogue, brands, campaigns, totals, recent picks and runs, scheduler, pins |
 | GET | `/catalogue` | `CatalogueData`: outcomes, tracks, scripts, tactics, strategies |
-| GET, POST | `/brands` | `ApiBrand[]`; create from `ApiNewBrand` |
+| GET, POST | `/brands` | `ApiBrand[]`, each with its organization (`orgId`, `orgName`) and its offers; create from `ApiNewBrand` |
 | GET | `/brands/:id/plans` | `ApiPlanPreview[]`: what a new campaign toward each Target would run today (its `ApiRouting`, its `ApiMilestone`s, cost per Target), best value per dollar first |
-| GET, POST | `/campaigns` | `ApiCampaign[]`; create from `ApiNewCampaign` (brand, start, Target, budget, `brief`), always paused |
-| GET, PATCH | `/campaigns/:id` | `ApiCampaignDetail`: its milestones, its Plan (`ApiPlanNode`, with the branches used over 7 days), choice points; PATCH `{ dailyBudgetCents }` |
+| GET, POST | `/campaigns` | `ApiCampaign[]`; create from `ApiNewCampaign` (brand, offer, start, Target, budget, `brief`), always paused |
+| GET, PATCH | `/campaigns/:id` | `ApiCampaignDetail`: its milestones, its Plan (`ApiPlanNode`, with the branches used over 7 days), what competes at each Engine it calls (`candidates`); PATCH `{ dailyBudgetCents }` |
 | POST | `/campaigns/:id/launch`, `/campaigns/:id/pause` | `ApiCampaign` |
 | GET | `/leads?campaignId=&brandId=&state=` | `ApiLead[]` |
 | GET | `/leads/:id` | `ApiLeadDetail` |
@@ -41,9 +41,11 @@ Put the API on the same origin under `/api` (a reverse proxy routing `/api/*` to
 | GET, POST | `/objects?outcome=` | `ApiObjectDynasty[]`; POST `ApiNewObjectVersion` (upgrade, fork or new dynasty) |
 | GET | `/scripts?outcome=` | `ApiScriptStats[]`: the scripts of one Engine, with their code, materials and capacity |
 | POST | `/scripts/:id/retire`, `/scripts/:id/restore` | `ApiScriptStats` |
-| POST | `/scripts/:id/capacity` | `ApiCapacity` (`perDay`, `daysPerUnit`), typed by a person for a script of the client's team; answers `ApiScriptStats` |
-| GET | `/research` | `ApiChoicePoint[]` |
-| GET | `/choices?campaignId=&leadId=` | `ApiChoice[]` |
+| POST | `/scripts/:id/capacity` | `ApiCapacity` (`perDay`, `daysPerUnit`, null for no limit), typed by a person for a script a person performs; answers `ApiScriptStats` |
+| GET | `/research` | `ApiCandidates[]`: at each place an Engine calls an outcome, the scripts (or the brand's Units) that compete, with the Rating's belief about each |
+| GET | `/picks?campaignId=&leadId=` | `ApiPick[]`: each pick, the candidates as scored then, and why |
+| GET | `/tasks?brandId=&status=` | `ApiTask[]`: the work the Plan ordered from the client's team, one per run of a script a person performs |
+| POST | `/tasks/:id/answer` | `ApiTaskAnswer` (`values`, one per field of the task's form); answers `ApiTask`. The answer becomes the Unit's content |
 | GET | `/ledger` | `ApiLedger`, per Engine, script, vendor and campaign, reconciled to the cent |
 
 ## What a campaign carries
@@ -51,5 +53,13 @@ Put the API on the same origin under `/api` (a reverse proxy routing `/api/*` to
 - `brief`: its strategy in the client's words. `verdicts`: what the judge read in it, per Engine, a strategy id or `"none"` (the Plan routes around that Engine). `caps`: most Units per day at an Engine. `endsAt`: the end of a test of a stated length.
 - `routing`: the Routing its Plan runs, `{ id, name, line }`, a view with a short name.
 - `performedBy`: absent for ours. A campaign another party runs (read through a connector) carries its name, and is never ticked, launched, paused or capped from the dashboard. Runs, Units and scripts carry `performedBy` too.
+
+## Tasks for the client's team
+
+A script a person performs (a closing call) declares a short form. Each run of it opens a task: the backend notifies the person by email, the person answers in the dashboard, and the answer becomes the Unit. Its first yes or no field says whether the outcome happened; the Unit then credits the picks that brought the person. Capacity is asked only for such work that repeats; code and AI scripts have none.
+
+## Scope
+
+The dashboard shows one organization, one of its brands and one offer at a time, picked at the top of the sidebar. A new campaign sells the offer picked there.
 
 A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashboard shows those words.

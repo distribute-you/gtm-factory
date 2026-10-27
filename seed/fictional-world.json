@@ -962,7 +962,19 @@
         "capacity": {
           "perDay": 10,
           "daysPerUnit": 2
-        }
+        },
+        "form": [
+          {
+            "key": "booked",
+            "label": "Did they book a meeting?",
+            "type": "yesno"
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "text"
+          }
+        ]
       },
       {
         "id": "rm_email",
@@ -1017,7 +1029,24 @@
         "capacity": {
           "perDay": 6,
           "daysPerUnit": 7
-        }
+        },
+        "form": [
+          {
+            "key": "paid",
+            "label": "Did they pay?",
+            "type": "yesno"
+          },
+          {
+            "key": "amount",
+            "label": "Amount",
+            "type": "money"
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "text"
+          }
+        ]
       }
     ],
     "tactics": [

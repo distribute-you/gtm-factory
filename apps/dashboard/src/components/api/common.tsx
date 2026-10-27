@@ -1,12 +1,12 @@
 "use client";
 
-/** Pieces every api page shares: read states, the campaign status and cap controls, choice, run and choice point tables. */
+/** Pieces every api page shares: read states, the campaign status and cap controls, pick, run and candidate place tables. */
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
-import { OURS, type ApiCampaign, type ApiChoice, type ApiChoicePoint, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
+import { OURS, type ApiCampaign, type ApiPick, type ApiCandidates, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
 import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, type ApiRead } from "@/lib/api/client";
@@ -323,43 +323,43 @@ function RunRow({ run, catalogue, open, onToggle }: { run: ApiRun; catalogue: Ca
   );
 }
 
-export function ChoicesTable({ choices, empty = "No choice made yet." }: { choices: ApiChoice[]; empty?: string }) {
+export function PicksTable({ picks, empty = "No pick made yet." }: { picks: ApiPick[]; empty?: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  if (choices.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
+  if (picks.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
-    <CardTable footer={`${formatCount(choices.length)} choices`}>
+    <CardTable footer={`${formatCount(picks.length)} picks`}>
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
           <th className={TH}>Material</th>
-          <th className={TH}>Chosen</th>
+          <th className={TH}>Picked</th>
           <th className={`${TH} w-full`}>Why</th>
           <th className={TH}>Credited</th>
         </tr>
       </thead>
       <tbody>
-        {choices.map((c) => (
-          <ChoiceRow key={c.id} choice={c} open={openId === c.id} onToggle={() => setOpenId(openId === c.id ? null : c.id)} />
+        {picks.map((c) => (
+          <PickRow key={c.id} pick={c} open={openId === c.id} onToggle={() => setOpenId(openId === c.id ? null : c.id)} />
         ))}
       </tbody>
     </CardTable>
   );
 }
 
-function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolean; onToggle: () => void }) {
+function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onToggle: () => void }) {
   return (
     <>
       <tr className="k-row k-line-subtle cursor-pointer border-b last:border-b-0" onClick={onToggle}>
-        <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(choice.at)}</td>
+        <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(pick.at)}</td>
         <td className={`${TD} whitespace-nowrap`}>
           <span className="inline-flex items-center gap-2">
-            <Mark kind="point" id={choice.point} size={16} />
-            {choice.pointLabel}
+            <Mark kind="point" id={pick.place} size={16} />
+            {pick.placeLabel}
           </span>
         </td>
-        <td className={`${TD} whitespace-nowrap font-medium`}>{choice.chosenLabel}</td>
-        <td className={`${TD} k-fg2 min-w-[260px]`}>{choice.reason}</td>
-        <td className={TD}>{choice.credited ? <ToneDot tone="teal">Yes</ToneDot> : <span className="k-fg4">—</span>}</td>
+        <td className={`${TD} whitespace-nowrap font-medium`}>{pick.pickedLabel}</td>
+        <td className={`${TD} k-fg2 min-w-[260px]`}>{pick.reason}</td>
+        <td className={TD}>{pick.credited ? <ToneDot tone="teal">Yes</ToneDot> : <span className="k-fg4">—</span>}</td>
       </tr>
       {open && (
         <tr className="k-line-subtle border-b">
@@ -374,8 +374,8 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
                 </tr>
               </thead>
               <tbody>
-                {choice.candidates.map((o) => (
-                  <tr key={o.id} className={o.id === choice.chosen ? "font-medium" : "k-fg2"}>
+                {pick.candidates.map((o) => (
+                  <tr key={o.id} className={o.id === pick.picked ? "font-medium" : "k-fg2"}>
                     <td className="py-0.5 pr-6">{o.label}</td>
                     <td className="py-0.5 pr-6 text-right tabular-nums">{formatRoi(o.meanScore)}</td>
                     <td className="py-0.5 text-right tabular-nums">{formatRoi(o.sampledScore)}</td>
@@ -390,15 +390,15 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
   );
 }
 
-/** Each choice point and its candidates' beliefs, under a uniform title. Rows keep the served order. */
-export function PointsList({ points, catalogue, empty = "No choice point yet." }: { points: ApiChoicePoint[]; catalogue?: CatalogueData | null; empty?: string }) {
+/** Each candidate place and its candidates' beliefs, under a uniform title. Rows keep the served order. */
+export function PointsList({ points, catalogue, empty = "No candidate place yet." }: { points: ApiCandidates[]; catalogue?: CatalogueData | null; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
-        const word = p.chooses === "unit" ? "Unit" : "Script";
+        const word = p.kind === "unit" ? "Unit" : "Script";
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.chooses === "unit" ? "Units" : "scripts"} compete here`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.kind === "unit" ? "Units" : "scripts"} compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`} colSpan={7}>
@@ -407,9 +407,9 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
               </tr>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>{word}</th>
-                <th className={`${TH} text-right`}>Value per $</th>
-                <th className={`${TH} text-right`}>Rate</th>
-                <th className={`${TH} text-right`}>Cost to next milestone</th>
+                <th className={`${TH} text-right`}>Share this week</th>
+                <th className={`${TH} text-right`}>$ per outcome</th>
+                <th className={`${TH} text-right`}>% reach the next milestone</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
@@ -419,9 +419,9 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>{o.label}</td>
-                  <td className={TDN}>{formatRoi(o.meanScore)}</td>
+                  <td className={TDN}>{formatRatePct(o.share)}</td>
+                  <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
                   <td className={TDN}>{formatRatePct(o.rateMean)}</td>
-                  <td className={TDN}>{formatCents(o.costMeanCents)}</td>
                   <td className={TDN}>{formatCount(o.picks)}</td>
                   <td className={TDN}>{formatCount(o.successes)}</td>
                   <td className={TDN}>{formatCents(o.spentCents)}</td>
@@ -435,36 +435,25 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
   );
 }
 
-/**
- * A choice card's uniform title, one glyph per object type: "<Engine> · its script" when the
- * scripts of the called outcome's Engine compete, "<Engine> · Material <outcome>" when the
- * brand's Units compete for the calling Engine.
- */
-export function ApiPointTitle({ point, catalogue }: { point: ApiChoicePoint; catalogue?: CatalogueData | null }) {
-  const unit = point.chooses === "unit";
-  const engine = unit ? point.consumer : point.material;
+/** A card's uniform title: "<Engine> · <n> scripts", or "<Outcome> · <n> Units" when the brand's Units compete. */
+export function ApiPointTitle({ point, catalogue }: { point: ApiCandidates; catalogue?: CatalogueData | null }) {
+  const unit = point.kind === "unit";
   const font = { fontFamily: "var(--font-geist-sans)" };
+  const n = point.candidates.length;
   return (
     <span className="inline-flex items-center gap-1.5 normal-case">
-      <Mark kind="engine" id={engine} size={18} />
+      <Mark kind={unit ? "material" : "engine"} id={point.material} size={18} />
       <span className="k-fg text-[13px] font-medium tracking-normal" style={font}>
-        {engineTitle(catalogue, engine)}
+        {unit ? outcomeName(catalogue, point.material) : engineTitle(catalogue, point.material)}
       </span>
       <span className="k-fg4">·</span>
-      {unit ? (
-        <>
-          <Mark kind="material" id={point.material} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
-            Material {outcomeName(catalogue, point.material)}
-          </span>
-        </>
-      ) : (
-        <>
-          <Mark kind="script" id={`scripts:${point.id}`} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
-            its script
-          </span>
-        </>
+      <span className="k-fg2 text-[13px] tracking-normal" style={font}>
+        {n} {unit ? (n === 1 ? "Unit" : "Units") : n === 1 ? "script" : "scripts"}
+      </span>
+      {point.consumer !== "campaign" && (
+        <span className="k-fg3 text-[12px] tracking-normal" style={font}>
+          for {engineTitle(catalogue, point.consumer)}
+        </span>
       )}
     </span>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { PlanFlow, type FlowNode } from "@/components/plan-flow";
 import { START, type ApiCampaign, type ApiCampaignDetail, type ApiPlanNode, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
@@ -10,7 +11,7 @@ import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { engineTitle, outcomeName, outcomePluralName, scriptTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
-import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
+import { BudgetButton, CampaignStatusButton, CapBar, PicksTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
 
 export function ApiCampaignsPage() {
   const read = useApi<ApiCampaign[]>("/campaigns");
@@ -262,19 +263,23 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
 
       <section className="mt-8">
         <SectionTitle right={<span>Recomputed at every tick; shares and costs over the last 7 days</span>}>Plan</SectionTitle>
-        <div className="k-card py-1" data-testid="plan-tree">
-          {d.plan ? <PlanTreeNode catalogue={catalogue} node={d.plan} depth={0} /> : <EmptyNote>No Plan yet: the first tick computes it.</EmptyNote>}
-        </div>
+        {chain.length > 0 ? (
+          <PlanFlow start={c.start} startLabel={outcomeName(catalogue, c.start)} target={c.target} nodes={chain.map((n) => flowNode(catalogue, n))} />
+        ) : (
+          <div className="k-card">
+            <EmptyNote>No Plan yet: the first tick computes it.</EmptyNote>
+          </div>
+        )}
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.points.length}>Choices</SectionTitle>
-        <PointsList points={d.points} catalogue={catalogue} empty={other ? `No choice read from ${other} yet.` : "No choice made yet. Launch the campaign and the first tick makes them."} />
+        <SectionTitle count={d.candidates.length}>Scripts per Engine</SectionTitle>
+        <PointsList points={d.candidates} catalogue={catalogue} empty={other ? `No pick read from ${other} yet.` : "No pick made yet. Launch the campaign and the first tick makes them."} />
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.recentChoices.length}>Why each choice was made</SectionTitle>
-        <ChoicesTable choices={d.recentChoices} />
+        <SectionTitle count={d.recentPicks.length}>Why each pick was made</SectionTitle>
+        <PicksTable picks={d.recentPicks} />
       </section>
 
       <section className="mt-8">
@@ -295,46 +300,25 @@ function strategyName(catalogue: CatalogueData | undefined, id: string): string 
   return catalogue?.strategies.find((s) => s.id === id)?.name ?? id;
 }
 
-/** One outcome of the Plan: its Engine's script now, the branches that made it, then what that script calls, indented. */
-function PlanTreeNode({ catalogue, node, depth }: { catalogue: CatalogueData | undefined; node: ApiPlanNode; depth: number }) {
+/** One Engine of the Plan as a workflow card: its script now, what made it this week, what its script calls. */
+function flowNode(catalogue: CatalogueData | undefined, node: ApiPlanNode): FlowNode {
   const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
-  const o = catalogue?.outcomes.find((x) => x.id === node.outcome);
-  const leaf = !node.scriptId;
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pr-4 text-[13px]" style={{ paddingLeft: 16 + depth * 20 }} data-plan-node={node.outcome}>
-        <span className="inline-flex min-w-[200px] items-center gap-1.5">
-          <Mark kind="outcome" id={node.outcome} icon={o?.icon} size={16} />
-          <span className="font-medium">{outcomeName(catalogue, node.outcome)}</span>
-        </span>
-        <span className="k-fg2 inline-flex items-center gap-1.5">
-          {leaf ? (
-            <span className="k-fg3">{o?.subject === "brand" ? `The brand's ${node.candidates === 1 ? "Unit" : `${formatCount(node.candidates)} Units`}` : o?.contentType === "rating" ? "Today's Rating" : "From the start"}</span>
-          ) : (
-            <>
-              <Mark kind={script ? (`script:${script.kind}` as const) : "script"} id={script?.dynasty ?? node.scriptId!} size={14} />
-              <span>{script?.name ?? scriptTitle(catalogue, node.scriptId!)}</span>
-              {node.candidates > 1 && <span className="k-fg3 text-[12px]">best of {formatCount(node.candidates)}</span>}
-            </>
-          )}
-        </span>
-        {node.branches.length > 0 && (
-          <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[12px] tabular-nums">
-            {node.branches.map((b) => (
-              <span key={b.scriptId} className="inline-flex items-center gap-1">
-                <span className="font-medium">{formatRatePct(b.share)}</span>
-                <span className="k-fg3">{scriptTitle(catalogue, b.scriptId)}</span>
-                <span className="k-fg3">at {b.costPerUnitCents != null ? formatCents(b.costPerUnitCents) : "—"}</span>
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
-      {node.materials.map((m) => (
-        <PlanTreeNode key={`${node.outcome}>${m.outcome}`} catalogue={catalogue} node={m} depth={depth + 1} />
-      ))}
-    </>
-  );
+  const subjects = new Set((catalogue?.outcomes ?? []).filter((o) => o.subject === "lead" || o.subject === "company").map((o) => o.id));
+  return {
+    outcome: node.outcome,
+    label: outcomeName(catalogue, node.outcome),
+    icon: catalogue?.outcomes.find((o) => o.id === node.outcome)?.icon,
+    script: node.scriptId ? { name: script?.name ?? scriptTitle(catalogue, node.scriptId), kind: script?.kind ?? "rules", dynasty: script?.dynasty ?? node.scriptId } : null,
+    candidates: node.candidates,
+    branches: node.branches.map((b) => ({ name: scriptTitle(catalogue, b.scriptId), share: b.share, costPerUnit: b.costPerUnitCents != null ? b.costPerUnitCents / 100 : null })),
+    sides: node.materials
+      .filter((m) => !subjects.has(m.outcome))
+      .map((m) => {
+        const o = catalogue?.outcomes.find((x) => x.id === m.outcome);
+        const from = m.scriptId ? scriptTitle(catalogue, m.scriptId) : o?.contentType === "rating" ? "Today's Rating" : o?.subject === "brand" ? (m.candidates === 1 ? "The brand's Unit" : `${formatCount(m.candidates)} brand Units`) : "The stock";
+        return { outcome: m.outcome, label: outcomeName(catalogue, m.outcome), icon: o?.icon, from };
+      }),
+  };
 }
 
 function OutcomeTag({ catalogue, id }: { catalogue: CatalogueData | undefined; id: string }) {

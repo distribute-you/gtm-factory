@@ -73,7 +73,7 @@ function MaterialsPopover({ model, part, anchor, onClose }: { model: Model; part
   const script = part.scriptId ? model.catalogue.script(part.scriptId) : undefined;
   const width = 380;
   return createPortal(
-    <div className="v2-root fixed inset-0 z-50" onClick={onClose}>
+    <div className="v2-root fixed inset-0 z-50" style={{ background: "transparent" }} onClick={onClose}>
       <div className="k-popover fixed p-3" style={{ width, top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Materials">
         <p className="k-label mb-1">What its code calls</p>
         <p className="mb-2 flex items-center gap-1.5 text-[13px]">

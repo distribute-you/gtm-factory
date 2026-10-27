@@ -60,10 +60,18 @@ export interface Track {
 
 export type ScriptKind = "rules" | "ai" | "human";
 
+/** One field of a task's answer form. */
+export interface TaskField {
+  key: string;
+  label: string;
+  type: "yesno" | "number" | "money" | "text";
+}
+
 /**
- * What a script can do in one day, and what one Unit takes. Measured for code
- * and AI scripts (runs, vendor quotas); typed by a person for the scripts a
- * person performs. A script out of capacity for today leaves today's choices.
+ * What a person can do in one day, and what one Unit takes: typed by a person
+ * for the scripts a person performs. Code and AI scripts have no capacity (a
+ * queue that releases progressively is a delay, not a capacity). A script out
+ * of capacity for today leaves today's picks.
  */
 export interface Capacity {
   /** Most Units it makes per day (unset: no limit). */
@@ -91,8 +99,8 @@ export interface Script {
   /** The code GTM Factory runs: a key of the script library. */
   code: string;
   /**
-   * The outcomes its code calls: read from the code by a judge for each new
-   * version, then what the ledger measured its runs consume. Never typed by hand.
+   * The outcomes its code calls: read from its code (each `ctx.get("...")` names
+   * one, a literal), then what the ledger measured its runs consume. Never typed by hand.
    */
   materials: OutcomeId[];
   /** Tactic values describing the script (typed: yes/no, a value from a list, a number). "Performed by" is one. */
@@ -100,6 +108,12 @@ export interface Script {
   /** Expected cost of one run, cents (the prior; the measured cost decides). */
   costCents: number;
   capacity?: Capacity;
+  /**
+   * A script a person performs is a task: each run asks the person, who answers
+   * this form. The answer becomes the Unit's content; its first yes/no field says
+   * whether the outcome happened.
+   */
+  form?: TaskField[];
   /**
    * Another party runs it on its own and reports what it saw (a webhook: the
    * mailbox reporting a message sent, the CRM, the organic market). It is
@@ -190,7 +204,7 @@ export function isOurs(script: Pick<Script, "tactics">): boolean {
 /**
  * A mutable catalogue. Lists keep insertion order, so every read is
  * deterministic. Retiring keeps the object for history and takes it out of
- * every choice.
+ * every pick.
  */
 export class Catalogue {
   private readonly data: CatalogueData;
@@ -352,7 +366,7 @@ export class Catalogue {
     return this;
   }
 
-  /** Retire an object: kept for history, out of every choice. */
+  /** Retire an object: kept for history, out of every pick. */
   retire(kind: Kind, id: string): this {
     this.memo.clear();
     const item = (this.data[kind] as unknown as Array<Record<string, unknown>>).find((x) => x.id === id);

@@ -20,6 +20,7 @@ export type SimAction =
   | { type: "budget"; campaignId: string; dailyBudgetCents: number }
   | { type: "verdict"; campaignId: string; outcome: string; strategyId: string }
   | { type: "capacity"; scriptId: string; capacity: Capacity }
+  | { type: "answerTask"; taskId: string; values: Record<string, string | number | boolean> }
   | { type: "retire"; kind: CatalogueKind; id: string }
   | { type: "restore"; kind: CatalogueKind; id: string }
   | { type: "upgradeScript"; dynasty: string; id: string; name: string; costCents?: number }
@@ -54,6 +55,9 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
       return;
     case "capacity":
       c.setCapacity(action.scriptId, action.capacity);
+      return;
+    case "answerTask":
+      session.answerTask(action.taskId, action.values);
       return;
     case "retire":
       c.retire(action.kind, action.id);

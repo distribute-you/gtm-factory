@@ -5,7 +5,7 @@ import { defaultWorld } from "./helpers";
 /** Days 50 to 60, mean of the five seeds: the bound the Supplier rating must stay under. */
 export const REGRET_BOUND = 0.05;
 
-describe("regret: the value per dollar lost against always choosing the hidden best", () => {
+describe("regret: the value per dollar lost against always picking the hidden best", () => {
   it("falls between days 0-10 and 50-60 on each of five seeds, and ends under the bound on average", () => {
     const start: number[] = [];
     const end: number[] = [];

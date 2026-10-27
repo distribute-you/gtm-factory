@@ -88,8 +88,8 @@ function ObjectsPage({ pin }: { pin: Pin }) {
                           {d.stats.length > 0 && (
                             <div className="k-inset mt-3 grid gap-px overflow-hidden rounded-[8px] sm:grid-cols-2 lg:grid-cols-3">
                               {d.stats.map((s) => (
-                                <div key={s.point} className="px-3 py-2 text-[12px]">
-                                  <span className="k-label block truncate">{s.pointLabel}</span>
+                                <div key={s.place} className="px-3 py-2 text-[12px]">
+                                  <span className="k-label block truncate">{s.placeLabel}</span>
                                   <span className="mt-0.5 block tabular-nums">
                                     {formatRatePct(s.rateMean)} reach the next milestone · {formatCount(s.successes)} of {formatCount(s.picks)} picks
                                   </span>
@@ -280,7 +280,7 @@ export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: im
           {error && <span className="text-[12px] text-[var(--data-rose)]">{error}</span>}
         </div>
       </div>
-      {s.points.length > 0 && (
+      {s.places.length > 0 && (
         <div className="k-scroll overflow-x-auto"><table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b border-t">
@@ -292,9 +292,9 @@ export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: im
             </tr>
           </thead>
           <tbody>
-            {s.points.map((p) => (
-              <tr key={p.point} className="k-row k-line-subtle border-b last:border-b-0">
-                <td className={TD}>{p.pointLabel}</td>
+            {s.places.map((p) => (
+              <tr key={p.place} className="k-row k-line-subtle border-b last:border-b-0">
+                <td className={TD}>{p.placeLabel}</td>
                 <td className={TDN}>{formatRatePct(p.rateMean)}</td>
                 <td className={TDN}>{formatCents(p.costMeanCents)}</td>
                 <td className={TDN}>{formatCount(p.picks)}</td>

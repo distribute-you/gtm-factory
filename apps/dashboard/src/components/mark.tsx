@@ -135,7 +135,7 @@ const ICONS: Record<string, Icon> = {
 };
 
 /**
- * The glyph of each kind of object that has no icon of its own. The four objects a choice card
+ * The glyph of each kind of object that has no icon of its own. The four objects a pick card
  * names wear one glyph each: an Engine, an outcome, a script (distribute.you dashboard v2's
  * workflow glyph) and a Material.
  */

@@ -1,7 +1,7 @@
 {
   "name": "@gtm-factory/core",
   "version": "0.6.0",
-  "description": "The GTM Factory framework: outcomes and their Engines and Providers, scripts as code, a Plan recomputed at every tick, pull and push, the ledger as common stock, the Supplier rating with traceability credit, typed tactics and splits, capacity, reliability and a seeded simulator. Pure TypeScript, zero runtime dependencies.",
+  "description": "The GTM Factory framework: outcomes and their Engines and Providers, scripts as code, a Plan recomputed at every tick, pull and push, the ledger as common stock, the Supplier rating with traceability credit, typed tactics and splits, capacity, reliability and a seeded simulator. Pure TypeScript; one runtime dependency (sucrase) to load script code given as text.",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",
@@ -20,5 +20,8 @@
     "@types/node": "^22.10.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "sucrase": "^3.35.1"
   }
 }

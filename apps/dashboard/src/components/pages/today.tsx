@@ -11,7 +11,7 @@ import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } fro
 import { useSim } from "@/lib/sim";
 
 export function TodayPage() {
-  const { model, scope } = useSim();
+  const { model, scope, offer } = useSim();
   return (
     <>
       <TopBar crumbs={[{ label: "Today" }]} />
@@ -38,7 +38,8 @@ export function PageSkeleton() {
 }
 
 function Today({ model, scope }: { model: Model; scope: string | null }) {
-  const campaigns = scopedCampaigns(model, scope);
+  const { offer } = useSim();
+  const campaigns = scopedCampaigns(model, scope, offer);
   const f = useMemo(() => scopeFigures(model, campaigns), [model, campaigns]);
   const r = useMemo(() => scopeReturn(model, campaigns), [model, campaigns]);
   const running = campaigns.filter((c) => c.status === "running").length;
@@ -167,9 +168,9 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
 export function CostPerOutcomeCard({ model, f }: { model: Model; f: ScopeFigures }) {
   const states = model.tracks.flatMap((t) => t.states).filter((s) => (f.outcomes[s.outcome] ?? 0) > 0);
   const [state, setState] = useState<string | null>(null);
-  const chosen = state && states.some((s) => s.outcome === state) ? state : (states[0]?.outcome ?? null);
-  const label = chosen ? outcomeLabel(model.catalogue, chosen) : "outcome";
-  const measured = chosen ? costPerOutcomeSeries(f.dailySpendCents, f.dailyOutcomes[chosen] ?? []) : [];
+  const picked = state && states.some((s) => s.outcome === state) ? state : (states[0]?.outcome ?? null);
+  const label = picked ? outcomeLabel(model.catalogue, picked) : "outcome";
+  const measured = picked ? costPerOutcomeSeries(f.dailySpendCents, f.dailyOutcomes[picked] ?? []) : [];
   const last = [...measured].reverse().find((x) => x != null) ?? null;
   const series = [{ key: "m", label: `Cost per ${label.toLowerCase()}`, values: measured, color: "var(--accent)" }];
   return (
@@ -180,7 +181,7 @@ export function CostPerOutcomeCard({ model, f }: { model: Model; f: ScopeFigures
           <Figure value={last != null ? formatUsd(last) : "—"} sub={`per ${label.toLowerCase()}`} />
           <div className="flex flex-wrap gap-1">
             {states.map((s) => (
-              <button key={s.outcome} type="button" onClick={() => setState(s.outcome)} className={`k-chip ${s.outcome === chosen ? "k-chip-on" : ""}`} aria-pressed={s.outcome === chosen}>
+              <button key={s.outcome} type="button" onClick={() => setState(s.outcome)} className={`k-chip ${s.outcome === picked ? "k-chip-on" : ""}`} aria-pressed={s.outcome === picked}>
                 {s.label}
               </button>
             ))}
@@ -216,14 +217,14 @@ export function ReturnCard({ f, expected }: { f: ScopeFigures; expected: number 
   );
 }
 
-/** The engine's latest choices and why: newest first. */
+/** The engine's latest picks and why: newest first. */
 export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campaignIds: Set<string>; limit?: number }) {
   const items = recentChoices(model, campaignIds, limit);
   return (
     <section>
-      <SectionTitle right={<span>Newest first</span>}>Why each choice was made</SectionTitle>
+      <SectionTitle right={<span>Newest first</span>}>Why each pick was made</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
-        {items.length === 0 && <EmptyNote>No choice yet. Press Run.</EmptyNote>}
+        {items.length === 0 && <EmptyNote>No pick yet. Press Run.</EmptyNote>}
         {items.map((c, i) => {
           const info = pointInfo(model.catalogue, c.point);
           const campaign = model.campaigns.find((x) => x.id === c.campaignId);
@@ -232,7 +233,7 @@ export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campa
               <Mark kind="point" id={c.point} size={28} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px]">
-                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{candidateLabel(model, c.point, c.chosenId, campaign?.brandId)}</span>
+                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{candidateLabel(model, c.point, c.pickedId, campaign?.brandId)}</span>
                 </p>
                 <p className="k-fg3 truncate text-[12px]">
                   {campaign?.name} · {explainChoice(model, c)}

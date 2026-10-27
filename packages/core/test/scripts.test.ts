@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SimulationSession, readMaterials, worldFromData, type ScriptCode, type ScriptLibrary } from "../src";
+import { SimulationSession, compileScript, libraryFromSources, readMaterials, worldFromData, type ScriptCode, type ScriptLibrary } from "../src";
 import { SOURCES } from "../../../scripts/src";
 import { LIBRARY, SCRIPTS_DIR, defaultWorld, worldData } from "./helpers";
 
@@ -54,6 +54,23 @@ describe("scripts are code", () => {
     expect(s.materialsOf(s.catalogue.script("wr_short")!)).toContain("company_researched");
     expect(s.materialsOf(s.catalogue.script("wr_short")!)).not.toContain("rating");
   }, 120_000);
+});
+
+describe("script code as data", () => {
+  it("a library built from the code as text runs the same world, byte for byte, as the files", () => {
+    const fromFiles = new SimulationSession(defaultWorld());
+    fromFiles.run(6);
+    const fromText = new SimulationSession(worldFromData(worldData(), libraryFromSources(SOURCES)));
+    fromText.run(6);
+    const digest = (x: SimulationSession) => JSON.stringify({ days: x.days, units: x.units.length, ledger: x.ledger().standardCents });
+    expect(digest(fromText)).toBe(digest(fromFiles));
+  }, 120_000);
+
+  it("refuses code that imports anything at run time, or exports no run function", () => {
+    expect(() => compileScript('import { x } from "fs";\nexport default function run() { return x; }')).toThrow(/imports nothing/);
+    expect(() => compileScript("export const a = 1;")).toThrow(/default function/);
+    expect(compileScript('import type { ScriptContext } from "@gtm-factory/core";\nexport default function run(ctx: ScriptContext) { return { content: { day: ctx.day } }; }')).toBeTypeOf("function");
+  });
 });
 
 describe("Providers", () => {

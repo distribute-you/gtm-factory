@@ -1,5 +1,5 @@
 /**
- * The universal prioritizer: ONE algorithm for every choice (the script of
+ * The universal prioritizer: ONE algorithm for every pick (the script of
  * an Engine, the Unit of the brand to consume). Thompson
  * sampling on value per dollar:
  *
@@ -30,9 +30,9 @@ export interface PricedCandidate {
   /** Belief about the dollars spent from the decision to the next milestone. */
   cost: CostBelief;
   /**
-   * How much better its value per dollar gets once the choices made after it
+   * How much better its value per dollar gets once the picks made after it
    * (under it, before the same milestone) sit at their best: its measured rate
-   * mixes every script those choices still try. 1 when nothing is under it.
+   * mixes every script those picks still try. 1 when nothing is under it.
    */
   uplift?: number;
 }
@@ -45,8 +45,8 @@ export interface ScoredCandidate {
   sampledScore: number;
 }
 
-export interface ChoiceResult {
-  chosenId: string;
+export interface PickResult {
+  pickedId: string;
   candidates: ScoredCandidate[];
 }
 
@@ -63,8 +63,8 @@ export function drawCost(c: CostBelief, rng: Rng): number {
 }
 
 /** One Thompson draw. Ties break on the candidate order. */
-export function prioritize(candidates: readonly PricedCandidate[], value: number, rng: Rng): ChoiceResult {
-  if (candidates.length === 0) throw new Error("a choice needs at least one candidate");
+export function prioritize(candidates: readonly PricedCandidate[], value: number, rng: Rng): PickResult {
+  if (candidates.length === 0) throw new Error("a pick needs at least one candidate");
   const scored: ScoredCandidate[] = candidates.map((o) => ({
     id: o.id,
     meanScore: meanScore(o, value),
@@ -72,5 +72,5 @@ export function prioritize(candidates: readonly PricedCandidate[], value: number
   }));
   let best = 0;
   for (let i = 1; i < scored.length; i++) if (scored[i]!.sampledScore > scored[best]!.sampledScore) best = i;
-  return { chosenId: scored[best]!.id, candidates: scored };
+  return { pickedId: scored[best]!.id, candidates: scored };
 }

@@ -47,7 +47,7 @@ describe("read models", () => {
     expect(session.ledger().reconciles).toBe(true);
   });
 
-  it("lists every choice of a campaign with beliefs and the hidden best", () => {
+  it("lists every pick of a campaign with beliefs and the hidden best", () => {
     const points = pointsOf(model, model.campaigns[0]!);
     expect(points.length).toBeGreaterThan(5);
     const graded = points.filter((p) => p.candidates.length > 1 && p.candidates.some((o) => o.isHiddenBest));
@@ -139,7 +139,7 @@ function sourceFiles(root: string): string[] {
 
 describe("the v6 vocabulary", () => {
   it("no retired word in the dashboard, the core or the scripts: product copy and code names alike", () => {
-    const words = /\b(pipes?|legs?|steps?|plays?|specifications?|options?|sales funnels?|sales paths?)\b/i;
+    const words = /\b(choices?|chosen|pipes?|legs?|steps?|plays?|specifications?|options?|sales funnels?|sales paths?)\b/i;
     const roots = [join(__dirname, ".."), join(__dirname, "../../../../packages/core/src"), join(__dirname, "../../../../scripts/src")];
     for (const root of roots) {
       for (const f of sourceFiles(root)) {

@@ -86,6 +86,13 @@ for (const [name, route] of PAGES) {
     leadHref = [...cols].reverse().find((c) => c.href)?.href ?? leadHref;
   }
 }
+// The organization, brand and offer selector, open.
+await page.goto(`${origin}/campaigns/`);
+await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
+await page.click('[data-testid="scope-selector"]');
+await page.waitForTimeout(500);
+await page.screenshot({ path: path.join(outDir, "scope-selector.png") });
+console.log("saved scope-selector");
 await browser.close();
 server.close();
 if (errors.length) {

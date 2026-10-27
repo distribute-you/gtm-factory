@@ -27,8 +27,10 @@
  *   GET  /scripts?outcome=              -> ApiScriptStats[]
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
  *   POST /scripts/:id/capacity ApiCapacity -> ApiScriptStats (a person types it for a Client's team script)
- *   GET  /research                      -> ApiChoicePoint[]
- *   GET  /choices?campaignId=&leadId=   -> ApiChoice[]
+ *   GET  /research                      -> ApiCandidates[]
+ *   GET  /picks?campaignId=&leadId=     -> ApiPick[]
+ *   GET  /tasks?brandId=&status=        -> ApiTask[] (work the Plan ordered from the client's team)
+ *   POST /tasks/:id/answer ApiTaskAnswer -> ApiTask (the answer becomes the Unit's content)
  *   GET  /ledger                        -> ApiLedger
  *
  * A write that fails answers 4xx/5xx with { error: string } in plain words.
@@ -38,9 +40,20 @@ import type { CatalogueData, OutcomeId } from "./catalogue";
 import type { LedgerReport } from "./ledger";
 import type { Pin } from "./world";
 
+/** An offer of a brand: what the brand sells, in the client's words. */
+export interface ApiOffer {
+  id: string;
+  name: string;
+}
+
 export interface ApiBrand {
   id: string;
   name: string;
+  /** The organization (the client account) the brand belongs to. */
+  orgId: string;
+  orgName: string;
+  /** Its offers; a campaign sells one of them. */
+  offers: ApiOffer[];
   website: string;
   /** The offer, in the client's words. */
   offer: string;
@@ -55,7 +68,7 @@ export interface ApiBrand {
   createdAt: string;
   /**
    * Who performs this client's campaigns (the "Performed by" tactic). Absent: Ours. A client
-   * another party runs is read here (its Units, runs and choices come in through a
+   * another party runs is read here (its Units, runs and picks come in through a
    * connector) and gets no campaign from this dashboard.
    */
   performedBy?: string;
@@ -142,6 +155,7 @@ export interface ApiPlanNode {
  */
 export interface ApiNewCampaign {
   brandId: string;
+  offerId: string;
   /** "start" (the market) or the outcome whose Units it pushes. */
   start: OutcomeId;
   /** The outcome it orders. */
@@ -162,6 +176,8 @@ export type ApiOutcomeCounts = Record<OutcomeId, number>;
 export interface ApiCampaign {
   id: string;
   brandId: string;
+  /** The offer it sells. */
+  offerId: string;
   name: string;
   /** The Routing its Plan runs (a view with a short name, never a control), null before its first tick. */
   routing: ApiRouting | null;
@@ -206,35 +222,43 @@ export interface ApiCandidate {
   costMeanCents: number;
   /** Value per dollar at the means. */
   meanScore: number;
+  /** Its share of the picks made here over the last 7 days. */
+  share: number;
   /** Decisions made and reached so far. */
   picks: number;
   successes: number;
   spentCents: number;
 }
 
-export interface ApiChoicePoint {
-  /** `consumer|material`: the consuming Engine (or "campaign" for the Target) and the outcome it calls. */
+/**
+ * What competes where an Engine calls an outcome: the scripts of that outcome's Engine
+ * ("Meeting booked · 3 scripts"), or the brand's Units of it ("Template · 3 Units").
+ */
+export interface ApiCandidates {
+  /** `consumer|material`: the calling Engine (or "campaign" for the Target) and the outcome it calls. */
   id: string;
-  /** The consuming Engine's outcome, or "campaign". */
+  /** The calling Engine's outcome, or "campaign". */
   consumer: string;
   material: OutcomeId;
   label: string;
-  /** What competes there: the scripts of the material's Engine, or the brand's Units (a template, an ICP). */
-  chooses: "script" | "unit";
+  /** Scripts of the material's Engine, or the brand's Units (a template, an ICP). */
+  kind: "script" | "unit";
   candidates: ApiCandidate[];
 }
 
-export interface ApiChoice {
+/** One pick: the candidate the Rating's draw took, for one subject, at one place. */
+export interface ApiPick {
   id: string;
   at: string;
   campaignId: string;
   brandId: string;
   leadId: string | null;
-  point: string;
-  pointLabel: string;
-  chosen: string;
-  chosenLabel: string;
-  /** Each candidate as scored at the moment of the choice (one Thompson draw). */
+  /** The ApiCandidates id it was made at, and its title. */
+  place: string;
+  placeLabel: string;
+  picked: string;
+  pickedLabel: string;
+  /** Each candidate as scored at the moment of the pick (one Thompson draw). */
   candidates: { id: string; label: string; meanScore: number; sampledScore: number }[];
   /** Why, in plain words. */
   reason: string;
@@ -270,7 +294,7 @@ export interface ApiOverview {
   brands: ApiBrand[];
   campaigns: ApiCampaign[];
   totals: { spentTodayCents: number; spentTotalCents: number; counts: ApiOutcomeCounts };
-  recentChoices: ApiChoice[];
+  recentPicks: ApiPick[];
   recentRuns: ApiRun[];
   /** The scheduler: last tick and whether it is running. */
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
@@ -290,8 +314,9 @@ export interface ApiCampaignDetail {
   plan: ApiPlanNode | null;
   /** Spend per UTC day, oldest first. */
   spendByDay: { day: string; cents: number }[];
-  points: ApiChoicePoint[];
-  recentChoices: ApiChoice[];
+  /** What competes at each Engine this campaign calls. */
+  candidates: ApiCandidates[];
+  recentPicks: ApiPick[];
   recentRuns: ApiRun[];
 }
 
@@ -303,7 +328,7 @@ export interface ApiUnit {
   runId: string | null;
   /** Who performed the script that made it (the "Performed by" tactic). */
   performedBy: string;
-  /** Choices on its traceability, its own included. */
+  /** Picks on its traceability, its own included. */
   traceability: string[];
   /** What it holds (a written message, a reply, a verdict), shown as is. */
   content: Record<string, unknown> | null;
@@ -327,7 +352,7 @@ export interface ApiLeadDetail {
   lead: ApiLead;
   units: ApiUnit[];
   runs: ApiRun[];
-  choices: ApiChoice[];
+  picks: ApiPick[];
 }
 
 export interface ApiObjectVersion {
@@ -336,7 +361,7 @@ export interface ApiObjectVersion {
   name: string;
   content: string;
   createdAt: string;
-  /** Head of its dynasty: what a Material choosing this dynasty consumes now. */
+  /** Head of its dynasty: what a Material picking this dynasty consumes now. */
   head: boolean;
 }
 
@@ -346,8 +371,8 @@ export interface ApiObjectDynasty {
   parentDynasty: string | null;
   brandId: string | null;
   versions: ApiObjectVersion[];
-  /** Per choice point it is offered at. */
-  stats: { point: string; pointLabel: string; picks: number; successes: number; rateMean: number }[];
+  /** Per place it competes at. */
+  stats: { place: string; placeLabel: string; picks: number; successes: number; rateMean: number }[];
   retired: boolean;
 }
 
@@ -393,7 +418,7 @@ export interface ApiScriptStats {
   runsToday: number;
   spentCents: number;
   outputs: number;
-  points: { point: string; pointLabel: string; picks: number; successes: number; rateMean: number; costMeanCents: number }[];
+  places: { place: string; placeLabel: string; picks: number; successes: number; rateMean: number; costMeanCents: number }[];
 }
 
 export interface ApiLedger {
@@ -406,4 +431,40 @@ export interface ApiLedger {
   /** The report of every run, reconciled to the cent. */
   report: LedgerReport;
   runs: ApiRun[];
+}
+
+/** One field of a task's answer form, declared by the script a person performs. */
+export interface ApiTaskField {
+  key: string;
+  label: string;
+  type: "yesno" | "number" | "money" | "text";
+}
+
+/**
+ * Work the Plan ordered from the client's team: a run of a script a person performs
+ * (a closing call with one person). The backend notifies the person by email; the
+ * answer becomes the content of the Unit, which credits the picks that brought the subject.
+ */
+export interface ApiTask {
+  id: string;
+  campaignId: string;
+  brandId: string;
+  scriptId: string;
+  scriptName: string;
+  /** The outcome the script makes (its Engine). */
+  outcome: OutcomeId;
+  /** Who it is about. */
+  leadId: string | null;
+  subjectName: string | null;
+  /** What is asked, one plain sentence ("Call Marie Dubois, Northwind, and say if she pays"). */
+  asked: string;
+  fields: ApiTaskField[];
+  status: "open" | "answered";
+  createdAt: string;
+  answeredAt: string | null;
+  answer: Record<string, string | number | boolean> | null;
+}
+
+export interface ApiTaskAnswer {
+  values: Record<string, string | number | boolean>;
 }

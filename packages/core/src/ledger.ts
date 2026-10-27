@@ -3,7 +3,7 @@
  * Units and has a cost. From the runs alone the ledger answers two
  * different questions:
  *
- *  DECIDE (choices read this): each Engine's OWN cost per input processed and
+ *  DECIDE (picks read this): each Engine's OWN cost per input processed and
  *  its yield. Materials bought from other Engines are not in it.
  *
  *  REPORT (prices, indexes, reports read this): the unit cost of each outcome

@@ -13,7 +13,7 @@ export interface PointGroup {
   points: { info: PointInfo; conv: PointConvergence }[];
 }
 
-/** Choice points grouped by the Engine that calls the outcome. */
+/** Candidate places grouped by the Engine that calls the outcome. */
 export function pointGroups(model: Model): PointGroup[] {
   const groups = new Map<string, PointGroup>();
   for (const conv of convergenceOf(model)) {

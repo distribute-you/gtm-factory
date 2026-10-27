@@ -160,7 +160,7 @@ function EnginePage({ model, data }: { model: Model; data: Extract<PageData, { k
       </section>
 
       <section className="mb-8">
-        <SectionTitle count={data.plugged.length} right={<span>The choice lives on the Material: each caller has its own best script.</span>}>
+        <SectionTitle count={data.plugged.length} right={<span>The pick lives on the Material: each caller has its own best script.</span>}>
           Who calls it
         </SectionTitle>
         <CardTable>

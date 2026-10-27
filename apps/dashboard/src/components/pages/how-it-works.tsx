@@ -19,7 +19,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     kind: "engine",
     title: "One Engine per outcome",
     lines: [
-      "An Engine makes one outcome. Competing scripts perform it: cold email and LinkedIn are two scripts of the Reply received Engine. The only choice is the script, by return on each dollar.",
+      "An Engine makes one outcome. Competing scripts perform it: cold email and LinkedIn are two scripts of the Reply received Engine. The only pick is the script, by return on each dollar.",
       "An Engine has two calls. Pull makes one new piece for a subject. Push takes a Unit that just landed and makes the next outcome from it.",
     ],
   },
@@ -62,8 +62,8 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "The Supplier rating",
     lines: [
       "A script cannot judge its candidates from its own data: a template's replies land later. The Supplier rating reads the ledger and the traceability and makes a Rating each day.",
-      "Every choice takes the Rating and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. A branch is rated as it will be once the choices under it sit at their best.",
-      "Every Unit records the choices that led to it. When the next milestone lands, every choice on that record is credited.",
+      "Every pick takes the Rating and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. A branch is rated as it will be once the picks under it sit at their best.",
+      "Every Unit records the picks that led to it. When the next milestone lands, every pick on that record is credited.",
     ],
   },
   {
@@ -84,7 +84,7 @@ export function HowItWorksPage() {
       <Page narrow>
         <PageHeader
           title="Revenue made easy, built like a production line"
-          sub="Campaigns order a Target, one Engine makes each outcome, scripts compete inside each Engine, and every choice goes where a dollar returns the most."
+          sub="Campaigns order a Target, one Engine makes each outcome, scripts compete inside each Engine, and every pick goes where a dollar returns the most."
           right={
             <a href={`${REPO_URL}/blob/main/docs/framework.md`} target="_blank" rel="noreferrer" className="k-btn">
               Read the spec

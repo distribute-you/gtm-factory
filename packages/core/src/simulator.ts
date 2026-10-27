@@ -11,8 +11,8 @@
  * Target. Scripts are code: they call `get(outcome)` on the Providers they
  * need, and a call to a piece still being made makes the run wait and run
  * again once it landed. Every Run performs one script and lands one Unit or
- * none, after its delay. Each Unit carries its traceability (the choices that
- * led to it), and when the next milestone lands every choice on its
+ * none, after its delay. Each Unit carries its traceability (the picks that
+ * led to it), and when the next milestone lands every pick on its
  * traceability is credited. Deterministic: one seed, one history.
  */
 
@@ -43,7 +43,7 @@ export interface Unit extends LedgerUnit {
   scriptId: string | null;
   /** The Units it consumed, by Material. */
   materials: Record<OutcomeId, string>;
-  /** Traceability: the choices that led to it (decision ids), its own included. */
+  /** Traceability: the picks that led to it (decision ids), its own included. */
   trace: number[];
   content?: Record<string, unknown>;
   /** Brand Units (an ICP, a template): their dynasty, version and text. */
@@ -55,7 +55,7 @@ export interface Unit extends LedgerUnit {
   conditions?: Condition[];
 }
 
-/** One choice: at a point (consuming Engine x Material), for a subject, the candidate picked. */
+/** One pick: at a point (consuming Engine x Material), for a subject, the candidate picked. */
 export interface Decision {
   id: number;
   point: string;
@@ -76,12 +76,12 @@ export interface Run extends LedgerRun {
   subjects: number;
 }
 
-export interface ChoiceRecord {
+export interface PickRecord {
   day: number;
   campaignId: string;
   point: string;
   candidates: { id: string; meanScore: number; picks: number }[];
-  chosenId: string;
+  pickedId: string;
   bestId: string;
 }
 
@@ -148,7 +148,7 @@ export interface CampaignEconomics {
 
 /**
  * A node of a Plan: an outcome, the script its Engine would run now (the
- * Rating's best by mean value per dollar, its own choices at their best, among
+ * Rating's best by mean value per dollar, its own picks at their best, among
  * the scripts the brief keeps),
  * and the Plan of each outcome that script calls. A leaf is served by its
  * Provider (a Unit of the brand in the stock, the start Unit, the Rating).
@@ -176,7 +176,7 @@ interface Order {
   person: Person | null;
   recontact: boolean;
   startUnit: string | null;
-  choices: Map<string, string>;
+  picked: Map<string, string>;
   decisionAt: Map<string, number>;
   /** Units received, per Material of a run (several when a script calls `get` again). */
   got: Map<string, string[]>;
@@ -207,9 +207,23 @@ interface PendingLanding {
   unit: Unit;
   final: boolean;
   flight: string;
+  /** A person's run is a task until it lands. */
+  task?: { id: string; dayOrdered: number };
 }
 
-/** Days from a choice to its milestone: the mean, and the part of it that is certain (one tick per Engine). */
+/** Work the Plan ordered from a person: one run of a script with a form, open until answered or due. */
+export interface TeamTask {
+  id: string;
+  scriptId: string;
+  campaignId: string;
+  brandId: string;
+  subject: string | null;
+  dayOrdered: number;
+  /** The day the hidden truth answers if the person has not. */
+  dueDay: number;
+}
+
+/** Days from a pick to its milestone: the mean, and the part of it that is certain (one tick per Engine). */
 interface Rem {
   mean: number;
   fixed: number;
@@ -255,7 +269,7 @@ export class SimulationSession {
   /** The ledger's common stock: every Unit, from every producer. */
   readonly units: Unit[] = [];
   readonly decisions: Decision[] = [];
-  readonly choices: ChoiceRecord[] = [];
+  readonly pickLog: PickRecord[] = [];
   readonly days: DaySnapshot[] = [];
   readonly pushes: PushRecord[] = [];
   readonly proposals: Proposal[] = [];
@@ -525,7 +539,7 @@ export class SimulationSession {
       }
     }
     if (day > 0 && day % this.world.settings.splitEveryDays === 0) this.studyAndPropose(day);
-    this.logChoices(day);
+    this.logPicks(day);
     for (const c of this.campaigns()) if (c.status === "running") this.routingOf(c, true);
     this.days.push(snap);
     this.today = null;
@@ -744,7 +758,7 @@ export class SimulationSession {
       person,
       recontact: false,
       startUnit,
-      choices: new Map(),
+      picked: new Map(),
       decisionAt: new Map(),
       got: new Map(),
       pending: new Set(),
@@ -769,11 +783,11 @@ export class SimulationSession {
     return o;
   }
 
-  /** Undo the last order, which ran nothing: its choices leave the evidence and the pick counts. */
+  /** Undo the last order, which ran nothing: its picks leave the evidence and the pick counts. */
   private undo(o: Order): void {
     if (this.orders[this.orders.length - 1] !== o) throw new Error("only the last order can be undone");
     for (const id of [...o.decisions].sort((a, b) => b - a)) {
-      if (this.decisions.length - 1 !== id) throw new Error("an undone order's choices are the last ones");
+      if (this.decisions.length - 1 !== id) throw new Error("an undone order's picks are the last ones");
       const d = this.decisions.pop()!;
       this.decisionObject.delete(id);
       this.evidence.bump(d.point, d.candidate, d.brandId, d.day, "t", -1);
@@ -818,7 +832,7 @@ export class SimulationSession {
       this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "f", 1);
     }
     if (status === "failed") for (const m of o.entered) if (!(o.subject && this.reached.get(o.subject)?.has(m))) bumpCell(this.milestoneCohorts, `${o.campaign.id}${SEP}${m}`, o.startDay, "f", 1);
-    o.choices.clear();
+    o.picked.clear();
     o.got.clear();
   }
 
@@ -838,11 +852,11 @@ export class SimulationSession {
     const out = this.catalogue.outcome(outcome);
     const ms = this.catalogue.isMilestone(outcome) || outcome === o.campaign.target ? outcome : milestone;
     const rem0 = ms === outcome ? NO_REM : remAbove;
-    let dynasty = o.choices.get(key);
+    let dynasty = o.picked.get(key);
     if (!dynasty) {
       const scripts = this.allowedScripts(o.campaign, outcome, false).filter((s) => out?.subject !== "lead" || this.feasible(o.campaign, s, o.from, new Set(), false));
       if (scripts.length === 0) return { kind: "fail", reason: `no script at ${key}` };
-      // Decide as late as possible: when every candidate works on the same input, that input is pulled first and the choice is made once it is here.
+      // Decide as late as possible: when every candidate works on the same input, that input is pulled first and the pick is made once it is here.
       const inputs = new Set(scripts.map((s) => this.subjectMaterialOf(s)));
       const shared = inputs.size === 1 ? [...inputs][0] : null;
       if (shared) {
@@ -856,7 +870,7 @@ export class SimulationSession {
       const rem = addRem(rem0, longest);
       const horizon = Math.max(...scripts.map((s) => (this.truthOf(s, null).horizonDays ?? 0) + 1)) + rem.mean * 3;
       dynasty = this.decide(o, point, today.map((s) => s.dynasty), day, rem, Math.ceil(horizon), ms, key);
-      o.choices.set(key, dynasty);
+      o.picked.set(key, dynasty);
     }
     const script = this.catalogue.headOf(dynasty);
     if (!script) return { kind: "fail", reason: `dynasty ${dynasty} has no active version` };
@@ -923,7 +937,7 @@ export class SimulationSession {
       return this.made(o, consumer, m, nth, milestone, rem, day, take);
     }
     if (out.subject === "run") return this.made(o, consumer, m, nth, milestone, rem, day, take);
-    // A brand Unit: chosen among the brand's dynasties in the stock (a decision), its head served; called again, a fresh one is made.
+    // A brand Unit: picked among the brand's dynasties in the stock (a decision), its head served; called again, a fresh one is made.
     const units = (this.brandUnits.get(`${brandId}${SEP}${m}`) ?? []).filter((u) => !received.has(u.id));
     const held: string[] = [];
     for (const u of units) {
@@ -932,10 +946,10 @@ export class SimulationSession {
     }
     if (held.length > 0) {
       const pk = pointKey(consumer.outcome, m);
-      let dynasty = o.choices.get(pk);
+      let dynasty = o.picked.get(pk);
       if (!dynasty || !held.includes(dynasty)) {
         dynasty = held.length > 1 ? this.decide(o, pk, held, day, rem, 0, milestone) : held[0]!;
-        o.choices.set(pk, dynasty);
+        o.picked.set(pk, dynasty);
       }
       const u = this.latestOf(units.filter((x) => this.candidateOf(x) === dynasty));
       if (!u) return { kind: "fail", reason: `no Unit of ${dynasty}` };
@@ -1057,7 +1071,7 @@ export class SimulationSession {
     // The real run: the vendor answers from the hidden truth.
     let fact: boolean | null = null;
     const consumedReal: Record<OutcomeId, string> = {};
-    // The trace: this choice, the choices made at this script's Materials, and what its Materials carried.
+    // The trace: this pick, the picks made at this script's Materials, and what its Materials carried.
     const traceNow = () => {
       const trace = new Set<number>();
       const own = o.decisionAt.get(key);
@@ -1099,6 +1113,8 @@ export class SimulationSession {
     const kind = this.catalogue.outcome(script.outcome)?.subject;
     const attested = this.attest(o, script, truth, made, final, day);
     if (kind !== "run" && subjectKey) this.storage.forEngine(script.outcome).set("served", subjectKey, { day, ok: attested });
+    // A person's run is a task. In the simulator the hidden truth answers it: a no at once, a yes when its delay ends, unless the visitor answers first.
+    const task = (script.form?.length ?? 0) > 0 && (kind === "lead" || kind === "company");
     if (!attested) return { kind: "fail", reason: `no outcome at ${script.outcome}` };
     const subject = this.subjectOf(o, script, run);
     const u = this.makeUnit(run, script.outcome, subject, o.client.brand.id, o.campaign.id, consumedReal, [...trace].sort((x, y) => x - y));
@@ -1108,7 +1124,7 @@ export class SimulationSession {
     const flight = `${script.outcome}${SEP}${kind === "brand" ? o.client.brand.id : subject}`;
     if (kind === "brand" || kind === "company") this.inFlight.add(flight);
     o.pending.add(key);
-    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight });
+    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight, ...(task ? { task: { id: `task:${run.id}`, dayOrdered: day } } : {}) });
     return { kind: "wait" };
   }
 
@@ -1231,7 +1247,7 @@ export class SimulationSession {
     return o.person?.id ?? o.subject ?? run.id;
   }
 
-  /** Hidden: the product of the end effects of this order's choices for a milestone, and of the Units it was served. */
+  /** Hidden: the product of the end effects of this order's picks for a milestone, and of the Units it was served. */
   private endProduct(o: Order, trace: Iterable<number>, milestone: OutcomeId): number {
     let p = 1;
     for (const d of trace) {
@@ -1314,16 +1330,55 @@ export class SimulationSession {
     const rest = this.pendings.filter((p) => p.tick > this.tickIndex);
     this.pendings.length = 0;
     this.pendings.push(...rest);
-    for (const p of due) {
+    for (const p of due) this.settle(p, day, null);
+  }
+
+  /** A pending Unit lands, or a person's task closes: answered by the person (`answer`), else by the hidden truth. */
+  private settle(p: PendingLanding, day: number, answer: { happened: boolean; values: Record<string, string | number | boolean> } | null): void {
+    {
+      const fails = answer ? !answer.happened : false;
+      if (answer) p.unit.content = { ...(p.unit.content ?? {}), ...answer.values };
+      if (fails) {
+        this.inFlight.delete(p.flight);
+        p.order.pending.delete(p.key);
+        if (p.order.status === "open") {
+          p.order.failReason = `no outcome at ${p.unit.outcome}`;
+          this.finish(p.order, "failed");
+        }
+        return;
+      }
       p.unit.day = day;
       this.inFlight.delete(p.flight);
       this.land(p.unit, day);
       p.order.pending.delete(p.key);
-      if (p.order.status !== "open") continue;
+      if (p.order.status !== "open") return;
       p.order.got.set(p.key, [p.unit.id]);
       if (p.final) p.order.passed.add(p.unit.outcome);
       if (p.final && p.unit.outcome === p.order.campaign.target) this.finish(p.order, "done");
     }
+  }
+
+  /** Every task still open: the work the Plan ordered from a person, oldest first. */
+  tasks(brandId?: string): TeamTask[] {
+    return this.pendings
+      .filter((p) => p.task && p.order.status === "open" && (!brandId || p.order.client.brand.id === brandId))
+      .map((p) => ({ id: p.task!.id, scriptId: p.unit.scriptId ?? "", campaignId: p.order.campaign.id, brandId: p.order.client.brand.id, subject: p.order.person?.id ?? p.order.subject, dayOrdered: p.task!.dayOrdered, dueDay: Math.floor(p.tick / this.ticksPerDay) }))
+      .sort((a, b) => a.dayOrdered - b.dayOrdered || (a.id < b.id ? -1 : 1));
+  }
+
+  /**
+   * A person answers a task: the answer becomes the Unit's content, and its first
+   * yes/no field says whether the outcome happened (no yes/no field: it did).
+   */
+  answerTask(taskId: string, values: Record<string, string | number | boolean>): void {
+    const k = this.pendings.findIndex((p) => p.task?.id === taskId);
+    if (k < 0) throw new Error(`task "${taskId}" is not open`);
+    const p = this.pendings[k]!;
+    const script = p.unit.scriptId ? this.catalogue.script(p.unit.scriptId) : undefined;
+    const flag = script?.form?.find((f) => f.type === "yesno");
+    const happened = flag ? values[flag.key] === true : true;
+    this.pendings.splice(k, 1);
+    this.settle(p, this.dayIndex, { happened, values });
   }
 
   /** A Unit lands in the stock: record it, credit the trace, push reactive campaigns, call the webhooks that report on it. */
@@ -1355,7 +1410,7 @@ export class SimulationSession {
     const first = !m.has(u.outcome);
     if (first) m.set(u.outcome, day);
 
-    // Credit every choice on the trace that exists for this milestone, for this subject.
+    // Credit every pick on the trace that exists for this milestone, for this subject.
     for (const d of u.trace) {
       const dec = this.decisions[d]!;
       if (dec.credited || dec.milestone !== u.outcome) continue;
@@ -1423,7 +1478,7 @@ export class SimulationSession {
     return this.catalogue.outcomes.find((o) => o.contentType === "rating" && !o.retired)?.id ?? null;
   }
 
-  /** The Supplier rating: each day it makes today's Rating for each brand with a running campaign; every choosing script consumes it. */
+  /** The Supplier rating: each day it makes today's Rating for each brand with a running campaign; every picking script consumes it. */
   private rate(day: number): void {
     const outcome = this.ratingOutcome();
     if (!outcome) return;
@@ -1487,8 +1542,8 @@ export class SimulationSession {
           const attested = this.rng.next() < (truth.recall ?? 1);
           this.attestations.push({ producer: script.dynasty, outcome: script.outcome, brandId: client.brand.id, subject: personId, attested });
           if (!attested) continue;
-          // The report is about a fact one of our runs made: its value goes to that run's campaign. It credits no choice:
-          // a choice is credited by what its own run attested (a judge that missed the fact missed it).
+          // The report is about a fact one of our runs made: its value goes to that run's campaign. It credits no pick:
+          // a pick is credited by what its own run attested (a judge that missed the fact missed it).
           const cause = this.factCause.get(personId);
           const run = this.newRun(day, null, script);
           this.land(this.makeUnit(run, script.outcome, personId, client.brand.id, cause?.campaignId ?? null, {}, []), day);
@@ -1506,15 +1561,15 @@ export class SimulationSession {
     const offered = this.dayPicksAll.get(pk) ?? new Set<string>();
     for (const c of candidates) offered.add(c);
     this.dayPicksAll.set(pk, offered);
-    let chosen = candidates[0]!;
+    let picked = candidates[0]!;
     if (candidates.length > 1) {
       const value = this.milestoneValue(o.campaign, milestone);
       const book = this.bookOf(o.client.brand.id);
       const priced: PricedCandidate[] = candidates.map((c) => ({ id: c, ...book.belief(point, c, candidates, o.client.brand.id, day), uplift: this.uplift(book, point, c, o.client.brand.id, day) }));
-      chosen = prioritize(priced, value, this.rng).chosenId;
+      picked = prioritize(priced, value, this.rng).pickedId;
     }
     this.pointMilestone.set(pk, milestone);
-    // This choice is under every choice this order made before it toward the same milestone.
+    // This pick is under every pick this order made before it toward the same milestone.
     for (const d of o.decisions) {
       const up = this.decisions[d]!;
       if (up.milestone !== milestone || up.point === point) continue;
@@ -1524,31 +1579,31 @@ export class SimulationSession {
       set.add(point);
     }
     const id = this.decisions.length;
-    this.decisions.push({ id, point, candidate: chosen, campaignId: o.campaign.id, brandId: o.client.brand.id, milestone, orderId: o.id, day, credited: false });
+    this.decisions.push({ id, point, candidate: picked, campaignId: o.campaign.id, brandId: o.client.brand.id, milestone, orderId: o.id, day, credited: false });
     o.decisions.push(id);
     o.decisionAt.set(slot, id);
-    this.evidence.bump(point, chosen, o.client.brand.id, day, "t", 1);
+    this.evidence.bump(point, picked, o.client.brand.id, day, "t", 1);
     let dp = this.dayPicks.get(pk);
     if (!dp) this.dayPicks.set(pk, (dp = new Map()));
-    dp.set(chosen, (dp.get(chosen) ?? 0) + 1);
+    dp.set(picked, (dp.get(picked) ?? 0) + 1);
     let series = this.picks.get(pk);
     if (!series) this.picks.set(pk, (series = new Map()));
-    let s = series.get(chosen);
-    if (!s) series.set(chosen, (s = []));
+    let s = series.get(picked);
+    if (!s) series.set(picked, (s = []));
     while (s.length <= day) s.push(0);
     s[day]! += 1;
-    return chosen;
+    return picked;
   }
 
   private readonly pointMilestone = new Map<string, OutcomeId>();
-  /** Per choice (point and candidate), the points chosen after it toward the same milestone. */
+  /** Per pick (point and candidate), the points picked after it toward the same milestone. */
   private readonly under = new Map<string, Set<string>>();
   private readonly gapCache = new Map<string, number>();
 
   /**
-   * The uplift of a candidate: the product, over the points chosen under it, of
+   * The uplift of a candidate: the product, over the points picked under it, of
    * the best candidate's value per dollar over the value per dollar of the mix
-   * picked there this last week. A branch whose own choices are still being
+   * picked there this last week. A branch whose own picks are still being
    * learned is rated as it will be once they are (the Plan reads the tree the
    * same way: each Engine at its best script).
    */
@@ -1778,7 +1833,7 @@ export class SimulationSession {
     return out;
   }
 
-  choicePoints(): { point: string; campaignId: string }[] {
+  candidatePlaces(): { point: string; campaignId: string }[] {
     return [...this.picks.keys()].map((k) => {
       const [point, campaignId] = k.split(SEP) as [string, string];
       return { point, campaignId };
@@ -1818,7 +1873,7 @@ export class SimulationSession {
     return this.pointMilestone.get(`${point}${SEP}${campaignId}`) ?? null;
   }
 
-  private logChoices(day: number): void {
+  private logPicks(day: number): void {
     for (const [k, picks] of this.dayPicks) {
       const [point, campaignId] = k.split(SEP) as [string, string];
       const candidates = [...(this.dayPicksAll.get(k) ?? [])];
@@ -1828,9 +1883,9 @@ export class SimulationSession {
         const b = this.belief(point, o, candidates, brandId, day);
         return { id: o, meanScore: betaMean(b.posterior) / Math.max(b.cost.mean, 1e-6), picks: picks.get(o) ?? 0 };
       });
-      const chosenId = [...scored].sort((x, y) => y.picks - x.picks || (x.id < y.id ? -1 : 1))[0]!.id;
+      const pickedId = [...scored].sort((x, y) => y.picks - x.picks || (x.id < y.id ? -1 : 1))[0]!.id;
       const bestId = [...scored].sort((x, y) => y.meanScore - x.meanScore || (x.id < y.id ? -1 : 1))[0]!.id;
-      this.choices.push({ day, campaignId, point, candidates: scored, chosenId, bestId });
+      this.pickLog.push({ day, campaignId, point, candidates: scored, pickedId, bestId });
     }
   }
 
@@ -1954,7 +2009,7 @@ export class SimulationSession {
       this.addUnit(u);
       this.proposals.push({ day, kind: "audience", brandId, campaignId: campaign.id, point: null, conditions, text, createdId: u.id, study });
     }
-    // Splits on scripts: per point, the tactic values of the script chosen; a split proposes a strategy of the producing Engine.
+    // Splits on scripts: per point, the tactic values of the script picked; a split proposes a strategy of the producing Engine.
     for (const point of this.evidence.pointCandidates.keys()) {
       const material = point.split("|")[1];
       if (!material || !this.catalogue.scriptsOf(material).length) continue;
