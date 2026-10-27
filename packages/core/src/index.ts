@@ -24,3 +24,4 @@ export function worldFromData(data: WorldData, library: ScriptLibrary, seed?: nu
   return load(data, { Catalogue, library, ...(seed !== undefined ? { seed } : {}) });
 }
 export * from "./factory-api";
+export * from "./release";

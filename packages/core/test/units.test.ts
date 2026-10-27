@@ -158,3 +158,12 @@ describe("the two calculations", () => {
     expect(r.dollarPrice).toBe(3);
   });
 });
+
+describe("the release", () => {
+  it("every page shows the release the core package carries", async () => {
+    const { RELEASE } = await import("../src");
+    const { readFileSync } = await import("node:fs");
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    expect(RELEASE).toBe(`v${pkg.version.split(".")[1]}`);
+  });
+});

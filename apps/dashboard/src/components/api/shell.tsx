@@ -1,5 +1,7 @@
 "use client";
 
+import { RELEASE } from "@gtm-factory/core";
+
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -95,7 +97,7 @@ function Sidebar() {
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
-        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory v7 · ${error ? "server unreachable" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
+        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory ${RELEASE} · ${error ? "server unreachable" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
         <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
           <PlusIcon size={14} weight="bold" />
           New campaign

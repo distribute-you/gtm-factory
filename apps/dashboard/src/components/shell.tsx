@@ -1,5 +1,7 @@
 "use client";
 
+import { RELEASE } from "@gtm-factory/core";
+
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -203,7 +205,7 @@ function ScopeSwitcher() {
   useEffect(() => {
     if (model && (value.brandId !== scope || value.offerId !== offer)) setScope(value.brandId, value.offerId);
   }, [model, value.brandId, value.offerId, scope, offer, setScope]);
-  return <ScopeSelector orgs={orgs} value={value} onChange={(v) => setScope(v.brandId, v.offerId)} note="GTM Factory v7 · fictional data" />;
+  return <ScopeSelector orgs={orgs} value={value} onChange={(v) => setScope(v.brandId, v.offerId)} note={`GTM Factory ${RELEASE} · fictional data`} />;
 }
 
 /** The simulator, always in reach above every page: the day, run / pause / one day / speed, reset on a seed. */
