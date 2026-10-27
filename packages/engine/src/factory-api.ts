@@ -52,6 +52,16 @@ export interface ApiBrand {
   /** Leads the client provided (a list), when any. */
   providedLeads: number;
   createdAt: string;
+  /**
+   * The factory that runs this client's campaigns (a catalogue factory id). Absent: this
+   * factory. Another factory's client is read here (its Units, runs and choices come in
+   * through a connector) and gets no campaign from this dashboard.
+   */
+  factory?: string;
+  /** Spent on this client, every campaign together, cents. */
+  spentTotalCents?: number;
+  /** Units reached by this client's leads, per outcome (every campaign together). */
+  counts?: ApiOutcomeCounts;
 }
 
 export interface ApiNewBrand {
@@ -131,7 +141,14 @@ export interface ApiCampaign {
   counts: ApiOutcomeCounts;
   createdAt: string;
   launchedAt: string | null;
+  /** This factory's last tick on it; for another factory's campaign, the last read of it. */
   lastTickAt: string | null;
+  /**
+   * The factory that runs it (a catalogue factory id). Absent: this factory. A campaign
+   * another factory runs is shown here as that factory reports it: this factory never
+   * ticks it, and it is never launched, paused or capped from this dashboard.
+   */
+  factory?: string;
 }
 
 export interface ApiOption {

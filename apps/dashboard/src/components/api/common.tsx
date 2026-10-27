@@ -10,7 +10,8 @@ import type { ApiCampaign, ApiChoice, ApiChoicePoint, ApiRun, CatalogueData, Out
 import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, type ApiRead } from "@/lib/api/client";
-import { outcomeName, pipeTitle } from "@/lib/api/labels";
+import { useFactory } from "@/lib/api/factory";
+import { factoryTitle, outcomeName, pipeTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi } from "@/lib/format";
 
 /** "3m ago", "2h ago", "4d ago". */
@@ -76,8 +77,33 @@ function Menu({ anchor, onClose, children }: { anchor: HTMLElement; onClose: () 
   );
 }
 
-/** A campaign's status: the dot and its word in a button; the menu holds the other state. */
+/** The name of the factory that runs a campaign or a client, when it is not this one; null for this factory. */
+export function useOtherFactory(factory: string | undefined): string | null {
+  const { data } = useFactory();
+  const f = factory ? data?.catalogue.factories.find((x) => x.id === factory) : undefined;
+  if (!factory || f?.ours) return null;
+  return factoryTitle(data?.catalogue, factory);
+}
+
+/** A campaign's status: the dot and its word in a button; the menu holds the other state. Another factory's campaign shows its status, read only. */
 export function CampaignStatusButton({ campaign }: { campaign: ApiCampaign }) {
+  const other = useOtherFactory(campaign.factory);
+  if (other) {
+    const live = campaign.status === "live";
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5" title={`Run by ${other}: this factory reads it and never runs it.`}>
+        <span className="inline-flex items-center gap-1.5 text-[13px]">
+          {live ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--run)]" /> : <span className="h-2 w-2 rounded-full border-[1.5px] border-[var(--fg-2)]" />}
+          {live ? "Live" : "Stopped"}
+        </span>
+        <span className="k-fg3 whitespace-nowrap text-[12px]">in {other}</span>
+      </span>
+    );
+  }
+  return <OwnStatusButton campaign={campaign} />;
+}
+
+function OwnStatusButton({ campaign }: { campaign: ApiCampaign }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -115,8 +141,14 @@ export function CampaignStatusButton({ campaign }: { campaign: ApiCampaign }) {
   );
 }
 
-/** The daily cap as a button ("$10/day"); a modal edits it. */
+/** The daily cap as a button ("$10/day"); a modal edits it. Another factory's cap is shown as it reports it. */
 export function BudgetButton({ campaign }: { campaign: ApiCampaign }) {
+  const other = useOtherFactory(campaign.factory);
+  if (other) return <span className="whitespace-nowrap text-[13px] tabular-nums">{campaign.dailyBudgetCents > 0 ? `${formatCents(campaign.dailyBudgetCents)}/day` : "No daily cap"}</span>;
+  return <OwnBudgetButton campaign={campaign} />;
+}
+
+function OwnBudgetButton({ campaign }: { campaign: ApiCampaign }) {
   const [open, setOpen] = useState(false);
   return (
     <>

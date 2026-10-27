@@ -9,20 +9,24 @@ import { useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
 import { outcomeName, pipeTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, plural } from "@/lib/format";
-import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, timeAgo } from "./common";
+import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, timeAgo, useOtherFactory } from "./common";
 
 export function ApiCampaignsPage() {
   const read = useApi<ApiCampaign[]>("/campaigns");
   const { data: o } = useFactory();
   const brandName = (id: string) => o?.brands.find((b) => b.id === id)?.name ?? "";
+  const brand = useSearchParams().get("brand");
   return (
     <>
-      <TopBar crumbs={[{ label: "Campaigns" }]} actions={<Link href="/campaigns/new/" className="k-btn-strong">New campaign</Link>} />
+      <TopBar crumbs={brand ? [{ label: "Campaigns", href: "/campaigns/" }, { label: brandName(brand) || "Brand" }] : [{ label: "Campaigns" }]} actions={<Link href="/campaigns/new/" className="k-btn-strong">New campaign</Link>} />
       <Page>
         <Read read={read}>
-          {(campaigns) => (
+          {(all) => {
+            const campaigns = brand ? all.filter((c) => c.brandId === brand) : all;
+            const live = campaigns.filter((c) => c.status === "live").length;
+            return (
             <>
-              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub="Each campaign runs one sales funnel for one brand, under a daily cap." />
+              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub={`${formatCount(live)} live. Each campaign runs one sales funnel for one brand, under a daily cap.`} />
               {campaigns.length === 0 ? (
                 <div className="k-card">
                   <EmptyNote>
@@ -72,7 +76,8 @@ export function ApiCampaignsPage() {
                 </CardTable>
               )}
             </>
-          )}
+            );
+          }}
         </Read>
       </Page>
     </>
@@ -101,6 +106,7 @@ export function ApiCampaignPage() {
 
 function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: CatalogueData | undefined }) {
   const c = d.campaign;
+  const other = useOtherFactory(c.factory);
   // Every outcome about a subject the funnel's pipes make, in the order they run (entry left out).
   // Object outcomes (a template, a brand context, an LLM completion) ride beside the pipe they feed.
   const line = d.funnel
@@ -120,7 +126,9 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
               {d.brand.test && <span className="k-chip ml-2">Staff test</span>}
             </p>
             <p className="k-fg3 mt-0.5 text-[12px]">
-              {c.launchedAt ? `Launched ${formatTime(c.launchedAt)}` : "Never launched"} · last tick {timeAgo(c.lastTickAt)}
+              {other
+                ? `Run by ${other} since ${formatTime(c.launchedAt ?? c.createdAt)} · read ${timeAgo(c.lastTickAt)}`
+                : `${c.launchedAt ? `Launched ${formatTime(c.launchedAt)}` : "Never launched"} · last tick ${timeAgo(c.lastTickAt)}`}
             </p>
           </div>
         </div>
@@ -131,7 +139,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3" data-testid="campaign-order">
-        <StatTile label="Start outcome" note={c.start === START ? "Pulls on its target at each tick" : "Pushes each Unit that lands into its first pipe"}>
+        <StatTile label="Start outcome" note={other ? `Run by ${other}` : c.start === START ? "Pulls on its target at each tick" : "Pushes each Unit that lands into its first pipe"}>
           <Figure value={outcomeName(catalogue, c.start)} />
         </StatTile>
         <StatTile label="Target" note="What the campaign orders">
@@ -167,7 +175,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
 
       <section className="mt-8">
         <SectionTitle count={d.points.length}>Choice points</SectionTitle>
-        <PointsList points={d.points} empty="No choice made yet. Launch the campaign and the first tick makes them." />
+        <PointsList points={d.points} empty={other ? `No choice read from ${other} yet.` : "No choice made yet. Launch the campaign and the first tick makes them."} />
       </section>
 
       <section className="mt-8">
