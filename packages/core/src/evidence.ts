@@ -158,7 +158,7 @@ export class EvidenceBook {
    * for the share of outcomes already due) and like-for-like in time: each
    * day's trials are weighted by how that day's decisions did at this point,
    * all candidates together, so a candidate tried mostly while the rest of the
-   * factory was still learning is not blamed for it.
+   * rest of the production was still learning is not blamed for it.
    */
   counts(point: string, candidate: string, brands: readonly string[], day: number, delay: DelayDistribution): Counts & { cost: number; n: number } {
     return this.computeCounts(point, candidate, brands, day, delay);

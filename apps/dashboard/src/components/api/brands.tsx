@@ -6,9 +6,9 @@ import type { ApiBrand, ApiNewBrand } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, TD, TDN, TH, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
+import { useOverview } from "@/lib/api/overview";
 import { formatCents, formatCount, plural } from "@/lib/format";
-import { Field, Read, formatTime, useOtherFactory } from "./common";
+import { Field, Read, formatTime, otherPerformer } from "./common";
 
 export function ApiBrandsPage() {
   const read = useApi<ApiBrand[]>("/brands");
@@ -56,17 +56,17 @@ export function ApiBrandsPage() {
   );
 }
 
-/** The first rung of the catalogue's first lead track (the outcome a client counts its interested leads by). */
+/** The first milestone of the catalogue's first Track (the outcome a client counts its interested people by). */
 function useFirstRung(): { id: string; label: string } | null {
-  const { data } = useFactory();
+  const { data } = useOverview();
   const c = data?.catalogue;
-  const track = c?.leadTracks[0];
+  const track = c?.tracks[0];
   const o = track ? c!.outcomes.filter((x) => x.track?.track === track.id && !x.retired).sort((a, b) => a.track!.rank - b.track!.rank)[0] : undefined;
   return o ? { id: o.id, label: o.plural ?? o.label } : null;
 }
 
 function BrandRow({ b }: { b: ApiBrand }) {
-  const other = useOtherFactory(b.factory);
+  const other = otherPerformer(b.performedBy);
   const rung = useFirstRung();
   return (
                       <tr className="k-row k-line-subtle border-b last:border-b-0">
@@ -166,11 +166,11 @@ export function ApiNewBrandPage() {
     <>
       <TopBar crumbs={[{ label: "Brands", href: "/brands/" }, { label: "New brand" }]} />
       <Page narrow>
-        <PageHeader title="Add a brand" sub="Tell the factory what the brand sells and to whom. It finds the leads and writes the emails." />
+        <PageHeader title="Add a brand" sub="Say what the brand sells and to whom. GTM Factory finds the people and writes the emails." />
         {created ? (
           <div className="k-card p-5">
-            <p className="text-[14px] font-medium">{created.name} is in the factory.</p>
-            <p className="k-fg2 mt-1 text-[13px]">Next, pick a sales funnel and a daily cap.</p>
+            <p className="text-[14px] font-medium">{created.name} is in GTM Factory.</p>
+            <p className="k-fg2 mt-1 text-[13px]">Next, pick a Target, a daily cap and your strategy.</p>
             <div className="mt-4 flex gap-2">
               <Link href={`/campaigns/new/?brand=${encodeURIComponent(created.id)}`} className="k-btn-strong">
                 New campaign for {created.name}

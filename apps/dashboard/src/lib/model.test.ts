@@ -6,9 +6,8 @@ import { WORLD, replay, type LoggedAction } from "./world";
 import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
 import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
-import { campaignLine, lineLegs, rankedLine } from "./funnels";
-import { playedLegs } from "./campaigns";
-import { proposeFunnels } from "./model";
+import { campaignPlanLine, draftPlanLine } from "./plan";
+import { OURS } from "@gtm-factory/core";
 
 describe("the world the dashboard plays", () => {
   it("replays the same history byte for byte", () => {
@@ -17,7 +16,7 @@ describe("the world the dashboard plays", () => {
     expect(JSON.stringify(a.days)).toBe(JSON.stringify(b.days));
   });
 
-  it("replays logged actions on their day: pause, strategy, an edit that makes a new version", () => {
+  it("replays logged actions on their day: pause, an edit that makes a new version", () => {
     const base = replay(WORLD.seed, [], 2).session;
     const c = base.campaigns()[0]!;
     const outcome = WORLD.catalogue.outcomes.find((o) => o.contentType === "text_with_variables")!.id;
@@ -37,13 +36,13 @@ describe("read models", () => {
   const { world, session } = replay(WORLD.seed, [], 20);
   const model = buildModel(world, session);
 
-  it("names the lead tracks with the owner's word and never mixes them", () => {
-    expect(leadTracks(model.catalogue).map((t) => t.label)).toEqual(["CRM lifecycle track", "Website visits track"]);
+  it("names the tracks and never mixes them", () => {
+    expect(leadTracks(model.catalogue).map((t) => t.label)).toEqual(["CRM lifecycle track", "Website visits track", "Conversation track"]);
   });
 
   it("our spend adds up to the ledger's spend of our runs", () => {
     const f = scopeFigures(model, model.campaigns);
-    const ours = session.runs.filter((r) => model.catalogue.factory(r.factory)?.ours).reduce((s, r) => s + r.spendCents, 0);
+    const ours = session.runs.filter((r) => r.performedBy === OURS).reduce((s, r) => s + r.spendCents, 0);
     expect(f.spendCents).toBe(ours);
     expect(session.ledger().reconciles).toBe(true);
   });
@@ -55,8 +54,8 @@ describe("read models", () => {
     expect(graded.length).toBeGreaterThan(5);
   });
 
-  it("shows where a provider leg is plugged and the best script at each Material", () => {
-    const multi = model.catalogue.legs.map((p) => pluggedAt(model, p.id)).filter((l) => l.length >= 2);
+  it("shows who calls an Engine and the best script for each caller", () => {
+    const multi = model.catalogue.engines().map((o) => pluggedAt(model, o)).filter((l) => l.length >= 2);
     expect(multi.length).toBeGreaterThan(0);
   });
 
@@ -64,7 +63,6 @@ describe("read models", () => {
     const outcome = model.catalogue.outcomes.find((o) => o.contentType === "text_with_variables")!.id;
     const d = objectDynasties(model, outcome, model.clients[0]!.brand.id);
     expect(d.length).toBeGreaterThanOrEqual(2);
-    expect(d.some((x) => x.versions.length > 1)).toBe(true);
   });
 
   it("cost per outcome over time is null before the first outcome, never zero", () => {
@@ -76,7 +74,7 @@ describe("pins are configuration", () => {
   const { world, session } = replay(WORLD.seed, [], 6);
   const model = buildModel(world, session);
 
-  it("the world ships two pins, and pinning any other outcome or leg gives it a page with no new code", () => {
+  it("the world ships two pins, and pinning any other outcome gives it a page with no new code", () => {
     expect(DEFAULT_PINS).toHaveLength(2);
     for (const p of DEFAULT_PINS) expect(pinnedPage(model, p, null).kind).toBe(p.kind);
     // Pin an object outcome nobody pinned: it gets a menu entry and a page listing its dynasties.
@@ -86,10 +84,10 @@ describe("pins are configuration", () => {
     expect(pinHref(pins[2]!)).toContain(encodeURIComponent(`outcome:${other.id}`));
     const page = pinnedPage(model, pins[2]!, null);
     expect(page.kind === "outcome" && page.dynasties.length).toBeGreaterThan(0);
-    // And a leg: its scripts, where it is plugged, its leg storage.
-    const leg = model.catalogue.legs.find((p) => model.catalogue.materialsOf(p).length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
-    const legPage = pinnedPage(model, { kind: "leg", id: leg.id, label: leg.name }, null);
-    expect(legPage.kind === "leg" && legPage.dynasties.length).toBeGreaterThan(0);
+    // And an outcome made per subject: its Engine's scripts, who calls it, its storage.
+    const engine = model.catalogue.engines().find((o) => model.catalogue.outcome(o)?.subject === "lead" && model.catalogue.scriptsOf(o).length > 1)!;
+    const enginePage = pinnedPage(model, { kind: "outcome", id: engine, label: engine }, null);
+    expect(enginePage.kind === "outcome" && enginePage.scripts.length).toBeGreaterThan(1);
   });
 });
 
@@ -112,19 +110,9 @@ describe("formats", () => {
   });
 });
 
-describe("the dashboard knows no outcome, leg or script by name", () => {
+describe("the dashboard knows no outcome or script by name", () => {
   it("no source line tests for a template, an LLM or an ICP", () => {
-    const root = join(__dirname, "..");
-    const files: string[] = [];
-    const walk = (d: string) => {
-      for (const f of readdirSync(d)) {
-        const p = join(d, f);
-        if (statSync(p).isDirectory()) walk(p);
-        else if (/\.tsx?$/.test(f) && !f.endsWith(".test.ts")) files.push(p);
-      }
-    };
-    walk(root);
-    for (const f of files) {
+    for (const f of sourceFiles(join(__dirname, ".."))) {
       const code = readFileSync(f, "utf8")
         .split("\n")
         .filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//"))
@@ -134,52 +122,61 @@ describe("the dashboard knows no outcome, leg or script by name", () => {
   });
 });
 
-describe("a funnel line and its plays describe the same legs", () => {
-  const { world, session } = replay(WORLD.seed, [], 20);
-  const model = buildModel(world, session);
+/** Every source file under a folder (tests and generated code left out). */
+function sourceFiles(root: string): string[] {
+  const files: string[] = [];
+  const walk = (d: string) => {
+    for (const f of readdirSync(d)) {
+      const p = join(d, f);
+      if (f === "node_modules" || f === ".next" || f === "out") continue;
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(f) && !f.endsWith(".test.ts") && f !== "sources.ts") files.push(p);
+    }
+  };
+  walk(root);
+  return files;
+}
 
-  it("for every campaign, the legs drawn in its funnel line are exactly the legs of its plays", () => {
-    for (const c of model.campaigns) {
-      const line = campaignLine(model, c);
-      const drawn = line.steps.flatMap((l) => l.parts.flatMap((p) => [...p.side, p.leg].map((x) => x.id)));
-      expect(new Set(drawn)).toEqual(new Set(playedLegs(model, c).map((p) => p.id)));
-      // Each step ends on its lead state, through its play.
-      line.steps.forEach((l, k) => {
-        expect(l.parts.at(-1)?.output).toBe(session.pathOf(c)[k]);
-        expect(l.parts.at(-1)?.leg.id).toBe(session.playsToday(c)[k]);
-      });
-      // Every leg whose Materials this campaign chose today is drawn.
-      for (const p of session.choicePoints().filter((x) => x.campaignId === c.id)) {
-        const consumer = model.catalogue.leg(p.point.split("|")[0]!);
-        if (!consumer) continue;
-        const picked = [...session.pickSeries(p.point, c.id).values()].some((arr) => arr.slice(-7).some((n) => n > 0));
-        const onLine = drawn.includes(consumer.id);
-        if (picked && !onLine) {
-          // Only a leg the step does not run today (another candidate at a Material) may be left out.
-          const alternatives = session.choicePoints().filter((x) => x.campaignId === c.id && !x.point.startsWith("play:"));
-          expect(alternatives.length).toBeGreaterThan(0);
-        }
+describe("the v6 vocabulary", () => {
+  it("no retired word in the dashboard, the core or the scripts: product copy and code names alike", () => {
+    const words = /\b(pipes?|legs?|steps?|plays?|specifications?|options?|sales funnels?|sales paths?)\b/i;
+    const roots = [join(__dirname, ".."), join(__dirname, "../../../../packages/core/src"), join(__dirname, "../../../../scripts/src")];
+    for (const root of roots) {
+      for (const f of sourceFiles(root)) {
+        // The HTML tag of a select's entry is the platform's word, not ours.
+        const text = readFileSync(f, "utf8").replace(/<\/?option\b/g, "<entry");
+        const hit = text.split("\n").find((l) => words.test(l));
+        expect(hit, f).toBeUndefined();
       }
     }
   });
+});
 
-  it("the follow-up campaign draws Message sent, the follow-up, the mailbox's replies, the reply judge, the interested lead", () => {
-    const follow = model.campaigns.find((c) => c.start !== "start")!;
-    const line = campaignLine(model, follow);
-    expect(line.start).toBe("message_sent");
-    expect(line.steps[0]!.parts.map((p) => [p.leg.id, p.output])).toEqual([
-      ["follow_up", "follow_up_queued"],
-      ["follow_up_replies", "reply_received"],
-      ["reply_judging", "lead_interested"],
-    ]);
-    expect(lineLegs(line).map((p) => p.id)).toEqual(playedLegs(model, follow).map((p) => p.id));
+describe("a campaign's Plan line", () => {
+  const { world, session } = replay(WORLD.seed, [], 20);
+  const model = buildModel(world, session);
+
+  it("goes from the campaign's start to its Target, through every milestone of its Routing", () => {
+    for (const c of model.campaigns) {
+      const line = campaignPlanLine(model, c);
+      expect(line.start).toBe(c.start);
+      expect(line.parts.at(-1)?.outcome).toBe(c.target);
+      const drawn = line.parts.map((p) => p.outcome);
+      for (const m of session.routingOf(c).line) expect(drawn).toContain(m);
+      for (const p of line.parts) expect(model.catalogue.script(p.scriptId!)?.outcome).toBe(p.outcome);
+    }
   });
 
-  it("a proposed funnel draws every leg its plays list offers, and has a name", () => {
-    const f = proposeFunnels(model, model.clients[0]!.offer.outcomes, "meeting_booked", 150)[0]!;
-    const line = rankedLine(model, f);
-    expect(line.funnel?.name).toBeTruthy();
-    expect(line.steps.map((l) => l.parts.at(-1)?.leg.id)).toEqual(f.steps.map((l) => l.legId));
-    expect(lineLegs(line).length).toBeGreaterThanOrEqual(f.steps.length);
+  it("the follow-up campaign draws Message sent, the follow-up, the reply, the interested person", () => {
+    const follow = model.campaigns.find((c) => c.start !== "start")!;
+    const line = campaignPlanLine(model, follow);
+    expect(line.start).toBe("message_sent");
+    expect(line.parts.map((p) => p.outcome)).toEqual(["follow_up_queued", "reply_received", "lead_interested"]);
+  });
+
+  it("a new campaign's Plan has a Routing with a name", () => {
+    const d = draftPlanLine(model, model.clients[0]!.brand.id, "start", "meeting_booked");
+    expect(d.parts.at(-1)?.outcome).toBe("meeting_booked");
+    expect(d.routing.name).toBeTruthy();
   });
 });

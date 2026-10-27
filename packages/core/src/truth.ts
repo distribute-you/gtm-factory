@@ -3,7 +3,7 @@
  * at a choice point, the true chance a decision there reaches its milestone and
  * the true cost from the decision to it, the other choice points set at their
  * own hidden best. Used to grade the Supplier rating (the Research page, the
- * regret test), never by the factory's choices.
+ * regret test), never by the choices.
  */
 
 import { START, type OutcomeId, type Script } from "./catalogue";
@@ -11,7 +11,7 @@ import { CAMPAIGN, pointKey, type PlanNode, type SimulationSession } from "./sim
 import { meetsAll, type Condition } from "./tactics";
 import { marketSample, segmentMultiplier, type Campaign } from "./world";
 
-type Step =
+type Op =
   | { kind: "decide"; point: string; candidates: string[] }
   | { kind: "run"; point: string; yieldRate: number; costCents: number; end: number; recall: number; falsePositive: number; final: boolean; segment: number };
 
@@ -22,7 +22,7 @@ interface Ctx {
   /** The milestone below (or the campaign's start): the subject comes from there. */
   from: OutcomeId;
   assign: Map<string, string>;
-  steps: Step[];
+  ops: Op[];
   ends: number;
   segment: number;
   seenPoints: Set<string>;
@@ -37,7 +37,7 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, final: boolean): bo
   const point = pointKey(consumer, o);
   if (scripts.length === 0) return false;
   const candidates = [...new Set(scripts.map((x) => x.dynasty))];
-  if (!c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, candidates });
+  if (!c.seenPoints.has(point)) c.ops.push({ kind: "decide", point, candidates });
   c.seenPoints.add(point);
   const assigned = c.assign.get(point);
   const dyn = assigned && candidates.includes(assigned) ? assigned : candidates[0]!;
@@ -50,10 +50,10 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, final: boolean): bo
   const bill = s.materialsOf(script);
   const subj = bill.find((m) => s.catalogue.outcome(m)?.subject === "lead") ?? null;
   for (const i of subj ? [subj, ...bill.filter((m) => m !== subj)] : bill) {
-    const before = c.steps.length;
+    const before = c.ops.length;
     if (!planObtain(c, script, i)) return false;
     // Recall at an attesting script comes from the scripts chosen at its Materials.
-    for (const st of c.steps.slice(before)) {
+    for (const st of c.ops.slice(before)) {
       if (st.kind !== "decide" || st.point !== pointKey(script.outcome, i)) continue;
       const t = s.candidateTruthAt(st.point, c.assign.get(st.point) ?? st.candidates[0]!);
       if (t.recall !== undefined) recall *= t.recall;
@@ -63,7 +63,7 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, final: boolean): bo
   // A script creating subjects finds someone only while its reserve lasts.
   const pick = !subj && out?.subject === "lead" ? s.pickChance(script, c.brandId, c.audience) : 1;
   c.produced.add(o);
-  c.steps.push({ kind: "run", point, yieldRate: Math.min(1, (truth.base ?? 1) * (truth.ownYield ?? 1) * pick), costCents: truth.costCents, end: 1, recall, falsePositive: fp, final, segment: c.segment });
+  c.ops.push({ kind: "run", point, yieldRate: Math.min(1, (truth.base ?? 1) * (truth.ownYield ?? 1) * pick), costCents: truth.costCents, end: 1, recall, falsePositive: fp, final, segment: c.segment });
   return true;
 }
 
@@ -82,7 +82,7 @@ function planObtain(c: Ctx, consumer: Script, i: OutcomeId): boolean {
   const point = pointKey(consumer.outcome, i);
   const candidates = s.objectDynasties(c.brandId, i);
   if (candidates.length === 0) return planProduce(c, consumer.outcome, i, false);
-  if (candidates.length > 1 && !c.seenPoints.has(point)) c.steps.push({ kind: "decide", point, candidates });
+  if (candidates.length > 1 && !c.seenPoints.has(point)) c.ops.push({ kind: "decide", point, candidates });
   c.seenPoints.add(point);
   const assigned = c.assign.get(point);
   const dyn = assigned && candidates.includes(assigned) ? assigned : candidates[0]!;
@@ -114,18 +114,18 @@ export function segmentAverage(s: SimulationSession, brandId: string, conditions
 
 /** The plan of one milestone: made from the milestone below it (or the start), asked by its consumer. */
 function plan(s: SimulationSession, campaign: Campaign, consumer: string, milestone: OutcomeId, from: OutcomeId, assign: Map<string, string>): Ctx | null {
-  const c: Ctx = { session: s, campaign, brandId: campaign.brandId, from, assign, steps: [], ends: 1, segment: 1, seenPoints: new Set(), produced: new Set(), audience: [] };
+  const c: Ctx = { session: s, campaign, brandId: campaign.brandId, from, assign, ops: [], ends: 1, segment: 1, seenPoints: new Set(), produced: new Set(), audience: [] };
   return planProduce(c, consumer, milestone, true) ? c : null;
 }
 
 /** True chance to reach the milestone and true cost to get there, from the first decision at `point`. */
 function fromPoint(c: Ctx, point: string): { p: number; cost: number } | null {
-  const k = c.steps.findIndex((st) => st.kind === "decide" && st.point === point);
+  const k = c.ops.findIndex((st) => st.kind === "decide" && st.point === point);
   if (k < 0) return null;
   let reach = 1;
   let cost = 0;
   let p = 0;
-  for (const st of c.steps.slice(k + 1)) {
+  for (const st of c.ops.slice(k + 1)) {
     if (st.kind !== "run") continue;
     cost += reach * st.costCents;
     if (st.final) {
@@ -164,7 +164,7 @@ export function hiddenTruth(s: SimulationSession, campaign: Campaign, consumer: 
       const ctx = plan(s, campaign, consumer, milestone, from, assign);
       if (!ctx) return assign;
       let changed = false;
-      for (const st of ctx.steps) {
+      for (const st of ctx.ops) {
         if (st.kind !== "decide" || st.candidates.length < 2 || fixed.has(st.point)) continue;
         let best = assign.get(st.point) ?? st.candidates[0]!;
         let bestScore = -1;
@@ -186,7 +186,7 @@ export function hiddenTruth(s: SimulationSession, campaign: Campaign, consumer: 
   const ctx = plan(s, campaign, consumer, milestone, from, assign);
   if (!ctx) return new Map();
   const out = new Map<string, HiddenCandidate[]>();
-  for (const st of ctx.steps) {
+  for (const st of ctx.ops) {
     if (st.kind !== "decide") continue;
     out.set(
       st.point,
@@ -204,7 +204,7 @@ export function hiddenTruth(s: SimulationSession, campaign: Campaign, consumer: 
   return out;
 }
 
-/** The hidden best candidate at every point of every leg of a campaign. */
+/** The hidden best candidate at every choice point of a campaign. */
 export function hiddenBest(s: SimulationSession, campaign: Campaign): Map<string, { best: string; candidates: HiddenCandidate[] }> {
   const out = new Map<string, { best: string; candidates: HiddenCandidate[] }>();
   for (const { consumer, milestone, from } of milestonesOf(s, campaign)) {
@@ -295,7 +295,7 @@ export interface PointConvergence {
   point: string;
   /** Picks over every campaign, to date. */
   picks: number;
-  /** The hidden best candidate per campaign (they may differ: a campaign's play can rule candidates out). */
+  /** The hidden best candidate per campaign (they may differ: a campaign's brief can rule candidates out). */
   bestByCampaign: Record<string, string>;
   /** Per day: picks, and picks on the campaign's hidden best. */
   daily: { picks: number; onBest: number }[];

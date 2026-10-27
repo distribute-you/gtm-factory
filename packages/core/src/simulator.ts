@@ -1,5 +1,5 @@
 /**
- * A factory at work on a simulated world, tick by tick.
+ * GTM Factory at work on a simulated world, tick by tick.
  *
  * Each outcome has one Engine (it makes the outcome: its scripts compete) and
  * one Provider (it serves the outcome: the stock, else an order to the
@@ -220,7 +220,7 @@ const addRem = (a: Rem, b: Rem): Rem => ({ mean: a.mean + b.mean, fixed: a.fixed
 
 type Obtained = { kind: "ok"; unit: string } | { kind: "wait" } | { kind: "fail"; reason: string } | { kind: "blocked" };
 
-/** Signals a run's code never sees: they stop it and tell the factory why. */
+/** Signals a run's code never sees: they stop it and tell the runner why. */
 class Blocked extends Error {}
 class Failed extends Error {}
 class Ready extends Error {}
@@ -424,7 +424,7 @@ export class SimulationSession {
 
   /**
    * What a judge reads in a campaign's brief (in the simulator, the hidden
-   * truth; in a factory, Jev): per Engine, the strategy it keeps or none, the
+   * truth; in production, Jev): per Engine, the strategy it keeps or none, the
    * daily caps, and the test length. Read once, stored on the campaign.
    */
   private judgeBrief(c: Campaign): void {
@@ -499,7 +499,7 @@ export class SimulationSession {
 
   // ---- the tick ---------------------------------------------------------------
 
-  step(): DaySnapshot {
+  nextDay(): DaySnapshot {
     const day = this.dayIndex;
     this.evidence.newDay();
     this.blind.newDay();
@@ -535,7 +535,7 @@ export class SimulationSession {
 
   run(days: number): DaySnapshot[] {
     const out: DaySnapshot[] = [];
-    for (let i = 0; i < days; i++) out.push(this.step());
+    for (let i = 0; i < days; i++) out.push(this.nextDay());
     return out;
   }
 
@@ -624,7 +624,7 @@ export class SimulationSession {
   private planNode(campaign: Campaign, consumer: string, o: OutcomeId, day: number, seen: Set<OutcomeId>): PlanNode {
     const out = this.catalogue.outcome(o);
     if (o === campaign.start || seen.has(o) || out?.contentType === "rating" || out?.subject === "brand") return { outcome: o, scriptId: null, candidates: out?.subject === "brand" ? this.objectDynasties(campaign.brandId, o).length : 0, materials: [] };
-    // The Plan is what the factory runs when every script has its capacity: today's limits only route one tick.
+    // The Plan is what runs when every script has its capacity: today's limits only route one tick.
     const scripts = this.allowedScripts(campaign, o, false).filter((s) => out?.subject !== "lead" || this.feasible(campaign, s, campaign.start, new Set(), false));
     if (scripts.length === 0) return { outcome: o, scriptId: null, candidates: 0, materials: [] };
     const point = pointKey(consumer, o);

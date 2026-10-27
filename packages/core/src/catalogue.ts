@@ -74,7 +74,7 @@ export interface Capacity {
 
 /**
  * What performs an Engine. A script makes ONE outcome and is code: its `code`
- * names the function the factory runs, which calls the Providers it needs. A
+ * names the function GTM Factory runs, which calls the Providers it needs. A
  * script is a version of a dynasty; the dynasty competes, its active head runs.
  * A fork starts a new dynasty from a parent's.
  */
@@ -88,7 +88,7 @@ export interface Script {
   /** The dynasty this one was forked from (its prior starts from the parent's). */
   parentDynasty?: string | null;
   kind: ScriptKind;
-  /** The code the factory runs: a key of the script library. */
+  /** The code GTM Factory runs: a key of the script library. */
   code: string;
   /**
    * The outcomes its code calls: read from the code by a judge for each new
@@ -179,10 +179,10 @@ export function defaultStrategyId(outcome: OutcomeId): string {
 
 /** The tactic every script carries: who performs it (ours, the client's team, the mailbox...). */
 export const PERFORMED_BY = "performed_by";
-/** The value of "Performed by" that is this factory: its runs spend the budget and count in its return. */
+/** The value of "Performed by" that is ours: its runs spend the budget and count in its return. */
 export const OURS = "Ours";
 
-/** Is a script performed by this factory? */
+/** Is a script performed by us? */
 export function isOurs(script: Pick<Script, "tactics">): boolean {
   return (script.tactics[PERFORMED_BY] ?? OURS) === OURS;
 }

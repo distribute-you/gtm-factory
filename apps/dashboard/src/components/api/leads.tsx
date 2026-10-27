@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/core";
-import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
+import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
-import { factoryTitle, outcomeName } from "@/lib/api/labels";
+import { useOverview } from "@/lib/api/overview";
+import { outcomeName, performerTitle } from "@/lib/api/labels";
 import { plural } from "@/lib/format";
 import { ChoicesTable, Read, RunsTable, formatTime, timeAgo } from "./common";
 
@@ -21,7 +21,7 @@ export function ApiLeadsPage() {
   if (campaign) qs.set("campaignId", campaign);
   if (state) qs.set("state", state);
   const read = useApi<ApiLead[]>(`/leads${qs.toString() ? `?${qs}` : ""}`);
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   const setFilter = (key: "campaign" | "state", value: string) => {
     const next = new URLSearchParams(search.toString());
     if (value) next.set(key, value);
@@ -37,19 +37,19 @@ export function ApiLeadsPage() {
         <PageHeader title={read.data ? plural(read.data.length, "lead", "leads") : "Leads"} sub="Every person a campaign found, and the furthest outcome each one reached." />
         <div className="mb-4 flex flex-wrap gap-2">
           <select aria-label="Campaign" className="k-input px-1.5" style={{ font: "inherit" }} value={campaign} onChange={(e) => setFilter("campaign", e.target.value)}>
-            <SelectItem value="">Every campaign</SelectItem>
+            <option value="">Every campaign</option>
             {o?.campaigns.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
+              <option key={c.id} value={c.id}>
                 {c.name}
-              </SelectItem>
+              </option>
             ))}
           </select>
           <select aria-label="State" className="k-input px-1.5" style={{ font: "inherit" }} value={state} onChange={(e) => setFilter("state", e.target.value)}>
-            <SelectItem value="">Every state</SelectItem>
+            <option value="">Every state</option>
             {leadStates.map((x) => (
-              <SelectItem key={x.id} value={x.id}>
+              <option key={x.id} value={x.id}>
                 {x.label}
-              </SelectItem>
+              </option>
             ))}
           </select>
         </div>
@@ -112,7 +112,7 @@ function StateWord({ outcome, catalogue }: { outcome: string; catalogue: Catalog
 export function ApiLeadPage() {
   const id = useSearchParams().get("id");
   const read = useApi<ApiLeadDetail>(id ? `/leads/${encodeURIComponent(id)}` : null);
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   return (
     <>
       <TopBar crumbs={[{ label: "Leads", href: "/leads/" }, { label: read.data?.lead.name || read.data?.lead.email || "Lead" }]} />
@@ -167,7 +167,7 @@ function Lead({ d, catalogue, campaignName }: { d: ApiLeadDetail; catalogue: Cat
         </section>
 
         <section className="mt-8">
-          <SectionTitle count={d.choices.length}>Choices made for this lead</SectionTitle>
+          <SectionTitle count={d.choices.length}>Choices made for this person</SectionTitle>
           <ChoicesTable choices={d.choices} />
         </section>
 
@@ -231,7 +231,7 @@ function ReportPaid({ leadId, done }: { leadId: string; done: boolean }) {
       <button type="button" className="k-btn w-full justify-center" disabled={busy} onClick={report}>
         {busy ? "Reporting" : "Report paid client"}
       </button>
-      <p className="k-fg3 mt-1.5 text-[12px]">The client&apos;s team is another factory. It reports this outcome.</p>
+      <p className="k-fg3 mt-1.5 text-[12px]">Performed by the client&apos;s team: it reports this outcome.</p>
       {error && <p className="mt-1 text-[12px] text-[var(--data-rose)]">{error}</p>}
     </div>
   );
@@ -244,7 +244,7 @@ function UnitCard({ oc, catalogue, choiceById }: { oc: ApiUnit; catalogue: Catal
         <Mark kind="outcome" id={oc.outcome} size={20} />
         <span className="text-[14px] font-medium">{outcomeName(catalogue, oc.outcome)}</span>
         <span className="k-mono k-fg2 text-[12px]">{formatTime(oc.at)}</span>
-        <span className="k-chip">{factoryTitle(catalogue, oc.factory)}</span>
+        <span className="k-chip">{performerTitle(oc.performedBy)}</span>
       </div>
       {oc.content && <Content content={oc.content} />}
       {oc.traceability.length > 0 && (

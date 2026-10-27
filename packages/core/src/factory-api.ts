@@ -1,11 +1,11 @@
 /**
- * The factory API: the contract between a RUNNING factory (a backend that runs
- * scripts for real, on real brands) and the dashboard's "api" data source.
- * Types only: this repository ships no backend. A factory serves these reads
+ * The API of a running GTM Factory: the contract between a backend that runs
+ * scripts for real, on real brands, and the dashboard's "api" data source.
+ * Types only: this repository ships no backend. A backend serves these reads
  * and writes as JSON under one base URL (the dashboard reads
  * NEXT_PUBLIC_FACTORY_API_URL, default "/api").
  *
- * Every figure is computed by the factory: the dashboard divides nothing.
+ * Every figure is computed by the running GTM Factory: the dashboard divides nothing.
  * Money is integer cents. Times are ISO strings. Ids are opaque strings.
  *
  *   GET  /overview                      -> ApiOverview
@@ -21,7 +21,7 @@
  *   PATCH /campaigns/:id  { dailyBudgetCents } -> ApiCampaign
  *   GET  /leads?campaignId=&brandId=&state= -> ApiLead[]
  *   GET  /leads/:id                     -> ApiLeadDetail
- *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another factory)
+ *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another party)
  *   GET  /objects?outcome=              -> ApiObjectDynasty[]
  *   POST /objects         ApiNewObjectVersion -> ApiObjectDynasty (upgrade, fork or new dynasty)
  *   GET  /scripts?outcome=              -> ApiScriptStats[]
@@ -187,7 +187,7 @@ export interface ApiCampaign {
   counts: ApiOutcomeCounts;
   createdAt: string;
   launchedAt: string | null;
-  /** This factory's last tick on it; for a campaign another party runs, the last read of it. */
+  /** Our last tick on it; for a campaign another party runs, the last read of it. */
   lastTickAt: string | null;
   /**
    * Who performs it (the "Performed by" tactic). Absent: Ours. A campaign another party
@@ -276,7 +276,7 @@ export interface ApiOverview {
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
   /**
    * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=)
-   * or its Engine's scripts (GET /scripts?outcome=). The factory ships its own (Templates, LLMs).
+   * or its Engine's scripts (GET /scripts?outcome=). The backend ships its own (Templates, LLMs).
    */
   pins?: Pin[];
 }

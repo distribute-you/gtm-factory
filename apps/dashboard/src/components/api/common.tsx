@@ -6,12 +6,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
-import type { ApiCampaign, ApiChoice, ApiChoicePoint, ApiRun, CatalogueData, OutcomeId } from "@gtm-factory/core";
+import { OURS, type ApiCampaign, type ApiChoice, type ApiChoicePoint, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
 import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, type ApiRead } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
-import { factoryTitle, outcomeName, legTitle } from "@/lib/api/labels";
+import { engineTitle, outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi } from "@/lib/format";
 
 /** "3m ago", "2h ago", "4d ago". */
@@ -43,7 +42,7 @@ export function ShimmerRows({ rows = 5 }: { rows?: number }) {
 export function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
     <div className="k-card px-4 py-3 text-[13px]">
-      <ToneDot tone="rose">The factory did not answer</ToneDot>
+      <ToneDot tone="rose">The server did not answer</ToneDot>
       <p className="k-fg2 mt-1">{children}</p>
     </div>
   );
@@ -77,21 +76,18 @@ function Menu({ anchor, onClose, children }: { anchor: HTMLElement; onClose: () 
   );
 }
 
-/** The name of the factory that runs a campaign or a client, when it is not this one; null for this factory. */
-export function useOtherFactory(factory: string | undefined): string | null {
-  const { data } = useFactory();
-  const f = factory ? data?.catalogue.factories.find((x) => x.id === factory) : undefined;
-  if (!factory || f?.ours) return null;
-  return factoryTitle(data?.catalogue, factory);
+/** Who performs a campaign or a client when it is not us (its "Performed by"); null when we do. */
+export function otherPerformer(performedBy: string | undefined): string | null {
+  return !performedBy || performedBy === OURS ? null : performedBy;
 }
 
-/** A campaign's status: the dot and its word in a button; the menu holds the other state. Another factory's campaign shows its status, read only. */
+/** A campaign's status: the dot and its word in a button; the menu holds the other state. A campaign another party performs shows its status, read only. */
 export function CampaignStatusButton({ campaign }: { campaign: ApiCampaign }) {
-  const other = useOtherFactory(campaign.factory);
+  const other = otherPerformer(campaign.performedBy);
   if (other) {
     const live = campaign.status === "live";
     return (
-      <span className="inline-flex flex-col items-start gap-0.5" title={`Run by ${other}: this factory reads it and never runs it.`}>
+      <span className="inline-flex flex-col items-start gap-0.5" title={`Performed by ${other}: read here, never run from here.`}>
         <span className="inline-flex items-center gap-1.5 text-[13px]">
           {live ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--run)]" /> : <span className="h-2 w-2 rounded-full border-[1.5px] border-[var(--fg-2)]" />}
           {live ? "Live" : "Stopped"}
@@ -141,9 +137,9 @@ function OwnStatusButton({ campaign }: { campaign: ApiCampaign }) {
   );
 }
 
-/** The daily cap as a button ("$10/day"); a modal edits it. Another factory's cap is shown as it reports it. */
+/** The daily cap as a button ("$10/day"); a modal edits it. Another party's cap is shown as it reports it. */
 export function BudgetButton({ campaign }: { campaign: ApiCampaign }) {
-  const other = useOtherFactory(campaign.factory);
+  const other = otherPerformer(campaign.performedBy);
   if (other) return <span className="whitespace-nowrap text-[13px] tabular-nums">{campaign.dailyBudgetCents > 0 ? `${formatCents(campaign.dailyBudgetCents)}/day` : "No daily cap"}</span>;
   return <OwnBudgetButton campaign={campaign} />;
 }
@@ -263,7 +259,7 @@ export function RunsTable({ runs, catalogue, empty = "No run yet." }: { runs: Ap
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
           <th className={TH}>Script</th>
-          <th className={TH}>Leg</th>
+          <th className={TH}>Engine</th>
           <th className={TH}>Status</th>
           <th className={`${TH} w-full`}>What happened</th>
           <th className={`${TH} text-right`}>Cost</th>
@@ -284,7 +280,7 @@ function RunRow({ run, catalogue, open, onToggle }: { run: ApiRun; catalogue: Ca
       <tr className="k-row k-line-subtle cursor-pointer border-b last:border-b-0" onClick={onToggle}>
         <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(run.at)}</td>
         <td className={`${TD} whitespace-nowrap`}>{run.scriptName}</td>
-        <td className={`${TD} k-fg2 whitespace-nowrap`}>{legTitle(catalogue, run.legId)}</td>
+        <td className={`${TD} k-fg2 whitespace-nowrap`}>{engineTitle(catalogue, run.engine)}</td>
         <td className={TD}>
           <RunStatus status={run.status} />
         </td>
@@ -292,7 +288,7 @@ function RunRow({ run, catalogue, open, onToggle }: { run: ApiRun; catalogue: Ca
           {run.note || <span className="k-fg4">—</span>}
           {run.leadId && (
             <Link href={`/leads/view/?id=${encodeURIComponent(run.leadId)}`} className="k-accent ml-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
-              Lead
+              Person
             </Link>
           )}
         </td>
@@ -400,9 +396,9 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
   return (
     <div className="space-y-3">
       {points.map((p) => {
-        const word = p.chooses === "unit" ? "Unit" : p.chooses === "leg" ? "Leg" : "Script";
+        const word = p.chooses === "unit" ? "Unit" : "Script";
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.chooses === "unit" ? "Units" : p.chooses === "leg" ? "legs" : "scripts"} compete here`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.chooses === "unit" ? "Units" : "scripts"} compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`} colSpan={7}>
@@ -413,7 +409,7 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
                 <th className={`${TH} w-full`}>{word}</th>
                 <th className={`${TH} text-right`}>Value per $</th>
                 <th className={`${TH} text-right`}>Rate</th>
-                <th className={`${TH} text-right`}>Cost to step end</th>
+                <th className={`${TH} text-right`}>Cost to next milestone</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
@@ -439,32 +435,35 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
   );
 }
 
-/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one glyph per object type (leg, outcome, script, Material). */
+/**
+ * A choice card's uniform title, one glyph per object type: "<Engine> · its script" when the
+ * scripts of the called outcome's Engine compete, "<Engine> · Material <outcome>" when the
+ * brand's Units compete for the calling Engine.
+ */
 export function ApiPointTitle({ point, catalogue }: { point: ApiChoicePoint; catalogue?: CatalogueData | null }) {
-  const leg = catalogue?.legs.find((l) => l.id === point.legId);
+  const unit = point.chooses === "unit";
+  const engine = unit ? point.consumer : point.material;
+  const font = { fontFamily: "var(--font-geist-sans)" };
   return (
     <span className="inline-flex items-center gap-1.5 normal-case">
-      <Mark kind="leg" id={point.legId} size={18} />
-      <span className="k-fg text-[13px] font-medium tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
-        {leg?.name ?? legTitle(catalogue, point.legId)}
+      <Mark kind="engine" id={engine} size={18} />
+      <span className="k-fg text-[13px] font-medium tracking-normal" style={font}>
+        {engineTitle(catalogue, engine)}
       </span>
       <span className="k-fg4">·</span>
-      {point.chooses === "leg" ? (
-        <>
-          <Mark kind="leg" id={`legs:${point.id}`} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>its leg</span>
-        </>
-      ) : point.material ? (
+      {unit ? (
         <>
           <Mark kind="material" id={point.material} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
+          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
             Material {outcomeName(catalogue, point.material)}
           </span>
         </>
       ) : (
         <>
           <Mark kind="script" id={`scripts:${point.id}`} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>its script</span>
+          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
+            its script
+          </span>
         </>
       )}
     </span>

@@ -44,8 +44,8 @@ export interface LedgerRun {
   support?: { kind: string; reason: string };
   /** Abnormal loss (a run on a lead already past its target, a loop): stated apart. */
   abnormalLoss?: string;
-  /** Who ran it: our factory, or another one at its access cost (`spendCents`). */
-  factory?: string;
+  /** Who performed it: Ours, or another party at its access cost (`spendCents`). */
+  performedBy?: string;
   /** Context, for reports only (the arithmetic never reads it). */
   campaignId?: string;
   scriptId?: string;

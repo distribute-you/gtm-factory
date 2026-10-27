@@ -12,11 +12,12 @@ import {
   SquaresFourIcon,
   StackIcon,
   StorefrontIcon,
+  UserListIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import { NavContext } from "@/components/nav-context";
 import { Mark } from "@/components/mark";
-import { FactoryProvider, useFactory } from "@/lib/api/factory";
+import { OverviewProvider, useOverview } from "@/lib/api/overview";
 import { formatCount } from "@/lib/format";
 import { timeAgo } from "./common";
 
@@ -26,7 +27,7 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
   return (
-    <FactoryProvider>
+    <OverviewProvider>
       <NavContext.Provider value={() => setOpen(true)}>
         <div className="v2-root flex h-[100dvh] w-full overflow-hidden">
           {open && <div className="fixed inset-0 z-40 bg-[#10101247] lg:hidden" onClick={() => setOpen(false)} />}
@@ -45,7 +46,7 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
           <div id="portal" />
         </div>
       </NavContext.Provider>
-    </FactoryProvider>
+    </OverviewProvider>
   );
 }
 
@@ -85,7 +86,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
-  const { data, error } = useFactory();
+  const { data, error } = useOverview();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
   const id = search.get("id");
   const brandName = (bid: string) => data?.brands.find((b) => b.id === bid)?.name ?? "";
@@ -93,11 +94,11 @@ function Sidebar() {
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
         <div className="flex h-9 items-center gap-2 px-2">
-          <Mark kind="factory" id="factory" size={22} />
+          <Mark kind="performer" id="gtm" size={22} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">GTM Factory v5</span>
+            <span className="block truncate text-[13px] font-medium">GTM Factory v6</span>
             <span className="k-fg3 block truncate text-[11px] leading-3">
-              {error ? "Factory unreachable" : data?.scheduler.lastTickAt ? `Last tick ${timeAgo(data.scheduler.lastTickAt)}` : "Live factory"}
+              {error ? "Server unreachable" : data?.scheduler.lastTickAt ? `Last tick ${timeAgo(data.scheduler.lastTickAt)}` : "Running for real"}
             </span>
           </span>
         </div>
@@ -143,14 +144,15 @@ function Sidebar() {
                 key={pinKey(p)}
                 href={pinHref(p)}
                 label={p.label}
-                icon={<Mark kind={p.kind === "outcome" ? "object" : p.kind} id={p.id} icon={p.icon} size={16} />}
+                icon={<Mark kind="object" id={p.id} icon={p.icon} size={16} />}
                 active={pathname.startsWith("/pinned") && search.get("pin") === pinKey(p)}
               />
             ))}
           </Group>
         )}
-        <Group title="Engine">
+        <Group title="Production">
           <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
+          <NavItem href="/team/" label="Done by your team" icon={<UserListIcon size={15} />} active={at("/team")} />
           <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
           <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
         </Group>

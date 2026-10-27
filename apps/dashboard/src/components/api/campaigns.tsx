@@ -3,18 +3,18 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Catalogue, START, describeCondition, type ApiCampaign, type ApiCampaignDetail, type CatalogueData } from "@gtm-factory/core";
+import { START, type ApiCampaign, type ApiCampaignDetail, type ApiPlanNode, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
-import { outcomeName, legTitle } from "@/lib/api/labels";
+import { useOverview } from "@/lib/api/overview";
+import { engineTitle, outcomeName, outcomePluralName, scriptTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
-import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, timeAgo, useOtherFactory } from "./common";
+import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
 
 export function ApiCampaignsPage() {
   const read = useApi<ApiCampaign[]>("/campaigns");
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   const brandName = (id: string) => o?.brands.find((b) => b.id === id)?.name ?? "";
   const brand = useSearchParams().get("brand");
   return (
@@ -27,7 +27,7 @@ export function ApiCampaignsPage() {
             const live = campaigns.filter((c) => c.status === "live").length;
             return (
             <>
-              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub={`${formatCount(live)} live. Each campaign orders a Target for one brand under a daily cap; its tree is rebuilt at every tick.`} />
+              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub={`${formatCount(live)} live. Each campaign orders a Target for one brand under a daily cap; its Plan is recomputed at every tick.`} />
               {campaigns.length === 0 ? (
                 <div className="k-card">
                   <EmptyNote>
@@ -88,7 +88,7 @@ export function ApiCampaignsPage() {
 export function ApiCampaignPage() {
   const id = useSearchParams().get("id");
   const read = useApi<ApiCampaignDetail>(id ? `/campaigns/${encodeURIComponent(id)}` : null);
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   return (
     <>
       <TopBar crumbs={[{ label: "Campaigns", href: "/campaigns/" }, { label: read.data?.campaign.name ?? "Campaign" }]} />
@@ -105,14 +105,30 @@ export function ApiCampaignPage() {
   );
 }
 
+/** The chain that carries the subject in a Plan, from the start up to the Target. */
+function chainOf(plan: ApiPlanNode | null, start: string, catalogue: CatalogueData | undefined): ApiPlanNode[] {
+  const subjects = new Set((catalogue?.outcomes ?? []).filter((o) => o.subject === "lead" || o.subject === "company").map((o) => o.id));
+  const out: ApiPlanNode[] = [];
+  let node: ApiPlanNode | undefined = plan ?? undefined;
+  for (let guard = 0; node && node.outcome !== start && node.scriptId && guard < 50; guard++) {
+    out.unshift(node);
+    node = node.materials.find((m) => subjects.has(m.outcome));
+  }
+  return out;
+}
+
 function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: CatalogueData | undefined }) {
   const c = d.campaign;
-  const other = useOtherFactory(c.factory);
+  const other = otherPerformer(c.performedBy);
   const target = outcomeName(catalogue, c.target);
+  const targetPlural = outcomePluralName(catalogue, c.target);
   const proactive = c.start === START;
   const targetIcon = catalogue?.outcomes.find((o) => o.id === c.target)?.icon;
-  // The lead states of the tree, start first, then every outcome counted off them.
-  const line = d.steps.length > 0 ? d.steps.map((s) => s.to) : Object.keys(c.counts);
+  const chain = chainOf(d.plan, c.start, catalogue);
+  // The milestones of the Routing, then every outcome counted off them.
+  const line = d.milestones.length > 0 ? d.milestones.map((s) => s.to) : Object.keys(c.counts);
+  const verdicts = Object.entries(c.verdicts ?? {});
+  const caps = Object.entries(c.caps ?? {});
   return (
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -120,16 +136,16 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
           <Mark kind="outcome" id={c.target} icon={targetIcon} size={40} />
           <div className="min-w-0">
             <h1 className="text-[24px] font-medium leading-[30px] tracking-[-0.02em]" data-testid="campaign-goal">
-              Goal: {target}
+              Goal: {targetPlural} for {d.brand.name}
             </h1>
             <p className="k-fg2 mt-0.5 text-[13px]">
-              {c.name} · {d.brand.name}
+              {c.name}
               {d.brand.test && <span className="k-chip ml-2">Staff test</span>}
             </p>
             <p className="k-fg3 mt-0.5 text-[12px]">
               {other
-                ? `Run by ${other} since ${formatTime(c.launchedAt ?? c.createdAt)} · read ${timeAgo(c.lastTickAt)}`
-                : `${c.launchedAt ? `Launched ${formatTime(c.launchedAt)}` : "Never launched"} · last tick ${timeAgo(c.lastTickAt)}`}
+                ? `Performed by ${other} since ${formatTime(c.launchedAt ?? c.createdAt)} · read ${timeAgo(c.lastTickAt)}`
+                : `${c.launchedAt ? `Launched ${formatTime(c.launchedAt)}` : "Never launched"} · last tick ${timeAgo(c.lastTickAt)}${c.endsAt ? ` · ends ${formatTime(c.endsAt)}` : ""}`}
             </p>
           </div>
         </div>
@@ -140,53 +156,58 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3" data-testid="campaign-order">
-        <StatTile label={proactive ? "Proactive" : "Reactive"} note={other ? `Run by ${other}` : proactive ? `Pulls on ${target.toLowerCase()} at each tick, down its tree` : "Pushes each Unit that lands up its tree"}>
+        <StatTile label={proactive ? "Proactive" : "Reactive"} note={other ? `Performed by ${other}` : proactive ? `Pulls on ${target} at each tick, down its Plan` : "Pushes each Unit that lands up its Plan"}>
           <Figure value={outcomeName(catalogue, c.start)} />
-        </StatTile>
-        <StatTile label="Strategy" note="The tree is rebuilt at every tick from performance">
-          <span className="text-[14px] leading-5">{(c.conditions ?? []).length > 0 ? c.conditions.map((x) => describeCondition(x, catalogue ? new Catalogue(catalogue) : undefined)).join(", ") : "Every channel"}</span>
         </StatTile>
         <StatTile label="Daily budget" note={c.volume ? `At most ${formatCount(c.volume.units)} new subjects per ${plural(c.volume.periodDays, "day", "days")}` : "No volume limit"}>
           <Figure value={formatCents(c.dailyBudgetCents)} />
         </StatTile>
+        <StatTile label="Today against the cap">
+          <CapBar campaign={c} />
+        </StatTile>
       </div>
 
-      <div className="k-card mb-3 px-4 py-3" data-testid="campaign-views">
-        <span className="flex min-w-0 flex-col gap-1 text-[13px]">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Mark kind="funnel" id={c.salesFunnel?.id ?? c.id} size={16} />
-            <span className="k-fg3 shrink-0">Sales funnel:</span>
-            <span className="truncate font-medium">{c.salesFunnel?.name ?? "Not run yet"}</span>
-          </span>
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Mark kind="path" id={c.salesPath?.id ?? c.id} size={16} />
-            <span className="k-fg3 shrink-0">Sales path:</span>
-            <span className="truncate font-medium">{c.salesPath?.name ?? "Not run yet"}</span>
-          </span>
-        </span>
-        {d.steps.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px]">
-            <OutcomeTag catalogue={catalogue} id={c.start} />
-            {d.steps.map((s) => (
-              <span key={`${s.from}>${s.to}`} className="inline-flex flex-wrap items-center gap-1.5">
-                {s.legs.map((legId) => (
-                  <span key={legId} className="inline-flex items-center gap-1.5">
-                    <span className="k-fg4">→</span>
-                    <LegTag catalogue={catalogue} legId={legId} stepLegs={s.legs} />
-                  </span>
-                ))}
-                <span className="k-fg4">→</span>
-                <OutcomeTag catalogue={catalogue} id={s.to} />
+      <div className="k-card mb-3 px-4 py-3" data-testid="campaign-brief">
+        <p className="k-label mb-1">Strategy</p>
+        <p className="text-[14px] leading-5">{c.brief ? c.brief : <span className="k-fg3">No brief: every script of every Engine may run.</span>}</p>
+        {(verdicts.length > 0 || caps.length > 0) && (
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[12px]">
+            {verdicts.map(([engine, strategy]) => (
+              <span key={engine} className="k-chip">
+                {engineTitle(catalogue, engine)}: {strategy === "none" ? "not used" : strategyName(catalogue, strategy)}
+              </span>
+            ))}
+            {caps.map(([engine, n]) => (
+              <span key={`cap:${engine}`} className="k-chip tabular-nums">
+                {engineTitle(catalogue, engine)}: at most {formatCount(n)} a day
               </span>
             ))}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatTile label="Today against the cap">
-          <CapBar campaign={c} />
-        </StatTile>
+      <div className="k-card mb-3 px-4 py-3" data-testid="campaign-routing">
+        <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
+          <Mark kind="routing" id={c.routing?.id ?? c.id} size={16} />
+          <span className="k-fg3 shrink-0">Routing:</span>
+          <span className="truncate font-medium">{c.routing?.name ?? "Not run yet"}</span>
+        </span>
+        {chain.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px]" data-testid="plan-line">
+            <OutcomeTag catalogue={catalogue} id={c.start} />
+            {chain.map((n) => (
+              <span key={n.outcome} className="inline-flex flex-wrap items-center gap-1.5">
+                <span className="k-fg4">→</span>
+                <ScriptTag catalogue={catalogue} node={n} />
+                <span className="k-fg4">→</span>
+                <OutcomeTag catalogue={catalogue} id={n.outcome} />
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <StatTile label="Spent in total">
           <Figure value={formatCents(c.spentTotalCents)} />
         </StatTile>
@@ -201,21 +222,21 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
         <OtherCounts catalogue={catalogue} line={line} counts={c.counts} />
       </section>
 
-      {d.steps.length > 0 && (
+      {d.milestones.length > 0 && (
         <section className="mt-8">
-          <SectionTitle count={d.steps.length}>Steps of the sales path</SectionTitle>
+          <SectionTitle count={d.milestones.length}>Milestones of the Routing</SectionTitle>
           <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={TH}>Step</th>
-                <th className={`${TH} text-right`}>Cost of this step per outcome</th>
+                <th className={TH}>Milestone</th>
+                <th className={`${TH} text-right`}>Cost of this outcome</th>
                 <th className={`${TH} text-right`}>Cost from Start</th>
                 <th className={`${TH} text-right`}>% conversion</th>
                 <th className={`${TH} text-right`}>Attempts per {target}</th>
               </tr>
             </thead>
             <tbody>
-              {d.steps.map((s) => (
+              {d.milestones.map((s) => (
                 <tr key={`${s.from}>${s.to}`} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>
                     <span className="inline-flex items-center gap-1.5 text-[12px]">
@@ -225,7 +246,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
                       {s.label === "expected" && <span className="k-chip ml-1">Learning</span>}
                     </span>
                   </td>
-                  <td className={TDN}>{formatCents(s.costOfStepCents)}</td>
+                  <td className={TDN}>{formatCents(s.costOfOutcomeCents)}</td>
                   <td className={TDN}>
                     <span className="font-medium">{formatCents(s.costFromStartCents)}</span>
                   </td>
@@ -235,35 +256,14 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
               ))}
             </tbody>
           </CardTable>
-          <p className="k-fg3 mt-2 text-[12px]">Cost from Start adds every step before it: it is the one the return reads.</p>
+          <p className="k-fg3 mt-2 text-[12px]">Cost from Start adds every milestone before it: the return reads it.</p>
         </section>
       )}
 
       <section className="mt-8">
-        <SectionTitle count={d.tree.length} right={<span>Last 7 days, every Unit this campaign made</span>}>
-          Production tree
-        </SectionTitle>
-        <div className="k-card divide-y divide-[var(--line-subtle)]" data-testid="production-tree">
-          {d.tree.length === 0 && <EmptyNote>Nothing made yet.</EmptyNote>}
-          {d.tree.map((t) => (
-            <div key={t.outcome} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px]">
-              <span className="w-[200px] shrink-0">
-                <OutcomeTag catalogue={catalogue} id={t.outcome} />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
-                {t.branches.map((b) => (
-                  <span key={b.legId} className="inline-flex items-center gap-1.5 tabular-nums">
-                    <span className="font-medium">{formatRatePct(b.share)}</span>
-                    <span className="k-fg3">via</span>
-                    <Mark kind="leg" id={b.legId} icon={catalogue?.legs.find((l) => l.id === b.legId)?.icon} size={14} />
-                    <span>{legTitle(catalogue, b.legId)}</span>
-                    <span className="k-fg3">at {b.costPerUnitCents != null ? formatCents(b.costPerUnitCents) : "—"}</span>
-                  </span>
-                ))}
-              </span>
-              <span className="k-fg3 shrink-0 text-[12px] tabular-nums">{plural(t.units, "Unit", "Units")}</span>
-            </div>
-          ))}
+        <SectionTitle right={<span>Recomputed at every tick; shares and costs over the last 7 days</span>}>Plan</SectionTitle>
+        <div className="k-card py-1" data-testid="plan-tree">
+          {d.plan ? <PlanTreeNode catalogue={catalogue} node={d.plan} depth={0} /> : <EmptyNote>No Plan yet: the first tick computes it.</EmptyNote>}
         </div>
       </section>
 
@@ -284,9 +284,55 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
 
       <p className="mt-6 text-[13px]">
         <Link href={`/leads/?campaign=${encodeURIComponent(c.id)}`} className="k-accent">
-          See this campaign&apos;s leads
+          See the people this campaign reached
         </Link>
       </p>
+    </>
+  );
+}
+
+function strategyName(catalogue: CatalogueData | undefined, id: string): string {
+  return catalogue?.strategies.find((s) => s.id === id)?.name ?? id;
+}
+
+/** One outcome of the Plan: its Engine's script now, the branches that made it, then what that script calls, indented. */
+function PlanTreeNode({ catalogue, node, depth }: { catalogue: CatalogueData | undefined; node: ApiPlanNode; depth: number }) {
+  const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
+  const o = catalogue?.outcomes.find((x) => x.id === node.outcome);
+  const leaf = !node.scriptId;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pr-4 text-[13px]" style={{ paddingLeft: 16 + depth * 20 }} data-plan-node={node.outcome}>
+        <span className="inline-flex min-w-[200px] items-center gap-1.5">
+          <Mark kind="outcome" id={node.outcome} icon={o?.icon} size={16} />
+          <span className="font-medium">{outcomeName(catalogue, node.outcome)}</span>
+        </span>
+        <span className="k-fg2 inline-flex items-center gap-1.5">
+          {leaf ? (
+            <span className="k-fg3">{o?.subject === "brand" ? `The brand's ${node.candidates === 1 ? "Unit" : `${formatCount(node.candidates)} Units`}` : o?.contentType === "rating" ? "Today's Rating" : "From the start"}</span>
+          ) : (
+            <>
+              <Mark kind={script ? (`script:${script.kind}` as const) : "script"} id={script?.dynasty ?? node.scriptId!} size={14} />
+              <span>{script?.name ?? scriptTitle(catalogue, node.scriptId!)}</span>
+              {node.candidates > 1 && <span className="k-fg3 text-[12px]">best of {formatCount(node.candidates)}</span>}
+            </>
+          )}
+        </span>
+        {node.branches.length > 0 && (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[12px] tabular-nums">
+            {node.branches.map((b) => (
+              <span key={b.scriptId} className="inline-flex items-center gap-1">
+                <span className="font-medium">{formatRatePct(b.share)}</span>
+                <span className="k-fg3">{scriptTitle(catalogue, b.scriptId)}</span>
+                <span className="k-fg3">at {b.costPerUnitCents != null ? formatCents(b.costPerUnitCents) : "—"}</span>
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+      {node.materials.map((m) => (
+        <PlanTreeNode key={`${node.outcome}>${m.outcome}`} catalogue={catalogue} node={m} depth={depth + 1} />
+      ))}
     </>
   );
 }
@@ -301,47 +347,45 @@ function OutcomeTag({ catalogue, id }: { catalogue: CatalogueData | undefined; i
   );
 }
 
-/** A leg of the line, with its "<n> materials" badge: the Bill of materials of its script, each Material with the leg that supplies it. */
-function LegTag({ catalogue, legId, stepLegs }: { catalogue: CatalogueData | undefined; legId: string; stepLegs: string[] }) {
+/** A script on the line, with its "<n> materials" badge: the outcomes its code calls, each with the Provider it comes from. */
+function ScriptTag({ catalogue, node }: { catalogue: CatalogueData | undefined; node: ApiPlanNode }) {
   const [open, setOpen] = useState(false);
-  const leg = catalogue?.legs.find((l) => l.id === legId);
-  const script = catalogue?.scripts.find((s) => s.legId === legId && s.status === "active");
-  const materials = script?.materials ?? [];
-  const supplier = (m: string) => stepLegs.map((id) => catalogue?.legs.find((l) => l.id === id)).find((l) => l?.output === m) ?? null;
+  const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
+  const name = script?.name ?? (node.scriptId ? scriptTitle(catalogue, node.scriptId) : engineTitle(catalogue, node.outcome));
   return (
     <span className="relative inline-flex items-center gap-1">
-      <Mark kind="leg" id={legId} icon={leg?.icon} size={14} />
-      <span>{leg?.name ?? legTitle(catalogue, legId)}</span>
-      {materials.length > 0 && (
-        <button type="button" className="k-chip ml-0.5 cursor-pointer text-[11px]" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {plural(materials.length, "material", "materials")}
+      <Mark kind={script ? (`script:${script.kind}` as const) : "engine"} id={script?.dynasty ?? node.outcome} size={14} />
+      <span>{name}</span>
+      {node.materials.length > 0 && (
+        <button type="button" className="k-chip ml-0.5 cursor-pointer text-[11px]" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-materials={node.outcome}>
+          {plural(node.materials.length, "material", "materials")}
         </button>
       )}
       {open && (
-        <span className="k-popover absolute left-0 top-full z-20 mt-1 block w-[340px] p-3" role="dialog" aria-label="Bill of materials">
-          <span className="k-label mb-1 block">Bill of materials</span>
+        <span className="k-popover absolute left-0 top-full z-20 mt-1 block w-[360px] p-3" role="dialog" aria-label="Materials">
+          <span className="k-label mb-1 block">What its code calls</span>
           <span className="mb-2 flex items-center gap-1.5 text-[13px]">
-            <Mark kind="script" id={script?.dynasty ?? legId} size={16} />
-            <span className="truncate font-medium">{script?.name}</span>
+            <Mark kind={script ? (`script:${script.kind}` as const) : "engine"} id={script?.dynasty ?? node.outcome} size={16} />
+            <span className="truncate font-medium">{name}</span>
+            <span className="k-fg3 truncate text-[12px]">makes {outcomeName(catalogue, node.outcome)}</span>
           </span>
-          {materials.map((m) => {
-            const from = supplier(m.outcome);
+          {node.materials.map((m) => {
             const o = catalogue?.outcomes.find((x) => x.id === m.outcome);
+            const from = m.scriptId
+              ? scriptTitle(catalogue, m.scriptId)
+              : o?.subject === "brand" && m.candidates > 0
+                ? `the brand's ${m.candidates === 1 ? "Unit" : `${m.candidates} Units`}`
+                : o?.contentType === "rating"
+                  ? "today's Rating"
+                  : o?.track
+                    ? "the milestone it starts from"
+                    : "the stock";
             return (
               <span key={m.outcome} className="flex items-center gap-2 py-1 text-[12px]">
                 <Mark kind="material" id={m.outcome} icon={o?.icon} size={16} />
                 <span className="min-w-0 flex-1 truncate">{outcomeName(catalogue, m.outcome)}</span>
-                <span className="k-fg3 inline-flex shrink-0 items-center gap-1">
-                  {from ? (
-                    <>
-                      from <Mark kind="leg" id={from.id} icon={from.icon} size={14} />
-                      <span className="k-fg2">{from.name}</span>
-                    </>
-                  ) : o?.track ? (
-                    "the step it starts from"
-                  ) : (
-                    "the stock"
-                  )}
+                <span className="k-fg3 shrink-0">
+                  Provider: <span className="k-fg2">{from}</span>
                 </span>
               </span>
             );

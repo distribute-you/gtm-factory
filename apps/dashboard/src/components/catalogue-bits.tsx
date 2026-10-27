@@ -1,52 +1,66 @@
 "use client";
 
 /**
- * Shared catalogue pieces, all read off data: a script's card and provider logo, a leg's Bill of
- * materials, one renderer per content type of a brand outcome, and the version editor (read, edit =
- * new version, compare two versions). No piece knows an outcome, a leg or a script by name.
+ * Shared catalogue pieces, all read off data: a script's card, provider logo, the outcomes its
+ * code calls and its code, one renderer per content type of a brand outcome, and the version
+ * editor (read, edit = new version, compare two versions). No piece knows an outcome or a
+ * script by name.
  */
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { describeCondition, type Catalogue, type ContentType, type Leg, type Unit, type Script } from "@gtm-factory/core";
+import { describeCondition, type Catalogue, type ContentType, type Unit, type Script } from "@gtm-factory/core";
+import { SOURCES } from "@gtm-factory/scripts";
 import { Mark } from "./mark";
-import { SelectItem } from "./ui";
-import { billOfMaterials, diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
+import { diffWords, headScript, materialsOfScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 
 /**
- * A script's Bill of materials (the leg's first script when none is named): the outcomes it
- * consumes per Unit produced, one line per Material, the conditions of its Specification, the
- * legs producing each (they share one stock) and the choice made among them.
+ * The outcomes a script's code calls, one line each with its Provider and the choice made
+ * there: read from the code by a judge, then what the ledger measured each run consumed.
  */
-export function BillOfMaterials({ model, leg, script }: { model: Model; leg: Leg; script?: Script }) {
-  const rows = billOfMaterials(model, leg, script);
-  if (rows.length === 0)
-    return <p className="k-fg3 text-[13px]">{leg.webhook ? "No Material: another factory calls its webhook." : "No Material: it draws its subjects from the market."}</p>;
+export function ScriptMaterials({ model, script }: { model: Model; script: Script }) {
+  const { rows, label } = materialsOfScript(model, script);
+  if (rows.length === 0) return <p className="k-fg3 text-[13px]">{script.webhook ? "Calls nothing: another party calls its webhook." : "Calls nothing: it draws its subjects from the market."}</p>;
   return (
-    <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]" data-testid="bill-of-materials">
-      {rows.map((r) => (
-        <div key={r.material} className="flex items-start gap-2.5 px-3 py-2 text-[13px]">
-          <Mark kind="material" id={r.material} icon={model.catalogue.outcome(r.material)?.icon} size={20} />
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5">
-              <span className="font-medium">{r.label}</span>
-              {r.subject && <span className="k-chip">Subject</span>}
-            </p>
-            <p className="k-fg3 text-[12px]">{r.how}</p>
-            {r.conditions.length > 0 && <p className="k-fg2 text-[12px]">Specification: {r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}</p>}
-            <p className="k-fg2 truncate text-[12px]">{r.producers.length ? `Made by ${r.producers.map((p) => p.name).join(", ")}` : "Made by no leg yet"}</p>
+    <div>
+      <p className="k-fg3 mb-1.5 text-[12px]">{label === "measured" ? "Measured on its runs." : "Read from its code; measured once it runs."}</p>
+      <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]" data-testid="script-materials">
+        {rows.map((r) => (
+          <div key={r.material} className="flex items-start gap-2.5 px-3 py-2 text-[13px]">
+            <Mark kind="material" id={r.material} icon={model.catalogue.outcome(r.material)?.icon} size={20} />
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5">
+                <span className="font-medium">{r.label}</span>
+                {r.subject && <span className="k-chip">Subject</span>}
+              </p>
+              <p className="k-fg3 text-[12px]">Provider: {r.how}</p>
+            </div>
+            {r.point ? (
+              <Link href={`/research/?point=${encodeURIComponent(r.point)}`} className="shrink-0 text-right hover:underline">
+                <span className="k-fg3 block text-[11px]">Chosen</span>
+                <span className="block max-w-[160px] truncate text-[12px] font-medium">{r.choice ?? "—"}</span>
+              </Link>
+            ) : (
+              <span className="k-fg4 shrink-0 text-[12px]">No choice</span>
+            )}
           </div>
-          {r.point ? (
-            <Link href={`/research/?point=${encodeURIComponent(r.point)}`} className="shrink-0 text-right hover:underline">
-              <span className="k-fg3 block text-[11px]">Chosen</span>
-              <span className="block max-w-[160px] truncate text-[12px] font-medium">{r.choice ?? "—"}</span>
-            </Link>
-          ) : (
-            <span className="k-fg4 shrink-0 text-[12px]">No choice</span>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A script's code: the file it runs, as text. A change is a new version of its dynasty. */
+export function ScriptCode({ script }: { script: Script }) {
+  const text = SOURCES[script.code];
+  if (!text) return <p className="k-fg3 text-[13px]">No code found for {script.code}.</p>;
+  return (
+    <div>
+      <p className="k-fg3 mb-1.5 font-mono text-[12px]">scripts/src/{script.code}.ts</p>
+      <pre className="k-inset k-scroll max-h-[420px] overflow-auto rounded-[8px] p-3 font-mono text-[12px] leading-[18px]" data-testid="script-code">
+        {text}
+      </pre>
     </div>
   );
 }
@@ -307,9 +321,9 @@ function VersionPick({ versions, value, onChange }: { versions: Unit[]; value: n
   return (
     <select className="k-input px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="Version">
       {versions.map((v, i) => (
-        <SelectItem key={v.id} value={i}>
+        <option key={v.id} value={i}>
           v{v.version} · day {v.day}
-        </SelectItem>
+        </option>
       ))}
     </select>
   );

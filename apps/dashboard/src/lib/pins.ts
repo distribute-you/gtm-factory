@@ -1,7 +1,8 @@
 /**
- * Sidebar pins are configuration: pin an outcome or a leg and it gets a menu entry whose
- * page lists, reads, edits and compares what it holds. The world ships its default pins as
- * data; a visitor's pins are kept in this browser. No page knows an outcome or a leg by name.
+ * Sidebar pins are configuration: pin an outcome and it gets a menu entry whose page lists,
+ * reads, edits and compares what it holds (its Units, its Engine's scripts). The world ships
+ * its default pins as data; a visitor's pins are kept in this browser. No page knows an
+ * outcome by name.
  */
 
 import type { Pin } from "@gtm-factory/core";
@@ -9,7 +10,7 @@ import { WORLD } from "./world";
 
 export type { Pin };
 
-const KEY = "gtm-factory:v2:pins";
+const KEY = "gtm-factory:v6:pins";
 
 export const DEFAULT_PINS: Pin[] = WORLD.pins ?? [];
 
@@ -26,7 +27,7 @@ export function parsePin(key: string | null, pins: readonly Pin[]): Pin | null {
   const found = pins.find((p) => pinKey(p) === key);
   if (found) return found;
   const [kind, ...rest] = key.split(":");
-  if ((kind === "outcome" || kind === "leg" || kind === "path" || kind === "funnel") && rest.length) return { kind, id: rest.join(":"), label: rest.join(":") };
+  if (kind === "outcome" && rest.length) return { kind, id: rest.join(":"), label: rest.join(":") };
   return null;
 }
 

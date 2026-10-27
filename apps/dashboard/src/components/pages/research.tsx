@@ -9,7 +9,7 @@ import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { headScript, candidateLabel, legName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
+import { headScript, candidateLabel, engineName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
 import { multiPlugged, pointGroups, recentShare } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
@@ -48,7 +48,7 @@ function Research({ model }: { model: Model }) {
       />
 
       {all.length === 0 ? (
-        <EmptyNote>No choice yet. Press play.</EmptyNote>
+        <EmptyNote>No choice yet. Press Run.</EmptyNote>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section>
@@ -136,7 +136,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
                 <tr className="k-line-subtle border-b">
                   <th className={TH}>Candidate</th>
                   <th className={`${TH} text-right`}>Picks, 7 days</th>
-                  <th className={`${TH} text-right`}>Belief: reaches the step's end</th>
+                  <th className={`${TH} text-right`}>Belief: reaches the next milestone</th>
                   <th className={`${TH} text-right`}>Belief: $ to the end</th>
                   <th className={`${TH} text-right`}>Belief: ends per $</th>
                   <th className={`${TH} text-right`}>Truth: reaches the end</th>
@@ -151,7 +151,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
                     <tr key={o.candidate} className="k-row k-line-subtle border-b last:border-0">
                       <td className={TD}>
                         <span className="flex items-center gap-2">
-                          {script ? <Mark kind={`script:${script.kind}`} id={script.dynasty} size={20} /> : <Mark kind={model.catalogue.leg(o.candidate) ? "leg" : "object"} id={o.candidate} size={20} />}
+                          {script ? <Mark kind={`script:${script.kind}`} id={script.dynasty} size={20} /> : <Mark kind="object" id={o.candidate} size={20} />}
                           <span className="truncate font-medium">{o.label}</span>
                           {o.isHiddenBest && (
                             <span className="k-chip inline-flex items-center gap-1 text-[var(--run)]">
@@ -165,7 +165,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
                         {formatRatePct(o.rate)} <span className="k-fg3">± {formatRatePct(o.rateSd)}</span>
                       </td>
                       <td className={TDN}>{formatUsd(o.cost)}</td>
-                      <td className={TDN}>{(o.rate / Math.max(o.cost, 1e-9)).toFixed(3)}</td>
+                      <td className={TDN}>{o.cost < 0.005 ? <span className="k-fg3">Free</span> : (o.rate / o.cost).toFixed(3)}</td>
                       <td className={TDN}>{o.truth ? formatRatePct(o.truth.rate) : <span className="k-fg4">—</span>}</td>
                       <td className={TDN}>{o.truth ? formatCents(Math.round(o.truth.costCents)) : <span className="k-fg4">—</span>}</td>
                       <td className={`${TDN} ${o.isHiddenBest ? "text-[var(--run)]" : ""}`}>{o.truth ? o.truth.perDollar.toFixed(3) : <span className="k-fg4">—</span>}</td>
@@ -181,20 +181,20 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
   );
 }
 
-/** The same provider leg plugged at two inputs: each input has its own choice, so its own best script. */
+/** One Engine called by two Engines: each caller has its own choice, so its own best script. */
 function MultiPlugged({ model }: { model: Model }) {
   const rows = useMemo(() => multiPlugged(model), [model]);
   if (rows.length === 0) return null;
   return (
     <section className="mt-10">
-      <SectionTitle right={<span>The choice lives on the Material, never on the provider leg</span>}>One leg, several Materials</SectionTitle>
+      <SectionTitle right={<span>The choice lives on the Material, never on the Engine</span>}>One Engine, several callers</SectionTitle>
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((r) => (
-          <div key={r.legId} className="k-card p-4">
+          <div key={r.outcome} className="k-card p-4">
             <div className="flex items-center gap-2">
-              <Mark kind="leg" id={r.legId} icon={model.catalogue.leg(r.legId)?.icon} size={28} />
-              <span className="text-[14px] font-medium">{legName(model.catalogue, r.legId)}</span>
-              <span className="k-fg3 ml-auto text-[12px]">plugged at {r.inputs.length} Materials</span>
+              <Mark kind="engine" id={r.outcome} icon={model.catalogue.outcome(r.outcome)?.icon} size={28} />
+              <span className="text-[14px] font-medium">{engineName(model.catalogue, r.outcome)}</span>
+              <span className="k-fg3 ml-auto text-[12px]">called by {r.inputs.length} Engines</span>
             </div>
             <div className="k-inset mt-3 divide-y divide-[var(--line-subtle)] rounded-[8px]">
               {r.inputs.map((i) => (

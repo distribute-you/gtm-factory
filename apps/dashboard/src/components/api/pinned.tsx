@@ -3,34 +3,35 @@
 import { useState } from "react";
 import type { ApiNewObjectVersion, ApiObjectDynasty, ApiObjectVersion, ApiScriptStats } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
-import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
+import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
-import { outcomeName, legTitle } from "@/lib/api/labels";
+import { useOverview } from "@/lib/api/overview";
+import { engineLine, engineTitle, outcomeName, performerTitle } from "@/lib/api/labels";
 import { useSearchParams } from "next/navigation";
 import type { Pin } from "@gtm-factory/core";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
 import { Field, Read, ShimmerRows, formatTime } from "./common";
 
-/** A pinned page: an outcome pin lists its object dynasties, a leg pin its scripts. Pins are the factory's data. */
+/** A pinned page: a brand outcome lists its Unit dynasties, any other outcome its Engine's scripts. Pins are served as data. */
 export function ApiPinnedPage() {
   const key = useSearchParams().get("pin") ?? "";
-  const { data: o, answered } = useFactory();
+  const { data: o, answered } = useOverview();
   const pin = o?.pins?.find((p) => `${p.kind}:${p.id}` === key) ?? null;
   if (!answered) return <Page><ShimmerRows /></Page>;
-  if (!pin || (pin.kind !== "outcome" && pin.kind !== "leg")) {
+  if (!pin) {
     return (
       <>
         <TopBar crumbs={[{ label: "Pinned" }]} />
         <Page>
           <div className="k-card">
-            <EmptyNote>This pin is not served by the factory.</EmptyNote>
+            <EmptyNote>This pin is not served here.</EmptyNote>
           </div>
         </Page>
       </>
     );
   }
-  return pin.kind === "outcome" ? <ObjectsPage pin={pin} /> : <ScriptsPage pin={pin} />;
+  const brandOutcome = o?.catalogue.outcomes.find((x) => x.id === pin.id)?.subject === "brand";
+  return brandOutcome ? <ObjectsPage pin={pin} /> : <ScriptsPage pin={pin} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +39,7 @@ export function ApiPinnedPage() {
 // ---------------------------------------------------------------------------
 
 function ObjectsPage({ pin }: { pin: Pin }) {
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   const outcome: string | null = pin.id;
   const read = useApi<ApiObjectDynasty[]>(outcome ? `/objects?outcome=${encodeURIComponent(outcome)}` : null);
   const [open, setOpen] = useState<{ dynasty: ApiObjectDynasty; version: ApiObjectVersion } | null>(null);
@@ -90,7 +91,7 @@ function ObjectsPage({ pin }: { pin: Pin }) {
                                 <div key={s.point} className="px-3 py-2 text-[12px]">
                                   <span className="k-label block truncate">{s.pointLabel}</span>
                                   <span className="mt-0.5 block tabular-nums">
-                                    {formatRatePct(s.rateMean)} reach the step&apos;s end · {formatCount(s.successes)} of {formatCount(s.picks)} picks
+                                    {formatRatePct(s.rateMean)} reach the next milestone · {formatCount(s.successes)} of {formatCount(s.picks)} picks
                                   </span>
                                 </div>
                               ))}
@@ -130,7 +131,7 @@ function ObjectsPage({ pin }: { pin: Pin }) {
 }
 
 function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; mode: "upgrade" | "fork" | "new"; dynasty: ApiObjectDynasty | null; onClose: () => void }) {
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   const head = dynasty?.versions.find((v) => v.head) ?? dynasty?.versions[dynasty.versions.length - 1];
   const [name, setName] = useState(mode === "fork" && head ? `${head.name} (fork)` : head?.name ?? "");
   const [content, setContent] = useState(head?.content ?? "");
@@ -170,11 +171,11 @@ function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; 
         {mode !== "upgrade" && (
           <Field label="Brand">
             <select className="k-input w-full px-1.5" style={{ font: "inherit" }} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-              <SelectItem value="">Every brand</SelectItem>
+              <option value="">Every brand</option>
               {o?.brands.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
+                <option key={b.id} value={b.id}>
                   {b.name}
-                </SelectItem>
+                </option>
               ))}
             </select>
           </Field>
@@ -197,12 +198,12 @@ function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; 
 }
 
 // ---------------------------------------------------------------------------
-// A leg pin: the scripts competing on it (LLMs...)
+// Any other outcome: the scripts competing in its Engine (LLMs...)
 // ---------------------------------------------------------------------------
 
 function ScriptsPage({ pin }: { pin: Pin }) {
-  const { data: o } = useFactory();
-  const read = useApi<ApiScriptStats[]>(`/scripts?legId=${encodeURIComponent(pin.id)}`);
+  const { data: o } = useOverview();
+  const read = useApi<ApiScriptStats[]>(`/scripts?outcome=${encodeURIComponent(pin.id)}`);
   return (
     <>
       <TopBar crumbs={[{ label: pin.label }]} />
@@ -211,7 +212,7 @@ function ScriptsPage({ pin }: { pin: Pin }) {
           <Read read={read}>
             {(scripts) => (
               <>
-                <PageHeader title={`${plural(scripts.length, "script", "scripts")} on ${legTitle(o?.catalogue, pin.id)}`} sub="Scripts compete on this leg. Each leg consuming its output picks its own best one." />
+                <PageHeader title={`${plural(scripts.length, "script", "scripts")} of the ${engineTitle(o?.catalogue, pin.id)} Engine`} sub={`Scripts compete in this Engine. ${engineLine(o?.catalogue, pin.id)}: each caller picks its own best one.`} />
                 {scripts.length === 0 ? (
                   <div className="k-card">
                     <EmptyNote>No script yet.</EmptyNote>
@@ -219,7 +220,7 @@ function ScriptsPage({ pin }: { pin: Pin }) {
                 ) : (
                   <div className="space-y-3">
                     {scripts.map((s) => (
-                      <ScriptCard key={s.id} s={s} />
+                      <ScriptCard key={s.id} s={s} catalogue={o?.catalogue} />
                     ))}
                   </div>
                 )}
@@ -232,7 +233,8 @@ function ScriptsPage({ pin }: { pin: Pin }) {
   );
 }
 
-function ScriptCard({ s }: { s: ApiScriptStats }) {
+/** A script of an Engine: its figures, who performs it, its code file, what its code calls, and where it competes. */
+export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: import("@gtm-factory/core").CatalogueData }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toggle = async () => {
@@ -262,7 +264,12 @@ function ScriptCard({ s }: { s: ApiScriptStats }) {
             ))}
           </div>
           <p className="k-fg3 mt-1 text-[12px] tabular-nums">
-            {formatCount(s.runs)} runs · {formatCents(s.spentCents)} spent · {formatCents(s.costCentsPrior)} expected per run
+            {formatCount(s.runs)} runs · {formatCents(s.spentCents)} spent · {formatCents(s.costCentsPrior)} expected per run · performed by {performerTitle(s.performedBy)}
+          </p>
+          <p className="k-fg3 mt-0.5 font-mono text-[12px]">scripts/src/{s.code}.ts</p>
+          <p className="k-fg2 mt-1 text-[12px]">
+            {s.materials.length > 0 ? `Calls ${s.materials.map((m) => outcomeName(catalogue, m)).join(", ")}` : "Calls nothing"}
+            <span className="k-fg3"> · {s.materialsLabel === "measured" ? "measured on its runs" : "read from its code"}</span>
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -279,7 +286,7 @@ function ScriptCard({ s }: { s: ApiScriptStats }) {
             <tr className="k-line-subtle border-b border-t">
               <th className={`${TH} w-full`}>Material</th>
               <th className={`${TH} text-right`}>Rate</th>
-              <th className={`${TH} text-right`}>Cost to step end</th>
+              <th className={`${TH} text-right`}>Cost to next milestone</th>
               <th className={`${TH} text-right`}>Picks</th>
               <th className={`${TH} text-right`}>Reached</th>
             </tr>

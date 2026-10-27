@@ -34,25 +34,25 @@ const origin = `http://localhost:${port}${BASE}`;
 export const PAGES = [
   ["today", "/"],
   ["new-campaign", "/campaigns/new/"],
-  ["new-campaign-funnels", "/campaigns/new/?step=funnels"],
+  ["new-campaign-plan", "/campaigns/new/?stage=plan"],
   ["campaigns", "/campaigns/"],
-  ["campaign", "/campaigns/view/?id=campaign-1"],
-  ["campaign-reactive", "/campaigns/view/?id=campaign-1f"],
+  ["campaign", "/campaigns/view/?id=campaign-outbound"],
+  ["campaign-reactive", "/campaigns/view/?id=campaign-follow-ups"],
+  ["campaign-ads", "/campaigns/view/?id=campaign-ads"],
+  ["team", "/team/"],
   ["icps", "/audiences/"],
   ["leads", "/leads/"],
   ["lead", "LEAD"],
   ["companies", "/companies/"],
   ["pinned-templates", "/pinned/?pin=outcome%3Atemplate_written"],
-  ["pinned-llms", "/pinned/?pin=leg%3Allm"],
-  ["leg-writer", "/pinned/?pin=leg%3Awriter"],
+  ["pinned-llms", "/pinned/?pin=outcome%3Allm_completion"],
   ["research", "/research/"],
   ["catalogue", "/catalogue/"],
-  ["catalogue-legs", "/catalogue/?tab=legs"],
+  ["catalogue-engines", "/catalogue/?tab=engines"],
   ["catalogue-scripts", "/catalogue/?tab=scripts"],
   ["catalogue-tactics", "/catalogue/?tab=tactics"],
   ["catalogue-strategies", "/catalogue/?tab=strategies"],
-  ["catalogue-paths", "/catalogue/?tab=paths"],
-  ["sales-funnel", "FUNNEL"],
+  ["catalogue-routings", "/catalogue/?tab=routings"],
   ["ledger", "/ledger/"],
   ["how-it-works", "/how-it-works/"],
 ];
@@ -64,13 +64,12 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(`${page.url()}: ${m.text()}`));
 page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
 
-// Day 30 of the default scenario, then every page reads the same saved history.
+// Day 30 of the world, then every page reads the same saved history.
 await page.goto(`${origin}/?day=30`);
 await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
 let leadHref = "/leads/";
-let funnelHref = "/catalogue/?tab=paths";
 for (const [name, route] of PAGES) {
-  await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route === "FUNNEL" ? funnelHref.replace(BASE, "") : route}`);
+  await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route}`);
   await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
   await page.waitForTimeout(1200);
   // The panel scrolls inside a fixed frame: grow the window to the panel's height to capture it whole.
@@ -81,29 +80,12 @@ for (const [name, route] of PAGES) {
   await page.screenshot({ path: file });
   await page.setViewportSize({ width: 1440, height: 900 });
   console.log("saved", file);
-  if (name === "catalogue-paths") funnelHref = (await page.$eval('a[href*="pin=funnel"]', (a) => a.getAttribute("href")).catch(() => null)) ?? funnelHref;
   if (name === "leads") {
     // The lead page shows the furthest lead of the board: its whole timeline, from first touch to paid.
     const cols = await page.$$eval("[data-col]", (els) => els.map((e) => ({ col: e.getAttribute("data-col"), href: e.querySelector("a")?.getAttribute("href") ?? null })));
     leadHref = [...cols].reverse().find((c) => c.href)?.href ?? leadHref;
   }
 }
-const shoot = async (name) => {
-  await page.waitForTimeout(800);
-  const h = await page.evaluate(() => (document.querySelector("main")?.scrollHeight ?? 900) + 64);
-  await page.setViewportSize({ width: 1440, height: Math.min(Math.max(900, h), 7000) });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outDir, `${name}.png`) });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  console.log("saved", name);
-};
-// The distribute.you catalogue scenario: its whole public catalogue, fictional clients.
-await page.goto(`${origin}/?scenario=distribute&day=20`);
-await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 20")', { timeout: 180000 });
-await shoot("distribute-today");
-await page.goto(`${origin}/catalogue/?tab=legs`);
-await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 20")', { timeout: 180000 });
-await shoot("distribute-catalogue-legs");
 await browser.close();
 server.close();
 if (errors.length) {

@@ -1,6 +1,6 @@
 /**
- * The universal prioritizer: ONE algorithm for every choice (the play of a
- * script of an Engine, the Unit of the brand to consume). Thompson
+ * The universal prioritizer: ONE algorithm for every choice (the script of
+ * an Engine, the Unit of the brand to consume). Thompson
  * sampling on value per dollar:
  *
  *  1. every candidate carries a Beta belief about the share of its decisions that

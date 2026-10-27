@@ -13,6 +13,9 @@ importers:
       '@gtm-factory/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gtm-factory/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.1(react@19.3.1))(react@19.3.1)

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SimulationSession, readMaterials, worldFromData, type ScriptCode, type ScriptLibrary } from "../src";
+import { SOURCES } from "../../../scripts/src";
 import { LIBRARY, SCRIPTS_DIR, defaultWorld, worldData } from "./helpers";
 
 /** The fictional world with one script's code replaced, and some scripts retired. */
@@ -22,6 +23,8 @@ describe("scripts are code", () => {
       expect(LIBRARY[script.code], script.id).toBeTypeOf("function");
       expect([...script.materials].sort(), script.id).toEqual([...readMaterials(readFileSync(file, "utf8"))].sort());
       expect(script.code).toBe(`${script.outcome}/${script.dynasty}/v${script.version}`);
+      // The text pages show is the file itself (node scripts/build-sources.mjs after an edit).
+      expect(SOURCES[script.code], script.id).toBe(readFileSync(file, "utf8"));
     }
   });
 

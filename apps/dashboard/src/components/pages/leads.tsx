@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { confidenceOf, type Unit, type TacticValue } from "@gtm-factory/core";
+import { OURS, confidenceOf, type Unit, type TacticValue } from "@gtm-factory/core";
 import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { companyName, factoryName, leadRows, candidateLabel, outcomeLabel, personName, legName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
+import { companyName, leadRows, candidateLabel, engineName, outcomeLabel, personName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -18,10 +18,10 @@ export function leadHref(id: string): string {
 
 const PER_COLUMN = 12;
 
-/** Who brought a lead in: our factory, or another one. */
+/** Who brought a person in: our runs, or another party. */
 function RootDot({ model, root }: { model: Model; root: string }) {
-  const ours = model.catalogue.factory(root)?.ours ?? false;
-  return <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : factoryName(model.catalogue, root)}</ToneDot>;
+  const ours = root === OURS;
+  return <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : root || "Another party"}</ToneDot>;
 }
 
 // ---------------------------------------------------------------------------
@@ -49,12 +49,12 @@ function Leads({ model, scope }: { model: Model; scope: string | null }) {
       ...t.states.map((s) => ({ key: s.outcome, label: s.label, rows: rows.filter((r) => r.states[t.id]?.outcome === s.outcome) })),
     ].filter((c) => !only || c.key === only),
   }));
-  const ours = rows.filter((r) => model.catalogue.factory(r.root)?.ours).length;
+  const ours = rows.filter((r) => r.root === OURS).length;
   return (
     <>
       <PageHeader
         title={<>{plural(rows.length, "lead", "leads")}</>}
-        sub={`${formatCount(ours)} brought by our runs, ${formatCount(rows.length - ours)} by another factory. A lead moves on each track on its own.`}
+        sub={`${formatCount(ours)} brought by our runs, ${formatCount(rows.length - ours)} by another party. A person moves on each track on its own.`}
         right={only ? <Link href="/leads/" className="k-btn">Every state</Link> : undefined}
       />
       {columns.map(({ track, cols }) =>
@@ -154,7 +154,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
   const reliability = useMemo(() => s.reliability(), [s, model.day]);
   const pushes = s.pushes.filter((p) => p.subject === id);
   const root = s.rootOf(id) ?? "";
-  const attempts = s.attemptsOf(id);
+  const orders = s.ordersOf(id);
   return (
     <>
       <div className="mb-6 flex items-start gap-3">
@@ -178,18 +178,18 @@ function Lead({ model, id }: { model: Model; id: string }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-8">
           <section>
-            <SectionTitle>Lead states</SectionTitle>
+            <SectionTitle>Milestones</SectionTitle>
             <div className="grid gap-3 md:grid-cols-2">
               {model.tracks.map((t) => (
                 <div key={t.id} className="k-card p-4">
                   <div className="mb-3 flex items-center gap-2">
-                    <Mark kind="leadTrack" id={t.id} size={20} />
+                    <Mark kind="track" id={t.id} size={20} />
                     <span className="text-[13px] font-medium">{t.label}</span>
                   </div>
                   <ol className="space-y-1.5">
                     {t.states.map((st) => {
                       const day = reached.get(st.outcome);
-                      const producers = [...new Set(timeline.filter((o) => o.outcome === st.outcome && o.legId).map((o) => o.legId!))];
+                      const producers = [...new Set(timeline.filter((o) => o.outcome === st.outcome && o.scriptId).map((o) => model.catalogue.script(o.scriptId!)?.dynasty ?? o.scriptId!))];
                       const conf = day !== undefined && producers.length > 0 ? confidenceOf(producers, st.outcome, reliability) : null;
                       return (
                         <li key={st.outcome} className="flex items-center gap-2 text-[13px]">
@@ -233,12 +233,12 @@ function Lead({ model, id }: { model: Model; id: string }) {
           <div className="k-card h-fit p-4">
             <p className="k-label mb-3">Pushed into campaigns</p>
             {pushes.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No reactive campaign took a Unit of this lead.</p>
+              <p className="k-fg3 text-[12px]">No reactive campaign took a Unit of this person.</p>
             ) : (
               <ul className="space-y-1.5">
                 {pushes.map((p) => (
                   <li key={`${p.campaignId}:${p.unitId}`} className="flex items-center gap-2 text-[13px]">
-                    <Mark kind="funnel" id={p.campaignId} size={18} />
+                    <Mark kind="campaign" id={p.campaignId} size={18} />
                     <span className="min-w-0 flex-1 truncate">{model.session.campaign(p.campaignId)?.name ?? p.campaignId}</span>
                     <span className="k-fg3 k-mono text-[12px]">Day {p.day}</span>
                   </li>
@@ -247,17 +247,17 @@ function Lead({ model, id }: { model: Model; id: string }) {
             )}
           </div>
           <div className="k-card h-fit p-4">
-            <p className="k-label mb-3">Steps tried</p>
+            <p className="k-label mb-3">Orders</p>
             <ul className="space-y-1.5">
-              {attempts.map((a, i) => (
+              {orders.map((a, i) => (
                 <li key={i} className="flex items-center gap-2 text-[12px]">
                   <span className="min-w-0 flex-1 truncate">
-                    {outcomeLabel(model.catalogue, a.from)} → {outcomeLabel(model.catalogue, a.to)}
+                    {model.session.campaign(a.campaignId)?.name ?? a.campaignId} · from {outcomeLabel(model.catalogue, a.from)}
                   </span>
                   <ToneDot tone={a.status === "done" ? "teal" : a.status === "failed" ? "rose" : "accent"}>{a.status === "done" ? "Reached" : a.status === "failed" ? "Stopped" : "Open"}</ToneDot>
                 </li>
               ))}
-              {attempts.length === 0 && <li className="k-fg3 text-[12px]">No step tried yet.</li>}
+              {orders.length === 0 && <li className="k-fg3 text-[12px]">No order yet.</li>}
             </ul>
           </div>
         </aside>
@@ -269,7 +269,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
 function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
   const [open, setOpen] = useState(false);
   const script = occ.scriptId ? model.catalogue.script(occ.scriptId) : undefined;
-  const ours = model.catalogue.factory(occ.factory)?.ours ?? false;
+  const ours = occ.performedBy === OURS;
   const campaign = occ.campaignId ? model.campaigns.find((c) => c.id === occ.campaignId) : undefined;
   const choices = occ.trace.map((d) => model.session.decisions[d]).filter((d): d is NonNullable<typeof d> => !!d);
   const inputs = Object.entries(occ.materials).filter(([, v]) => v);
@@ -280,12 +280,12 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{outcomeLabel(model.catalogue, occ.outcome)}</span>
           <span className="k-fg3 block truncate text-[12px]">
-            {occ.legId ? legName(model.catalogue, occ.legId) : "Setup"}
+            {occ.scriptId ? `${engineName(model.catalogue, occ.outcome)} Engine` : "Setup"}
             {script ? ` · ${script.name}` : ""}
             {campaign ? ` · ${campaign.name}` : ""}
           </span>
         </span>
-        <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our run" : factoryName(model.catalogue, occ.factory)}</ToneDot>
+        <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our run" : occ.performedBy}</ToneDot>
         <span className="k-fg3 k-mono w-14 shrink-0 text-right text-[12px]">Day {occ.day}</span>
       </button>
       {open && (
@@ -311,7 +311,7 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
           <div>
             <p className="k-label mb-1">Traceability: the choices that led here</p>
             {choices.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No choice: a single candidate or another factory.</p>
+              <p className="k-fg3 text-[12px]">No choice: a single candidate or another party.</p>
             ) : (
               <ul className="space-y-1">
                 {choices.map((d) => (
@@ -393,7 +393,7 @@ function Companies({ model, scope }: { model: Model; scope: string | null }) {
     <>
       <PageHeader
         title={<>{plural(rows.length, "company", "companies")}</>}
-        sub="Every lead resolves to one person in one company: identity is a leg, and every leg shares its ids. One company research serves every lead of that company."
+        sub="Every person found belongs to one company, and every Engine shares its ids. One company research serves everyone at that company."
       />
       <CardTable
         footer={
@@ -460,7 +460,7 @@ function Companies({ model, scope }: { model: Model; scope: string | null }) {
           {list.length === 0 && (
             <tr>
               <td colSpan={5 + companyTactics.length}>
-                <EmptyNote>No company yet. Press play.</EmptyNote>
+                <EmptyNote>No company yet. Press Run.</EmptyNote>
               </td>
             </tr>
           )}

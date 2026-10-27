@@ -1,10 +1,10 @@
 /**
- * A script is code. The factory hands it a context and runs it; the script
+ * A script is code. GTM Factory hands it a context and runs it; the script
  * calls the Providers it needs with `get(outcome)`, its vendors through the
  * metered `vendor` client, keeps its notes in its Engine's storage, and returns
  * the content of one Unit, or none. It never calls another script, an Engine
  * or the ledger. The same code runs in the simulator (the vendor answers from
- * the hidden truth) and in a factory (real vendors).
+ * the hidden truth) and in production (real vendors).
  */
 
 import type { OutcomeId } from "./catalogue";
@@ -36,7 +36,7 @@ export interface Vendor {
 
 /**
  * Thrown by `get()` when the piece is being made (ordered, or in flight): the
- * run waits, and the factory runs the script again once it has landed. A
+ * run waits, and the script runs again once it has landed. A
  * script never catches it.
  */
 export class Waiting extends Error {

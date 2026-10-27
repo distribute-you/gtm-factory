@@ -89,3 +89,5 @@ export const LIBRARY: ScriptLibrary = {
   "meeting_attended/rm_sms/v1": s41,
   "paid_client/cl_call/v1": s42,
 };
+
+export { SOURCES } from "./sources";

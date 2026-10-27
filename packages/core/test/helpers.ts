@@ -19,6 +19,3 @@ export function worldOf(data: WorldData, seed?: number): WorldSpec {
 }
 
 export { LIBRARY };
-
-/** Words of retired objects, spelled in parts so that a search of the repository for them finds nothing. */
-export const RETIRED = [["occ", "urrence"], ["sha", "dow"], ["unl", "ess"], ["trig", "ger"]].map((w) => new RegExp(w.join(""), "i"));

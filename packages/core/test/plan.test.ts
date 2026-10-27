@@ -20,7 +20,7 @@ describe("the Plan is recomputed at every tick", () => {
     const pickedEachDay = (days: number) => {
       const seen: string[] = [];
       for (let d = 0; d < days; d++) {
-        s.step();
+        s.nextDay();
         seen.push(nodeOf(s.planOf(c), "reply_received")!.scriptId!);
       }
       return seen;
