@@ -221,7 +221,7 @@ export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
     leg,
     material,
     title: `${leg?.name ?? humanize(consumer)} · Material ${outcomeLabel(catalogue, material)}`,
-    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material).toLowerCase()} to serve from the stock` : `Which script produces it`,
+    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material)} Unit to serve from the stock` : `Which script produces it`,
   };
 }
 

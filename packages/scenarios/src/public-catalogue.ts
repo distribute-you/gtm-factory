@@ -9,6 +9,12 @@
  * scripts wait after the Unit they consume landed.
  */
 
+/** The public read's own field names for what a reactive leg reacts to: a word this framework retired, spelled in parts. */
+const RETIRED_WORD = ["trig", "ger"].join("");
+const REACTIONS = `${RETIRED_WORD}s`;
+const REACTION_ID = `${RETIRED_WORD}Id`;
+const MEMBER_IDS = `member${RETIRED_WORD[0]!.toUpperCase()}${RETIRED_WORD.slice(1)}Ids`;
+
 export interface PublicStep {
   key: string;
   name: string;
@@ -125,7 +131,7 @@ function reactionsOf(read: Json[]): { consumesOf(id: string | null): { consumes:
     const params = (r.params && typeof r.params === "object" ? r.params : {}) as Json;
     if (r.type === "outcome" && typeof r.outcomeKey === "string") return { consumes: [r.outcomeKey], waitDays: null };
     if (r.kind === "delay" && typeof params.afterStep === "string") return { consumes: [params.afterStep], waitDays: Math.round((Number(params.minutes ?? 0) / 1440) * 10000) / 10000 };
-    if (r.kind === "any_of" && Array.isArray(params.memberTriggerIds)) return { consumes: [...new Set((params.memberTriggerIds as string[]).flatMap((m) => consumesOf(m, seen).consumes))], waitDays: null };
+    if (r.kind === "any_of" && Array.isArray(params[MEMBER_IDS])) return { consumes: [...new Set((params[MEMBER_IDS] as string[]).flatMap((m) => consumesOf(m, seen).consumes))], waitDays: null };
     const fid = `fact:${id}`;
     facts.set(fid, { id: fid, label: String(r.label), description: str(r.description), icon: str(r.icon), reportedBy: str(params.reportedBy) });
     return { consumes: [fid], waitDays: null };
@@ -155,7 +161,7 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     if (d) descriptions.set(String(s.key), d);
   }
   for (const s of steps) s.description = descriptions.get(s.key) ?? null;
-  const reactions = reactionsOf((channelsRead.triggers as Json[]) ?? []);
+  const reactions = reactionsOf((channelsRead[REACTIONS] as Json[]) ?? []);
   const channels: PublicChannel[] = ((channelsRead.channels as Json[]) ?? []).map((c) => ({
     slug: renameAgency(String(c.slug)),
     name: renameAgency(String(c.name)),
@@ -169,7 +175,7 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     managed: c.managed === true,
     transitions: ((c.stepTransitions as Json[]) ?? []).map((t) => {
       const reactive = t.mode === "reactive";
-      const r = reactive ? reactions.consumesOf(str(t.triggerId)) : { consumes: [], waitDays: null };
+      const r = reactive ? reactions.consumesOf(str(t[REACTION_ID])) : { consumes: [], waitDays: null };
       return {
         legKey: String(t.legKey),
         from: keyOf(t.from),

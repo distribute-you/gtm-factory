@@ -17,19 +17,20 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
   },
   {
     kind: "leg",
-    title: "Legs and their Bill of materials",
+    title: "Legs, and the Bill of materials of each script",
     lines: [
-      "A leg turns its Bill of materials into one outcome. Each line is a Material: the message writer consumes a verified email, a company researched, a template, a brand context, an LLM completion and a Rating per message.",
-      "Each leg has two functions. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. Both open Runs: one Run is one script executed, one Unit or none.",
-      "A Specification is what a consumer asks for: the organisation of Paul's company, a brand context younger than 90 days, one of them.",
+      "A leg goes from one outcome to another, performed by competing scripts. Each script declares its own Bill of materials: a writer with a company research, another without.",
+      "Every leg runs the same code. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. It picks a script, serves it each Material from the stock, else pulls that outcome from the best producer, then runs it.",
+      "A Specification names the outcome, never a producer: the brand context of my lead's organisation, younger than 90 days. Whichever leg is picked receives it, like a purchase order names a part, not a machine.",
     ],
   },
   {
     kind: "campaign",
     title: "The Campaign orders production",
     lines: [
-      "A Campaign is a target outcome, a daily budget and a start outcome. From Start it is proactive: at each tick it pulls on its target. From any other outcome it is reactive: it pushes each Unit that lands into its first leg.",
-      "A pull serves the most advanced Units first. Upstream makes only what downstream asked for. A Unit advances one leg per tick, since every run takes time.",
+      "A Campaign fixes only its Target, its budget and its strategy (Channel is cold email). Its production tree is rebuilt at every tick from performance.",
+      "From Start it is proactive: it pulls from the Target down, each Material from the stock, else from the best producer. From any other outcome it is reactive: it pushes each Unit that lands up toward the Target.",
+      "The sales path and the sales funnel are views: the tree actually used, with a short name to talk about it. A Unit advances one leg per tick, since every run takes time.",
       "A follow-up campaign starts from Message sent. Its script waits its days since the last message, then writes. Who is never served, such as people who asked to stop, is the strategy's choice.",
     ],
   },
@@ -63,7 +64,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "Credit through traceability",
     lines: [
       "Every Unit records the choices that led to it, its own included, and those carried by the Units it consumed.",
-      "When the end of a step lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
+      "When the next lead state lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
     ],
   },
   {
@@ -93,7 +94,7 @@ export function HowItWorksPage() {
       <Page narrow>
         <PageHeader
           title="Revenue made easy, as a factory"
-          sub="Go-to-market as a factory: Campaigns order outcomes, legs make them from their Bill of materials, scripts compete inside each leg, and every choice goes where a dollar returns the most."
+          sub="Go-to-market as a factory: Campaigns order a Target, legs make outcomes, scripts compete inside each leg with their own Bill of materials, and every choice goes where a dollar returns the most."
           right={
             <a href={`${REPO_URL}/blob/main/docs/framework.md`} target="_blank" rel="noreferrer" className="k-btn">
               Read the spec

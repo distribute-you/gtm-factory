@@ -625,12 +625,11 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
   );
 }
 
-/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one mark per object type. */
+/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one glyph per object type (leg, outcome, script, Material). */
 export function PointTitle({ model, info }: { model: Model; info: PointInfo }) {
-  const o = model.catalogue.outcome(info.material);
   return (
     <Link href={`/research/?point=${encodeURIComponent(info.key)}`} className="inline-flex min-w-0 items-center gap-1.5 text-[14px] font-medium hover:underline">
-      {info.leg ? <Mark kind="leg" id={info.leg.id} icon={info.leg.icon} size={20} /> : <Mark kind="outcome" id={info.material} icon={o?.icon} size={20} />}
+      {info.leg ? <Mark kind="leg" id={info.leg.id} size={20} /> : <Mark kind="outcome" id={info.material} size={20} />}
       <span className="truncate">{info.leg ? info.leg.name : `Step to ${outcomeLabel(model.catalogue, info.material)}`}</span>
       <span className="k-fg4">·</span>
       {info.kind === "play" ? (
@@ -640,7 +639,7 @@ export function PointTitle({ model, info }: { model: Model; info: PointInfo }) {
         </>
       ) : info.consumer ? (
         <>
-          <Mark kind="material" id={info.material} icon={o?.icon} size={16} />
+          <Mark kind="material" id={info.material} size={16} />
           <span className="truncate">Material {outcomeLabel(model.catalogue, info.material)}</span>
         </>
       ) : (

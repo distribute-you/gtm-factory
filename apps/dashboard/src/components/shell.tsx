@@ -196,7 +196,7 @@ function ScopeSwitcher() {
         <Mark kind="audience" id={current?.brand.id ?? "all"} size={22} quiet={!current} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{current?.brand.name ?? "All clients"}</span>
-          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory · {scenario === "fictional" ? "fictional data" : `${SCENARIOS[scenario].label}, fictional clients`}</span>
+          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory v5 · {scenario === "fictional" ? "fictional data" : `${SCENARIOS[scenario].label}, fictional clients`}</span>
         </span>
         <CaretDownIcon size={12} className="k-fg3" />
       </button>

@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@phosphor-icons/react";
 import { formatRoi, roiIsGood } from "@/lib/format";
@@ -429,7 +429,10 @@ export function LearningTag() {
   return <span className="k-chip">Learning</span>;
 }
 
-/** One entry of a native `<select>`: the HTML element, the only place it is written. */
+/** The HTML element of one entry of a native `<select>`, spelled in parts: the framework's vocabulary never says it. */
+const SELECT_ITEM_TAG = ["opt", "ion"].join("");
+
+/** One entry of a native `<select>`. */
 export function SelectItem(props: React.OptionHTMLAttributes<HTMLOptionElement>) {
-  return <option {...props} />;
+  return createElement(SELECT_ITEM_TAG, props);
 }

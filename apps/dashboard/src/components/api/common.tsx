@@ -439,13 +439,12 @@ export function PointsList({ points, catalogue, empty = "No choice point yet." }
   );
 }
 
-/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one mark per object type. */
+/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one glyph per object type (leg, outcome, script, Material). */
 export function ApiPointTitle({ point, catalogue }: { point: ApiChoicePoint; catalogue?: CatalogueData | null }) {
   const leg = catalogue?.legs.find((l) => l.id === point.legId);
-  const outcome = point.material ? catalogue?.outcomes.find((o) => o.id === point.material) : undefined;
   return (
     <span className="inline-flex items-center gap-1.5 normal-case">
-      <Mark kind="leg" id={point.legId} icon={leg?.icon} size={18} />
+      <Mark kind="leg" id={point.legId} size={18} />
       <span className="k-fg text-[13px] font-medium tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
         {leg?.name ?? legTitle(catalogue, point.legId)}
       </span>
@@ -457,7 +456,7 @@ export function ApiPointTitle({ point, catalogue }: { point: ApiChoicePoint; cat
         </>
       ) : point.material ? (
         <>
-          <Mark kind="material" id={point.material} icon={outcome?.icon} size={14} />
+          <Mark kind="material" id={point.material} size={14} />
           <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
             Material {outcomeName(catalogue, point.material)}
           </span>

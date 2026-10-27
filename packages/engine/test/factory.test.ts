@@ -230,7 +230,7 @@ describe("the Campaign orders production", () => {
     expect(z.runs.filter((r) => r.campaignId === "campaign-1f").length).toBe(0);
   }, 60_000);
 
-  it("the follow-up leg waits its days since the last message through its script's tactic: no trigger", () => {
+  it("the follow-up leg waits its days since the last message through its script's tactic, nothing fires it from outside", () => {
     const runs = s.runs.filter((r) => r.legId === "follow_up");
     expect(runs.length).toBeGreaterThan(500);
     for (const r of runs) {
@@ -239,7 +239,7 @@ describe("the Campaign orders production", () => {
       expect(wait).toBe(4);
       expect(r.day - sent.day).toBeGreaterThanOrEqual(wait);
     }
-    expect("triggers" in worldData().catalogue).toBe(false);
+    for (const w of RETIRED) for (const k of Object.keys(worldData().catalogue)) expect(k).not.toMatch(w);
   });
 });
 
