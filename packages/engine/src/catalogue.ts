@@ -377,13 +377,14 @@ export class Catalogue {
     return out?.plural ?? `${out?.label ?? o}s`;
   }
 
-  /** Short plain words: "Paid clients from the market"; the states it passes through only to tell two apart. */
+  /** Short plain words: "Paid clients from the market"; the states it passes through only to tell two apart (the first, then all), a number last. */
   private pathNames(start: OutcomeId, line: readonly OutcomeId[]): string[] {
     const target = line[line.length - 1] ?? start;
     const from = start === START ? "the market" : this.plural(start).toLowerCase();
     const base = `${this.plural(target)} from ${from}`;
     const via = line.slice(0, -1).map((o) => this.plural(o).toLowerCase());
-    return via.length > 0 ? [base, `${base}, via ${via[0]}`] : [base];
+    const all = via.length > 1 ? `${via.slice(0, -1).join(", ")} and ${via[via.length - 1]}` : via[0];
+    return via.length > 0 ? [...new Set([base, `${base}, via ${via[0]}`, `${base}, via ${all}`])] : [base];
   }
 
   /** Short plain words: the leg that brings the first lead state, then the Target ("Reply judge to paid clients"). */

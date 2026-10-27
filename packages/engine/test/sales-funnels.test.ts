@@ -24,6 +24,14 @@ describe("sales paths and sales funnels are views with a name", () => {
     expect(c.funnelsOf(p.id).map((x) => x.id)).toEqual([f.id, g.id]);
   });
 
+  it("tells two paths apart by the states they pass through before numbering them", () => {
+    const c = new Catalogue(worldData().catalogue);
+    expect(c.nameSalesPath(START, ["paid_client"]).name).toBe("Paid clients from the market");
+    expect(c.nameSalesPath(START, ["lead_interested", "paid_client"]).name).toBe("Paid clients from the market, via leads interested");
+    expect(c.nameSalesPath(START, ["lead_interested", "meeting_booked", "paid_client"]).name).toBe("Paid clients from the market, via leads interested and meetings booked");
+    expect(c.nameSalesPath(START, ["lead_interested", "meeting_attended", "paid_client"]).name).toBe("Paid clients from the market, via leads interested and meetings attended");
+  });
+
   it("a campaign's tree is read as a named sales funnel; one seed gives the same names", () => {
     const run = () => {
       const s = new SimulationSession(defaultWorld());
