@@ -7,6 +7,7 @@
  * the hidden truth) and in production (real vendors).
  */
 
+import { transform } from "sucrase";
 import type { OutcomeId } from "./catalogue";
 import type { EngineStorage } from "./storage";
 import type { TacticValue } from "./tactics";
@@ -83,4 +84,26 @@ export function readMaterials(source: string): OutcomeId[] {
   const out: OutcomeId[] = [];
   for (const m of source.matchAll(/\bget\(\s*["'`]([a-z0-9_:.-]+)["'`]\s*\)/gi)) if (!out.includes(m[1]!)) out.push(m[1]!);
   return out;
+}
+
+/**
+ * A script's code given as text (the way a hosted GTM Factory keeps it, in its database):
+ * transpiled at load into the function it exports. The text imports only types; it runs
+ * with nothing but its context. Isolation (a sandbox, a time limit) is the host's call.
+ */
+export function compileScript(source: string): ScriptCode {
+  const { code } = transform(source, { transforms: ["typescript", "imports"] });
+  const module: { exports: Record<string, unknown> } = { exports: {} };
+  const load = (name: string): never => {
+    throw new Error(`a script imports nothing at run time, it asked for "${name}"`);
+  };
+  new Function("module", "exports", "require", code)(module, module.exports, load);
+  const run = module.exports.default;
+  if (typeof run !== "function") throw new Error("a script's code must export a default function run(ctx)");
+  return run as ScriptCode;
+}
+
+/** A script library from code given as text, by code key. */
+export function libraryFromSources(sources: Readonly<Record<string, string>>): ScriptLibrary {
+  return Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, compileScript(source)]));
 }
