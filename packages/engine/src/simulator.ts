@@ -21,10 +21,10 @@
  */
 
 import { START, billOf, defaultStrategyId, type Catalogue, type Leg, type OutcomeId, type Script, type Specification, type Strategy } from "./catalogue";
-import { EvidenceBook, SEP, bumpCell, legCountsOf, legEstimateOf, type CellStore } from "./evidence";
+import { EvidenceBook, SEP, bumpCell, legCountsOf, legEstimateOf, type Cell, type CellStore } from "./evidence";
 import { chainCostPerTarget, costForwardLine, legBreakdown, valueBackwardLine } from "./funnels";
 import { buildLedger, type LedgerReport, type LedgerRun, type LedgerUnit } from "./ledger";
-import { prioritize, type PricedOption } from "./prioritizer";
+import { prioritize, type PricedCandidate } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
 import { createRng, type Rng } from "./rng";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
@@ -57,11 +57,11 @@ export interface Unit extends LedgerUnit {
   conditions?: Condition[];
 }
 
-/** One choice: at a point (consuming leg x Material), for a subject, the option picked. */
+/** One choice: at a point (consuming leg x Material), for a subject, the candidate picked. */
 export interface Decision {
   id: number;
   point: string;
-  option: string;
+  candidate: string;
   campaignId: string;
   brandId: string;
   /** The outcome this decision exists for: the next lead state of its campaign's sales path (or its Target). */
@@ -84,10 +84,10 @@ export interface ChoiceRecord {
   day: number;
   campaignId: string;
   point: string;
-  options: { id: string; meanScore: number; picks: number }[];
-  /** The option with the most picks today. */
+  candidates: { id: string; meanScore: number; picks: number }[];
+  /** The candidate with the most picks today. */
   chosenId: string;
-  /** The option with the best expected value per dollar today. */
+  /** The candidate with the best expected value per dollar today. */
   bestId: string;
 }
 
@@ -366,7 +366,7 @@ export class SimulationSession {
   private readonly truePositive = new Map<string, number>();
   private readonly persons = new Map<string, Person>();
   private readonly evidence: EvidenceBook;
-  /** What a Rating that reads no evidence sees: every option at its prior. */
+  /** What a Rating that reads no evidence sees: every candidate at its prior. */
   private readonly blind: EvidenceBook;
   private readonly legCohorts: CellStore = new Map();
   private readonly picks = new Map<string, Map<string, number[]>>();
@@ -385,7 +385,7 @@ export class SimulationSession {
   private rawCounter = 0;
   private today: DaySnapshot | null = null;
   private dayPicks = new Map<string, Map<string, number>>();
-  /** Options offered per (point, campaign), ever. */
+  /** Candidates offered per (point, campaign), ever. */
   private readonly dayPicksAll = new Map<string, Set<string>>();
   /** New subjects made per campaign per day (for a volume per period). */
   private readonly madePerDay = new Map<string, number[]>();
@@ -394,6 +394,7 @@ export class SimulationSession {
     this.world = world;
     this.catalogue = world.catalogue;
     this.rng = createRng(world.seed);
+    this.treeRng = createRng(`${world.seed}|tree`);
     this.brandIds = [...new Set(world.clients.map((c) => c.brand.id))];
     const ctx = {
       catalogue: this.catalogue,
@@ -639,16 +640,28 @@ export class SimulationSession {
 
   private readonly stepsCache = new Map<string, OutcomeId[]>();
 
+  /** Cohorts with old evidence faded by the world's half-life, so a world that changes is read again. */
+  private faded(cohort: ReadonlyMap<number, Cell> | undefined): Map<number, Cell> | undefined {
+    const half = this.world.settings.memoryHalfLifeDays ?? 0;
+    if (!cohort || half <= 0) return cohort as Map<number, Cell> | undefined;
+    const out = new Map<number, Cell>();
+    for (const [d, c] of cohort) {
+      const w = Math.pow(0.5, Math.max(0, this.dayIndex - d) / half);
+      out.set(d, { t: c.t * w, s: c.s * w, f: c.f * w, c: c.c * w });
+    }
+    return out;
+  }
+
   /** A step's figures for a campaign: its own cohorts, the fleet's while it has fewer than 20 attempts of its own. */
   private stepCounts(campaign: Campaign, from: OutcomeId, to: OutcomeId): { successes: number; trials: number; costCents: number; attempts: number } {
     const plays = this.playsFor(campaign, from, to);
     const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
     const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
-    const own = legCountsOf(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`), this.dayIndex, mean, fixed);
+    const own = legCountsOf(this.faded(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
     if (own.attempts >= 20) return own;
     let acc = { successes: 0, trials: 0, costCents: 0, attempts: 0 };
     for (const c of this.campaigns()) {
-      const x = legCountsOf(this.legCohorts.get(`${c.id}${SEP}${stepKey(from, to)}`), this.dayIndex, mean, fixed);
+      const x = legCountsOf(this.faded(this.legCohorts.get(`${c.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
       acc = { successes: acc.successes + x.successes, trials: acc.trials + x.trials, costCents: acc.costCents + x.costCents, attempts: acc.attempts + x.attempts };
     }
     return acc;
@@ -658,13 +671,18 @@ export class SimulationSession {
    * Rebuild a campaign's production tree for this tick. Pull starts from the
    * Target and goes down, push starts from the start outcome and goes up; both
    * read the same tree: from each lead state, the next one toward the Target
-   * that gives the most value per dollar (a step's yield and cost are drawn
-   * from their beliefs when several steps compete, so a step with little data
-   * gets tried). A lead state with a single way up is not drawn.
+   * worth the most, value flowing backward from the Target (V = y x V(next) - c,
+   * section 8; with no value stated, the most Target Units per dollar). A step's yield is drawn from its belief when several steps
+   * compete, so a step with little data gets tried; a lead state with a single
+   * way up is not drawn.
    */
   private rebuildTree(campaign: Campaign): void {
+    const value = this.targetValue(campaign).amount;
     const next = new Map<OutcomeId, OutcomeId>();
+    // Per lead state: the chance one attempt reaches the Target, and what it spends on the way.
     const memo = new Map<OutcomeId, { p: number; k: number } | null>();
+    // No value stated anywhere: the most Target Units per dollar.
+    const worth = (x: { p: number; k: number }) => (value > 0 ? x.p * value - x.k : x.p / Math.max(x.k, 1e-9));
     const visit = (x: OutcomeId, seen: Set<OutcomeId>): { p: number; k: number } | null => {
       if (x === campaign.target) return { p: 1, k: 0 };
       if (memo.has(x)) return memo.get(x)!;
@@ -678,13 +696,12 @@ export class SimulationSession {
         const c = this.stepCounts(campaign, x, to);
         const yieldMean = (c.successes + 1) / (c.trials + 2);
         const y = outs.length > 1 ? this.treeRng.beta(c.successes + 1, Math.max(0, c.trials - c.successes) + 1) : yieldMean;
-        const cost = c.attempts > 0 ? c.costCents / 100 / c.attempts : 0.01;
-        const p = y * up.p;
-        const k = cost + y * up.k;
-        if (!best || p / Math.max(k, 1e-9) > best.p / Math.max(best.k, 1e-9)) best = { p, k, to };
+        const cost = c.attempts > 0 ? c.costCents / 100 / c.attempts : 0;
+        const here = { p: y * up.p, k: cost + y * up.k };
+        if (!best || worth(here) > worth(best)) best = { ...here, to };
       }
-      const v = best ? { p: best.p, k: best.k } : null;
       if (best) next.set(x, best.to);
+      const v = best ? { p: best.p, k: best.k } : null;
       memo.set(x, v);
       return v;
     };
@@ -903,7 +920,7 @@ export class SimulationSession {
     for (const d of a.decisions) {
       const dec = this.decisions[d]!;
       if (dec.credited) continue;
-      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "f", 1);
+      this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "f", 1);
     }
     if (status === "failed") bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "f", 1);
     a.choices.clear();
@@ -1138,7 +1155,7 @@ export class SimulationSession {
       const u = this.latestOf(conformingUnits.filter((x) => this.candidateOf(x) === dynasty));
       if (!u) return { kind: "fail", reason: `no Unit of ${dynasty}` };
       const dec = a.decisionAt.get(key);
-      if (dec !== undefined && this.decisions[dec]!.option === dynasty) this.decisionObject.set(dec, u.id);
+      if (dec !== undefined && this.decisions[dec]!.candidate === dynasty) this.decisionObject.set(dec, u.id);
       else a.served.push(u.id);
       a.objects[i] = dynasty;
       a.got.set(key, u.id);
@@ -1177,7 +1194,7 @@ export class SimulationSession {
     return head;
   }
 
-  /** Dynasties (options) of a brand outcome a brand holds in the stock. */
+  /** Dynasties (candidates) of a brand outcome a brand holds in the stock. */
   objectDynasties(brandId: string, outcome: OutcomeId): string[] {
     const out: string[] = [];
     for (const o of this.brandUnits.get(`${brandId}${SEP}${outcome}`) ?? []) {
@@ -1248,9 +1265,9 @@ export class SimulationSession {
     return this.truthOf(script, point);
   }
 
-  /** Hidden truth of an option at a point. For grading only. */
-  optionTruthAt(point: string, option: string): Partial<ScriptTruth> {
-    return this.optionTruth(point, option);
+  /** Hidden truth of a candidate at a point. For grading only. */
+  candidateTruthAt(point: string, candidate: string): Partial<ScriptTruth> {
+    return this.candidateTruth(point, candidate);
   }
 
   private truthOf(script: Script, point: string | null): ScriptTruth {
@@ -1259,10 +1276,10 @@ export class SimulationSession {
     return { ...base, ...(at ?? {}) };
   }
 
-  private optionTruth(point: string, option: string): Partial<ScriptTruth> {
-    const s = this.catalogue.headOf(option);
+  private candidateTruth(point: string, candidate: string): Partial<ScriptTruth> {
+    const s = this.catalogue.headOf(candidate);
     if (s) return this.truthOf(s, point);
-    const at = this.world.truth.at[point]?.[option];
+    const at = this.world.truth.at[point]?.[candidate];
     if (at) return at;
     return {};
   }
@@ -1302,7 +1319,7 @@ export class SimulationSession {
       const play = a.decisionAt.get(playPoint(a.from, a.to));
       if (play !== undefined) trace.add(play);
     }
-    for (const i of leg.materials) {
+    for (const i of billOf(script)) {
       const d = a.decisionAt.get(pointKey(leg.id, i));
       if (d !== undefined) trace.add(d);
       const u = this.unitById.get(materials[i]!);
@@ -1313,10 +1330,10 @@ export class SimulationSession {
     let fact: boolean;
     let recall = truth.recall ?? 1;
     let fp = truth.falsePositive ?? 0;
-    for (const i of leg.materials) {
+    for (const i of billOf(script)) {
       const d = a.decisionAt.get(pointKey(leg.id, i));
       if (d === undefined) continue;
-      const t = this.optionTruth(this.decisions[d]!.point, this.decisions[d]!.option);
+      const t = this.candidateTruth(this.decisions[d]!.point, this.decisions[d]!.candidate);
       if (t.recall !== undefined) recall *= t.recall;
       if (t.falsePositive !== undefined) fp = Math.max(fp, t.falsePositive);
     }
@@ -1368,9 +1385,9 @@ export class SimulationSession {
         p *= this.endProduct(a, trace);
         if (a.person) {
           p *= this.world.clients.find((c) => c.brand.id === a.person!.brandId)?.truthMultiplier ?? 1;
-          if (a.legIndex === 0 && this.isProactive(a.campaign)) p *= segmentMultiplier(this.world, a.person.values) * (a.recontact ? this.world.truth.recontactMult : 1);
+          if (a.from === START) p *= segmentMultiplier(this.world, a.person.values) * (a.recontact ? this.world.truth.recontactMult : 1);
         }
-        if (a.legIndex > 0 && pt.onFalseInput !== undefined && a.person && !this.truePositive.has(a.person.id) && this.catalogue.factory(this.rootFactory.get(a.person.id) ?? "")?.ours !== false) p *= pt.onFalseInput;
+        if (a.from !== a.campaign.start && pt.onFalseInput !== undefined && a.person && !this.truePositive.has(a.person.id) && this.catalogue.factory(this.rootFactory.get(a.person.id) ?? "")?.ours !== false) p *= pt.onFalseInput;
       }
       fact = p >= 1 || this.rng.next() < Math.min(0.97, p);
       if (raw && fact && kind === "lead") {
@@ -1411,9 +1428,9 @@ export class SimulationSession {
     let p = 1;
     for (const d of trace) {
       const dec = this.decisions[d]!;
-      if (dec.legTarget !== a.to || dec.attemptId !== a.id) continue;
+      if (dec.stepEnd !== a.to || dec.attemptId !== a.id) continue;
       const obj = this.decisionObject.get(d);
-      p *= obj ? this.objectTruthEnd(this.unitById.get(obj)!) : (this.optionTruth(dec.point, dec.option).end ?? 1);
+      p *= obj ? this.objectTruthEnd(this.unitById.get(obj)!) : (this.candidateTruth(dec.point, dec.candidate).end ?? 1);
     }
     for (const id of a.served) p *= this.objectTruthEnd(this.unitById.get(id)!);
     return p;
@@ -1439,11 +1456,11 @@ export class SimulationSession {
     a.spentCents += cents;
     for (const d of a.decisions) {
       const dec = this.decisions[d]!;
-      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "c", cents);
+      this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "c", cents);
     }
     // Leg economics read our own spend: what another factory charges is its cost, not ours.
-    if (ours) bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "c", cents);
-    const root = a.legIndex === 0 ? a : a.person ? this.attemptOf.get(`${a.campaign.id}${SEP}0${SEP}${a.person.id}`) : undefined;
+    if (ours) bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "c", cents);
+    const root = a.from === a.campaign.start ? a : a.person ? this.attemptFrom.get(`${a.campaign.id}${SEP}${a.campaign.start}${SEP}${a.person.id}`) : undefined;
     if (root && ours) {
       const k = `${a.campaign.id}${SEP}${root.id}`;
       const s = this.subjectsByCampaign.get(k) ?? { entryDay: root.startDay, spendCents: 0, value: 0 };
@@ -1528,13 +1545,13 @@ export class SimulationSession {
     // Credit every choice on the trace that exists for this outcome, for this subject.
     for (const d of u.trace) {
       const dec = this.decisions[d]!;
-      if (dec.credited || dec.legTarget !== u.outcome) continue;
+      if (dec.credited || dec.stepEnd !== u.outcome) continue;
       const at = this.attempts[dec.attemptId]!;
       if (at.person?.id !== u.subject) continue;
       dec.credited = true;
       // Settled as a failure when its attempt ended, and reached after all (another producer attested it).
-      if (at.status !== "open") this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "f", -1);
-      this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "s", 1);
+      if (at.status !== "open") this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "f", -1);
+      this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "s", 1);
     }
 
     // Reactive campaigns starting from this outcome: the Unit is pushed into their first leg.
@@ -1545,24 +1562,20 @@ export class SimulationSession {
       const campaign = this.campaign(cid);
       // A campaign counts what its own runs made, and what another factory brought or attested.
       if (!campaign || (u.campaignId !== null && u.campaignId !== cid)) continue;
-      const k = campaign.line.indexOf(u.outcome);
-      if (k < 0) continue;
+      // The step of this campaign that just reached its end.
+      const done = this.attemptTo.get(`${cid}${SEP}${u.outcome}${SEP}${u.subject}`);
+      if (!done && !this.pathOf(campaign).includes(u.outcome)) continue;
       if (this.today) {
         const o = (this.today.outcomes[cid] ??= {});
         o[u.outcome] = (o[u.outcome] ?? 0) + 1;
       }
-      // The leg attempt that just reached its end.
-      const done = this.attemptOf.get(`${cid}${SEP}${k}${SEP}${u.subject}`);
       if (done && !this.legDone.has(done.id)) {
         this.legDone.add(done.id);
-        bumpCell(this.legCohorts, `${cid}${SEP}${k}`, done.startDay, "s", 1);
+        bumpCell(this.legCohorts, `${cid}${SEP}${stepKey(done.from, done.to)}`, done.startDay, "s", 1);
       }
-      if (k === campaign.line.length - 1) this.creditValue(campaign, u.subject);
-      // A reactive campaign pushes the Unit on into its next leg; a proactive one pulls it from the stock.
-      else if (!this.isProactive(campaign) && campaign.status === "running" && done) {
-        const person = this.persons.get(u.subject);
-        if (person && !this.attemptOf.has(`${cid}${SEP}${k + 1}${SEP}${u.subject}`)) this.newAttempt(campaign, this.clientOf(cid)!, k + 1, person, day, u.id);
-      }
+      if (u.outcome === campaign.target) this.creditValue(campaign, u.subject);
+      // A reactive campaign pushes the Unit on up its tree; a proactive one pulls it from the stock.
+      else if (!this.isProactive(campaign) && campaign.status === "running" && done) this.push(campaign, u, day);
     }
   }
 
@@ -1571,13 +1584,16 @@ export class SimulationSession {
   private setPerson(a: Attempt, person: Person): void {
     a.person = person;
     a.subject = person.id;
-    this.attemptOf.set(`${a.campaign.id}${SEP}${a.legIndex}${SEP}${person.id}`, a);
+    this.attemptFrom.set(`${a.campaign.id}${SEP}${a.from}${SEP}${person.id}`, a);
+    this.attemptTo.set(`${a.campaign.id}${SEP}${a.to}${SEP}${person.id}`, a);
   }
   private readonly decisionObject = new Map<number, string>();
   private readonly unitTruth = new Map<string, number>();
-  /** The attempt of each campaign leg for each person. */
-  private readonly attemptOf = new Map<string, Attempt>();
-  private readonly pointLeg = new Map<string, number>();
+  /** The attempt of each campaign for each person, by the lead state it started from, and by the one it goes to. */
+  private readonly attemptFrom = new Map<string, Attempt>();
+  private readonly attemptTo = new Map<string, Attempt>();
+  /** The step's end each point was last decided for, per campaign. */
+  private readonly pointStep = new Map<string, OutcomeId>();
 
   private enroll(subject: string, campaignId: string): void {
     let s = this.enrolled.get(subject);
@@ -1596,7 +1612,7 @@ export class SimulationSession {
       bucket[campaign.id] = (bucket[campaign.id] ?? 0) + v;
     }
     if (ours) {
-      const root = this.attemptOf.get(`${campaign.id}${SEP}0${SEP}${subject}`);
+      const root = this.attemptFrom.get(`${campaign.id}${SEP}${campaign.start}${SEP}${subject}`);
       if (root) {
         const s = this.subjectsByCampaign.get(`${campaign.id}${SEP}${root.id}`);
         if (s) s.value += v;
@@ -1702,23 +1718,23 @@ export class SimulationSession {
 
   // ---- decisions and beliefs -----------------------------------------------------------
 
-  /** One choice for one subject: the universal prioritizer over the options at a point, on today's Rating. */
-  private decide(a: Attempt, point: string, options: string[], day: number, remDelay: Rem, horizon = 0): string {
-    this.evidence.offer(point, options, remDelay.mean, horizon, remDelay.fixed);
-    this.blind.offer(point, options, remDelay.mean, horizon, remDelay.fixed);
+  /** One choice for one subject: the universal prioritizer over the candidates at a point, on today's Rating. */
+  private decide(a: Attempt, point: string, candidates: string[], day: number, remDelay: Rem, horizon = 0): string {
+    this.evidence.offer(point, candidates, remDelay.mean, horizon, remDelay.fixed);
+    this.blind.offer(point, candidates, remDelay.mean, horizon, remDelay.fixed);
     const offered = this.dayPicksAll.get(`${point}${SEP}${a.campaign.id}`) ?? new Set<string>();
-    for (const o of options) offered.add(o);
+    for (const o of candidates) offered.add(o);
     this.dayPicksAll.set(`${point}${SEP}${a.campaign.id}`, offered);
-    let chosen = options[0]!;
-    if (options.length > 1) {
+    let chosen = candidates[0]!;
+    if (candidates.length > 1) {
       const value = this.legValue(a);
       const book = this.bookOf(a.client.brand.id);
-      const priced: PricedOption[] = options.map((o) => ({ id: o, ...book.belief(point, o, options, a.client.brand.id, day) }));
+      const priced: PricedCandidate[] = candidates.map((o) => ({ id: o, ...book.belief(point, o, candidates, a.client.brand.id, day) }));
       chosen = prioritize(priced, value, this.rng).chosenId;
     }
-    this.pointLeg.set(`${point}${SEP}${a.campaign.id}`, a.legIndex);
+    this.pointStep.set(`${point}${SEP}${a.campaign.id}`, a.to);
     const id = this.decisions.length;
-    this.decisions.push({ id, point, option: chosen, campaignId: a.campaign.id, brandId: a.client.brand.id, legTarget: a.to, attemptId: a.id, day, credited: false });
+    this.decisions.push({ id, point, candidate: chosen, campaignId: a.campaign.id, brandId: a.client.brand.id, stepEnd: a.to, attemptId: a.id, day, credited: false });
     a.decisions.push(id);
     a.decisionAt.set(point, id);
     this.evidence.bump(point, chosen, a.client.brand.id, day, "t", 1);
@@ -1735,7 +1751,7 @@ export class SimulationSession {
     return chosen;
   }
 
-  /** The evidence a brand's Rating reads: the ledger; a Rating script that reads no evidence gives every option its prior. */
+  /** The evidence a brand's Rating reads: the ledger; a Rating script that reads no evidence gives every candidate its prior. */
   private bookOf(brandId: string): EvidenceBook {
     const r = this.ratingOf(brandId);
     const script = r?.scriptId ? this.catalogue.script(r.scriptId) : undefined;
@@ -1747,30 +1763,30 @@ export class SimulationSession {
     return String(b?.tactics[this.world.settings.clientGroupTactic] ?? "");
   }
 
-  /** The belief about one option at one point for one client, as the brand's Rating reads it (see EvidenceBook.belief). */
-  belief(point: string, option: string, options: readonly string[], brandId: string, day: number) {
-    return this.bookOf(brandId).belief(point, option, options, brandId, day);
+  /** The belief about one candidate at one point for one client, as the brand's Rating reads it (see EvidenceBook.belief). */
+  belief(point: string, candidate: string, candidates: readonly string[], brandId: string, day: number) {
+    return this.bookOf(brandId).belief(point, candidate, candidates, brandId, day);
   }
 
-  /** The parent dynasty of a forked option (a script dynasty, or a brand dynasty such as a finer ICP). */
-  private parentOf(option: string): string | null {
-    const s = this.catalogue.versionsOf(option)[0];
+  /** The parent dynasty of a forked candidate (a script dynasty, or a brand dynasty such as a finer ICP). */
+  private parentOf(candidate: string): string | null {
+    const s = this.catalogue.versionsOf(candidate)[0];
     if (s?.parentDynasty) return s.parentDynasty;
-    return this.parentDynasty.get(option) ?? null;
+    return this.parentDynasty.get(candidate) ?? null;
   }
 
   /** The parent of each forked brand dynasty (a finer ICP). */
   private readonly parentDynasty = new Map<string, string>();
 
-  /** Value of one Unit at the end of an attempt's leg (backward from the campaign's target). */
-  private legValue(a: Attempt): number {
-    const ck = `${a.campaign.id}${SEP}${a.legIndex}`;
-    const hit = this.legValueCache.get(ck);
-    if (hit !== undefined && this.legValueDay === this.dayIndex) return hit;
+  /** Value of one Unit at the end of an attempt's step (backward from the campaign's Target, along today's tree). */
+  private legValue(a: Pick<Attempt, "campaign" | "to">): number {
+    const ck = `${a.campaign.id}${SEP}${a.to}`;
     if (this.legValueDay !== this.dayIndex) {
       this.legValueCache.clear();
       this.legValueDay = this.dayIndex;
     }
+    const hit = this.legValueCache.get(ck);
+    if (hit !== undefined) return hit;
     const v = this.computeLegValue(a);
     this.legValueCache.set(ck, v);
     return v;
@@ -1779,32 +1795,42 @@ export class SimulationSession {
   private readonly legValueCache = new Map<string, number>();
   private legValueDay = -1;
 
-  private computeLegValue(a: Attempt): number {
+  private computeLegValue(a: Pick<Attempt, "campaign" | "to">): number {
     const target = this.targetValue(a.campaign).amount;
-    const legs = this.legEstimates(a.campaign, this.dayIndex);
-    const { values } = valueBackwardLine(legs.map((l) => ({ costPerAttempt: l.costPerAttempt ?? 0, yieldRate: l.yieldRate ?? 0.5 })), target);
-    return Math.max(values[a.legIndex + 1] ?? target, target * 0.01);
+    const steps: { costPerAttempt: number; yieldRate: number }[] = [];
+    for (let x: OutcomeId | null = a.to, n = 0; x && x !== a.campaign.target && n < 20; n++) {
+      const to: OutcomeId | null = this.nextOf(a.campaign, x);
+      if (!to) break;
+      const e = this.stepEstimate(a.campaign, x, to);
+      steps.push({ costPerAttempt: e.costPerAttempt ?? 0, yieldRate: e.yieldRate ?? 0.5 });
+      x = to;
+    }
+    const { values } = valueBackwardLine(steps, target);
+    return Math.max(values[0] ?? target, target * 0.01);
   }
 
-  // ---- reports ---------------------------------------------------------------------------
+  // ---- reports: the views ------------------------------------------------------------
 
-  /** Where a campaign's line starts: Start, or its start outcome. */
+  /** Where a campaign's tree starts: Start, or its start outcome. */
   startOf(campaign: Campaign): OutcomeId {
     return campaign.start;
   }
 
-  /** The sales path a campaign runs (named on first sight). */
+  /** The sales path a campaign's tree runs today (a view, named on first sight). */
   salesPathOf(campaign: Campaign) {
-    return this.catalogue.peekSalesPath(campaign.start, campaign.line);
+    return this.catalogue.peekSalesPath(campaign.start, this.pathOf(campaign));
   }
 
-  /** The leg playing each leg of a campaign today: its pinned play, else the play picked most over the last 7 days. */
+  /** The steps of the sales path the tree runs today, from one lead state to the next. */
+  stepsOf(campaign: Campaign): { from: OutcomeId; to: OutcomeId }[] {
+    const line = this.pathOf(campaign);
+    return line.map((to, k) => ({ from: k === 0 ? campaign.start : line[k - 1]!, to }));
+  }
+
+  /** The leg that made each lead state of today's sales path: the play picked most over the last 7 days. */
   playsToday(campaign: Campaign): (string | null)[] {
-    return campaign.line.map((to, k) => {
-      const from = k === 0 ? campaign.start : campaign.line[k - 1]!;
+    return this.stepsOf(campaign).map(({ from, to }) => {
       const plays = this.playsFor(campaign, from, to);
-      const pinned = campaign.pinned?.[k];
-      if (pinned && plays.some((p) => p.id === pinned)) return pinned;
       let best: string | null = plays[0]?.id ?? null;
       let bestN = 0;
       for (const [o, arr] of this.pickSeries(playPoint(from, to), campaign.id)) {
@@ -1819,78 +1845,132 @@ export class SimulationSession {
   }
 
   /**
-   * The sales funnel a campaign runs today: its sales path and the play of each
-   * leg. `name` stores the names (the session does it once a day, in campaign
-   * order, so a seed always gives the same names); otherwise nothing is stored.
+   * The sales funnel a campaign's tree runs today (a view): its sales path and
+   * the leg that made each lead state. `name` stores the names (the session does
+   * it once a day, in campaign order, so a seed always gives the same names);
+   * otherwise nothing is stored.
    */
   salesFunnelOf(campaign: Campaign, name = false) {
+    const line = this.pathOf(campaign);
+    if (line.length === 0) return null;
     const plays = this.playsToday(campaign);
     if (plays.some((p) => p === null)) return null;
-    return name ? this.catalogue.nameSalesFunnel(campaign.start, campaign.line, plays as string[]) : this.catalogue.peekSalesFunnel(campaign.start, campaign.line, plays as string[]);
+    return name ? this.catalogue.nameSalesFunnel(campaign.start, line, plays as string[]) : this.catalogue.peekSalesFunnel(campaign.start, line, plays as string[]);
   }
 
   /**
-   * Every leg a leg runs through, in the order they run: the leg providing
-   * each Material of the leg's play (the script picked most at that Material
-   * over the last 7 days, else the first allowed), down to the leg's start,
-   * then the play itself. `main` marks the chain that carries the subject; the
-   * others feed a Material of a leg on it (a research, a model call).
-   * `campaign` null reads the picks of every campaign (a funnel not launched yet).
+   * Every leg a step runs through, in the order they run: the explosion of the
+   * Bill of materials of the script each leg runs most (over the last 7 days,
+   * else the first allowed), each Material with the leg that supplies it, down
+   * to the step's start, then the play itself. `main` marks the chain that
+   * carries the subject; the others feed a Material of a leg on it (a research,
+   * a model call). `campaign` null reads the picks of every campaign.
    */
-  legPipes(play: string, from: OutcomeId, campaign: Campaign | null): LegPipe[] {
-    const out: LegPipe[] = [];
+  legsOfStep(play: string, from: OutcomeId, campaign: Campaign | null): StepLeg[] {
+    const out: StepLeg[] = [];
     const seen = new Set<string>();
-    const strategic = campaign ?? ({ strategies: {}, start: from } as unknown as Campaign);
+    const strategic = campaign ?? ({ strategies: {}, start: from, target: from } as unknown as Campaign);
     const starts = this.startsOf(strategic);
-    const visit = (legId: string, feeds: { leg: string; material: OutcomeId } | null, main: boolean) => {
+    const mostPicked = (point: string, fallback: string | null): string | null => {
+      let best = fallback;
+      let bestN = 0;
+      for (const [c, arr] of this.pickSeries(point, campaign?.id)) {
+        const n = arr.slice(-7).reduce((x, y) => x + y, 0);
+        if (n > bestN || (n === bestN && n > 0 && best !== null && c < best)) {
+          best = c;
+          bestN = n;
+        }
+      }
+      return best;
+    };
+    const visit = (legId: string, script: Script | null, feeds: { leg: string; material: OutcomeId } | null, main: boolean) => {
       if (seen.has(legId)) return;
       seen.add(legId);
       const leg = this.catalogue.leg(legId);
       if (!leg) return;
-      const subject = this.catalogue.subjectMaterial(leg);
-      const order = subject ? [subject, ...leg.materials.filter((i) => i !== subject)] : [...leg.materials];
+      const runs = script ?? this.catalogue.dynastiesOf(legId)[0] ?? null;
+      const bill = runs ? billOf(runs) : [];
+      const subject = runs ? this.catalogue.subjectOf(runs) : null;
+      const order = subject ? [subject, ...bill.filter((i) => i !== subject)] : bill;
+      const supplied: { material: OutcomeId; leg: string | null }[] = [];
       for (const i of order) {
         const o = this.catalogue.outcome(i);
-        if (!o || o.track || i === from || o.contentType === "rating") continue;
+        if (!o) continue;
+        if (o.track || i === from || o.contentType === "rating") {
+          supplied.push({ material: i, leg: null });
+          continue;
+        }
         const providers = this.catalogue.providersOf(i).filter((p) => !p.webhook);
-        const series = this.pickSeries(pointKey(leg.id, i), campaign?.id);
+        const series = this.pickSeries(pointKey(legId, i), campaign?.id);
         let candidates: Leg[];
         if (o.subject === "brand") candidates = providers.filter((p) => this.catalogue.dynastiesOf(p.id).some((s) => series.has(s.dynasty)));
         else if (o.subject === "run") candidates = providers;
         else candidates = providers.filter((p) => this.catalogue.rootsOf(p, starts).has(from) || this.catalogue.rootsOf(p).has(START));
-        if (candidates.length === 0) continue;
-        const scripts = this.allowedScripts(strategic, leg, i, candidates);
-        let best = scripts[0]?.dynasty ?? null;
-        let bestN = 0;
-        for (const [opt, arr] of series) {
-          const n = arr.slice(-7).reduce((x, y) => x + y, 0);
-          if (n > bestN || (n === bestN && n > 0 && best !== null && opt < best)) {
-            best = opt;
-            bestN = n;
-          }
+        if (candidates.length === 0 || !runs) {
+          supplied.push({ material: i, leg: null });
+          continue;
         }
-        const provider = (best ? this.catalogue.headOf(best)?.legId : undefined) ?? candidates[0]?.id;
-        if (provider) visit(provider, { leg: leg.id, material: i }, main && i === subject);
+        const scripts = this.allowedScripts(strategic, { leg, script: runs }, i, candidates);
+        const best = mostPicked(pointKey(legId, i), scripts[0]?.dynasty ?? null);
+        const head = best ? this.catalogue.headOf(best) : undefined;
+        const provider = head?.legId ?? candidates[0]?.id;
+        supplied.push({ material: i, leg: provider ?? null });
+        if (provider) visit(provider, head && head.legId === provider ? head : null, { leg: legId, material: i }, main && i === subject);
       }
-      out.push({ legId, output: leg.output, feeds, main });
+      out.push({ legId, output: leg.output, scriptId: runs?.id ?? null, materials: supplied, feeds, main });
     };
-    visit(play, null, true);
+    const end = this.catalogue.leg(play)?.output ?? from;
+    const stepScript = mostPicked(pointKey(stepConsumer(from, end), end), null);
+    const head = stepScript ? this.catalogue.headOf(stepScript) : undefined;
+    visit(play, head && head.legId === play ? head : null, null, true);
     return out;
   }
 
-  /** Every leg each leg of a campaign runs through today (see `legPipes`), leg by leg. */
-  campaignPipes(campaign: Campaign): LegPipe[][] {
+  /** Every leg each step of a campaign's tree runs through today (see `legsOfStep`), step by step. */
+  campaignLegs(campaign: Campaign): StepLeg[][] {
     const plays = this.playsToday(campaign);
-    return campaign.line.map((_, k) => {
+    return this.stepsOf(campaign).map(({ from }, k) => {
       const play = plays[k];
-      return play ? this.legPipes(play, k === 0 ? campaign.start : campaign.line[k - 1]!, campaign) : [];
+      return play ? this.legsOfStep(play, from, campaign) : [];
     });
   }
 
-  /** The value of one target outcome of a campaign: stated, else the fleet median of stated ones. */
+  /**
+   * The production tree a campaign actually used over the last 7 days, per
+   * outcome it made: each branch (the leg that made it), its share of the Units
+   * and its cost of this step per Unit.
+   */
+  productionTree(campaignId: string, days = 7): { outcome: OutcomeId; units: number; branches: { legId: string; units: number; share: number; costPerUnit: number | null }[] }[] {
+    const since = this.dayIndex - days;
+    const made = new Map<OutcomeId, Map<string, number>>();
+    const spend = new Map<string, number>();
+    const unitsOfRun = new Set<string>();
+    for (const u of this.units) {
+      if (u.campaignId !== campaignId || u.day < since || !u.legId) continue;
+      const m = made.get(u.outcome) ?? new Map<string, number>();
+      m.set(u.legId, (m.get(u.legId) ?? 0) + 1);
+      made.set(u.outcome, m);
+      unitsOfRun.add(u.runId);
+    }
+    for (const r of this.runs) {
+      if (r.campaignId !== campaignId || r.day < since || !r.legId) continue;
+      spend.set(r.legId, (spend.get(r.legId) ?? 0) + r.spendCents);
+    }
+    const out: { outcome: OutcomeId; units: number; branches: { legId: string; units: number; share: number; costPerUnit: number | null }[] }[] = [];
+    for (const [outcome, byLeg] of made) {
+      const total = [...byLeg.values()].reduce((x, y) => x + y, 0);
+      const branches = [...byLeg]
+        .map(([legId, units]) => ({ legId, units, share: units / total, costPerUnit: units > 0 ? (spend.get(legId) ?? 0) / 100 / units : null }))
+        .sort((x, y) => y.units - x.units || (x.legId < y.legId ? -1 : 1));
+      out.push({ outcome, units: total, branches });
+    }
+    return out;
+  }
+
+  /** The value of one Target Unit of a campaign: stated, else the fleet median of stated ones. */
   targetValue(campaign: Campaign): { amount: number; label: "stated" | "expected" } {
     const offer = this.world.clients.find((c) => c.offer.id === campaign.offerId)?.offer;
-    const target = campaign.line[campaign.line.length - 1]!;
+    const target = campaign.target;
     const stated = offer?.outcomeValues?.[target] ?? (this.isTop(target) ? offer?.lifetimeRevenue : undefined);
     if (stated !== undefined) return { amount: stated, label: "stated" };
     const all = this.world.clients.map((c) => c.offer.outcomeValues?.[target] ?? (this.isTop(target) ? c.offer.lifetimeRevenue : undefined)).filter((x): x is number => x !== undefined && x > 0).sort((x, y) => x - y);
@@ -1904,22 +1984,24 @@ export class SimulationSession {
     return !this.catalogue.outcomes.some((o) => o.track?.track === t.track && o.track.rank > t.rank);
   }
 
-  /** Each leg of a campaign as the decisions read it: censoring-corrected yield and measured cost per attempt. */
-  legEstimates(campaign: Campaign, day = this.dayIndex): CampaignEconomics["legs"] {
-    return campaign.line.map((to, k) => {
-      const from = k === 0 ? campaign.start : campaign.line[k - 1]!;
-      const plays = this.playsFor(campaign, from, to);
-      const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
-      const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
-      return { from, to, ...legEstimateOf(this.legCohorts.get(`${campaign.id}${SEP}${k}`), day, mean, fixed) };
-    });
+  /** One step of a campaign as the decisions read it: censoring-corrected yield and measured cost per attempt. */
+  stepEstimate(campaign: Campaign, from: OutcomeId, to: OutcomeId, day = this.dayIndex): StepEstimate {
+    const plays = this.playsFor(campaign, from, to);
+    const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
+    const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
+    return { from, to, ...legEstimateOf(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`), day, mean, fixed) };
   }
 
-  /** Mean delay from a leg's start to its end through a leg (the longest chain of subject Materials, a tick per leg). */
+  /** Each step of the sales path a campaign's tree runs today. */
+  stepEstimates(campaign: Campaign, day = this.dayIndex): StepEstimate[] {
+    return this.stepsOf(campaign).map(({ from, to }) => this.stepEstimate(campaign, from, to, day));
+  }
+
+  /** Mean delay from a step's start to its end through a leg (the longest chain of subject Materials, a tick per leg). */
   legDelayMean(leg: Leg, campaign: Campaign | null = null, seen = new Set<string>()): number {
     if (seen.has(leg.id)) return 0;
     seen.add(leg.id);
-    const ordered = leg.materials.some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
+    const ordered = this.catalogue.materialsOf(leg).some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
     const own = tickDelay(this.world.truth.legs[leg.id]?.delayMeanDays ?? leg.maturity.delayMeanDays, this.ticksPerDay) + ordered / this.ticksPerDay;
     const s = this.catalogue.subjectMaterial(leg);
     const out = s ? this.catalogue.outcome(s) : undefined;
@@ -1927,22 +2009,22 @@ export class SimulationSession {
     return own + Math.max(0, ...this.catalogue.providersOf(s).filter((p) => !p.webhook).map((p) => this.legDelayMean(p, campaign, new Set(seen))));
   }
 
-  /** Days certain from a leg's start to its end through a leg: one per leg on its longest chain, and one per ordered Material. */
+  /** Days certain from a step's start to its end through a leg: one per leg on its longest chain, and one per ordered Material. */
   legFixedDays(leg: Leg, campaign: Campaign | null = null, seen = new Set<string>()): number {
     if (seen.has(leg.id)) return 0;
     seen.add(leg.id);
-    const own = this.pipeTicks(leg).fixed;
+    const own = this.legTicks(leg).fixed;
     const s = this.catalogue.subjectMaterial(leg);
     const out = s ? this.catalogue.outcome(s) : undefined;
     if (!s || out?.track || (campaign && s === campaign.start)) return own;
     return own + Math.max(0, ...this.catalogue.providersOf(s).filter((p) => !p.webhook).map((p) => this.legFixedDays(p, campaign, new Set(seen))));
   }
 
-  /** Expected and measured return of a campaign, on the same formula: value / cost per target. */
+  /** Expected and measured return of a campaign, on the same formula: value / cost per Target Unit. */
   economics(campaignId: string): CampaignEconomics {
     const campaign = this.campaign(campaignId)!;
     const tv = this.targetValue(campaign);
-    const legs = this.legEstimates(campaign);
+    const steps = this.stepEstimates(campaign);
     let spendCents = 0;
     let valueOurs = 0;
     let valueOther = 0;
@@ -1953,19 +2035,19 @@ export class SimulationSession {
     }
     // Expected: the chain formula on the decision estimates, with a delta-method interval.
     let expected: CampaignEconomics["expected"] = { value: null, low: null, high: null };
-    if (legs.every((l) => l.yieldRate !== null && l.costPerAttempt !== null)) {
-      const chain = legs.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }));
+    if (steps.length > 0 && steps.every((l) => l.yieldRate !== null && l.costPerAttempt !== null)) {
+      const chain = steps.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }));
       const t = chainCostPerTarget(chain);
       if (Number.isFinite(t) && t > 0) {
         const v = tv.amount / t;
         let rel2 = 0;
-        for (const l of legs) if (l.attempts > 0 && l.yieldRate) rel2 += (1 - l.yieldRate) / (l.attempts * l.yieldRate);
+        for (const l of steps) if (l.attempts > 0 && l.yieldRate) rel2 += (1 - l.yieldRate) / (l.attempts * l.yieldRate);
         const rel = Math.sqrt(rel2);
         expected = { value: v, low: v * Math.exp(-1.96 * rel), high: v * Math.exp(1.96 * rel) };
       }
     }
-    // Measured on the mature basis: subjects that entered before the funnel's delay horizon.
-    const horizon = Math.ceil(legs.reduce((s, l) => s + Math.max(0, ...this.playsFor(campaign, l.from, l.to).map((p) => this.legDelayMean(p, campaign))) * 3, 0));
+    // Measured on the mature basis: subjects that entered before the tree's delay horizon.
+    const horizon = Math.ceil(steps.reduce((s, l) => s + Math.max(0, ...this.playsFor(campaign, l.from, l.to).map((p) => this.legDelayMean(p, campaign))) * 3, 0));
     const cutoffDay = this.dayIndex - horizon;
     let mSpend = 0;
     let mValue = 0;
@@ -1985,10 +2067,30 @@ export class SimulationSession {
       spendCents: mSpend,
       cutoffDay,
     };
-    return { campaignId, spendCents, valueOurs, valueOther, targetsOurs: tv.amount > 0 ? Math.round(valueOurs / tv.amount) : 0, measured, expected, legs, targetValue: tv.amount, valueLabel: tv.label };
+    return { campaignId, spendCents, valueOurs, valueOther, targetsOurs: tv.amount > 0 ? Math.round(valueOurs / tv.amount) : 0, measured, expected, steps, targetValue: tv.amount, valueLabel: tv.label };
   }
 
-  /** Picks per day per option at a point, for one campaign (or every campaign). */
+  /**
+   * The rows of a campaign page: per step of today's sales path, its attempts
+   * per Target Unit, its cost of this step per outcome and its cost from Start
+   * (cumulative: the one the return reads).
+   */
+  stepCosts(campaign: Campaign): { from: OutcomeId; to: OutcomeId; attemptsPerTarget: number | null; costOfStep: number | null; costFromStart: number | null }[] {
+    const steps = this.stepEstimates(campaign);
+    const ok = steps.every((l) => l.yieldRate !== null && l.costPerAttempt !== null && l.yieldRate > 0);
+    const chain = ok ? steps.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! })) : [];
+    const forward = ok ? costForwardLine(chain) : [];
+    const per = ok ? legBreakdown(chain) : [];
+    return steps.map((l, k) => ({
+      from: l.from,
+      to: l.to,
+      attemptsPerTarget: ok ? per[k]!.leadsNeeded : null,
+      costOfStep: l.yieldRate && l.costPerAttempt !== null ? l.costPerAttempt / l.yieldRate : null,
+      costFromStart: ok ? forward[k]! : null,
+    }));
+  }
+
+  /** Picks per day per candidate at a point, for one campaign (or every campaign). */
   pickSeries(point: string, campaignId?: string): Map<string, number[]> {
     const out = new Map<string, number[]>();
     for (const [k, series] of this.picks) {
@@ -2012,8 +2114,8 @@ export class SimulationSession {
     });
   }
 
-  /** The options a campaign has at a point today (a brand point offers the brand's own dynasties in the stock). */
-  optionsFor(point: string, campaign: Campaign): string[] {
+  /** The candidates a campaign has at a point today (a brand point offers the brand's own dynasties in the stock). */
+  candidatesFor(point: string, campaign: Campaign): string[] {
     const material = point.split("|")[1] ?? "";
     const out = this.catalogue.outcome(material);
     if (out?.subject === "brand") {
@@ -2021,49 +2123,44 @@ export class SimulationSession {
       if (held.length > 0) return held;
     }
     const seen = new Set(this.dayPicksAll.get(`${point}${SEP}${campaign.id}`) ?? []);
-    const offered = this.optionsAt(point).filter((o) => seen.has(o));
-    return offered.length > 0 ? offered : this.optionsAt(point);
+    const offered = this.candidatesAt(point).filter((o) => seen.has(o));
+    return offered.length > 0 ? offered : this.candidatesAt(point);
   }
 
-  /** The options ever offered at a point. */
-  optionsAt(point: string): string[] {
-    return [...(this.evidence.pointOptions.get(point) ?? [])];
+  /** The candidates ever offered at a point. */
+  candidatesAt(point: string): string[] {
+    return [...(this.evidence.pointCandidates.get(point) ?? [])];
   }
 
-  /** Today's belief of each option at a point, for a campaign: mean rate, its spread, mean cost, mean value per dollar. */
-  beliefsAt(point: string, campaignId: string): { option: string; rate: number; rateSd: number; cost: number; valuePerDollar: number; decisions: number; successes: number }[] {
+  /** Today's belief of each candidate at a point, for a campaign: mean rate, its spread, mean cost, mean value per dollar. */
+  beliefsAt(point: string, campaignId: string): { candidate: string; rate: number; rateSd: number; cost: number; valuePerDollar: number; decisions: number; successes: number }[] {
     const campaign = this.campaign(campaignId);
     if (!campaign) return [];
-    const options = this.optionsFor(point, campaign);
+    const candidates = this.candidatesFor(point, campaign);
     const brandId = campaign.brandId;
     const delay = this.evidence.delayOf(point);
-    const fake = { campaign, client: this.clientOf(campaignId)!, legIndex: Math.max(0, this.legOfPoint(campaign, point)) } as Attempt;
-    const value = this.legValue(fake);
-    return options.map((o) => {
-      const b = this.belief(point, o, options, brandId, this.dayIndex);
+    const value = this.legValue({ campaign, to: this.pointStep.get(`${point}${SEP}${campaign.id}`) ?? campaign.target });
+    return candidates.map((o) => {
+      const b = this.belief(point, o, candidates, brandId, this.dayIndex);
       const c = this.evidence.counts(point, o, [brandId], this.dayIndex, delay);
-      return { option: o, rate: betaMean(b.posterior), rateSd: Math.sqrt(betaVariance(b.posterior)), cost: b.cost.mean, valuePerDollar: (betaMean(b.posterior) * value) / Math.max(b.cost.mean, 1e-6), decisions: c.n, successes: c.successes };
+      return { candidate: o, rate: betaMean(b.posterior), rateSd: Math.sqrt(betaVariance(b.posterior)), cost: b.cost.mean, valuePerDollar: (betaMean(b.posterior) * value) / Math.max(b.cost.mean, 1e-6), decisions: c.n, successes: c.successes };
     });
-  }
-
-  private legOfPoint(campaign: Campaign, point: string): number {
-    return this.pointLeg.get(`${point}${SEP}${campaign.id}`) ?? 0;
   }
 
   private logChoices(day: number): void {
     for (const [k, picks] of this.dayPicks) {
       const [point, campaignId] = k.split(SEP) as [string, string];
-      const options = [...(this.dayPicksAll.get(k) ?? [])];
-      if (options.length < 2) continue;
+      const candidates = [...(this.dayPicksAll.get(k) ?? [])];
+      if (candidates.length < 2) continue;
       const campaign = this.campaign(campaignId)!;
       const brandId = campaign.brandId;
-      const scored = options.map((o) => {
-        const b = this.belief(point, o, options, brandId, day);
+      const scored = candidates.map((o) => {
+        const b = this.belief(point, o, candidates, brandId, day);
         return { id: o, meanScore: betaMean(b.posterior) / Math.max(b.cost.mean, 1e-6), picks: picks.get(o) ?? 0 };
       });
       const chosenId = [...scored].sort((x, y) => y.picks - x.picks || (x.id < y.id ? -1 : 1))[0]!.id;
       const bestId = [...scored].sort((x, y) => y.meanScore - x.meanScore || (x.id < y.id ? -1 : 1))[0]!.id;
-      this.choices.push({ day, campaignId, point, options: scored, chosenId, bestId });
+      this.choices.push({ day, campaignId, point, candidates: scored, chosenId, bestId });
     }
   }
 
@@ -2082,7 +2179,7 @@ export class SimulationSession {
       // The audience most served so far is the parent; the split looks inside the people it brought.
       const icpCount = new Map<string, number>();
       for (const a of this.attempts) {
-        if (a.campaign.id !== campaign.id || a.legIndex !== 0) continue;
+        if (a.campaign.id !== campaign.id || a.from !== START) continue;
         const dyn = a.objects[audience];
         if (dyn) icpCount.set(dyn, (icpCount.get(dyn) ?? 0) + 1);
       }
@@ -2092,7 +2189,7 @@ export class SimulationSession {
       if (!parent) continue;
       const records: SplitRecord[] = [];
       for (const a of this.attempts) {
-        if (a.campaign.id !== campaign.id || a.legIndex !== 0 || !a.person || a.startDay > mature || a.objects[audience] !== parentDyn) continue;
+        if (a.campaign.id !== campaign.id || a.from !== START || !a.person || a.startDay > mature || a.objects[audience] !== parentDyn) continue;
         records.push({ values: a.person.values, success: this.reached.get(a.person.id)?.has(a.to) ?? false, stratum: `${campaign.brandId}|month-${Math.floor(a.startDay / 30)}` });
       }
       const study = studySplits(records, leadTactics);
@@ -2116,7 +2213,8 @@ export class SimulationSession {
       this.addUnit(u);
       this.proposals.push({ day, kind: "audience", brandId, campaignId: campaign.id, point: null, conditions, text, createdId: u.id, study });
       // The same conditions, as a strategy a play can choose (who the play serves).
-      const play = this.playsFor(campaign, START, campaign.line[0]!)[0];
+      const firstStep = this.nextOf(campaign, START);
+      const play = firstStep ? this.playsFor(campaign, START, firstStep)[0] : undefined;
       if (play) {
         const sid = `${play.id}#proposed-${brandId}-${day}`;
         if (!this.catalogue.strategy(sid)) {
@@ -2125,8 +2223,8 @@ export class SimulationSession {
         }
       }
     }
-    // Splits on scripts: per point, the tactic values of the option chosen.
-    for (const point of this.evidence.pointOptions.keys()) {
+    // Splits on scripts: per point, the tactic values of the candidate chosen.
+    for (const point of this.evidence.pointCandidates.keys()) {
       const [consumer, material] = point.split("|") as [string, string];
       const consumerPipe = this.catalogue.leg(consumer);
       if (!consumerPipe || !material) continue;
@@ -2134,7 +2232,7 @@ export class SimulationSession {
       const records: SplitRecord[] = [];
       for (const d of this.decisions) {
         if (d.point !== point || d.day > mature) continue;
-        const s = this.catalogue.headOf(d.option);
+        const s = this.catalogue.headOf(d.candidate);
         if (!s) continue;
         records.push({ values: s.tactics, success: d.credited, stratum: `${d.brandId}|month-${Math.floor(d.day / 30)}` });
       }
@@ -2175,35 +2273,35 @@ export class SimulationSession {
   }
 
   /** Attempts of a campaign's legs (for the lead timeline and reports). */
-  attemptsOf(subject: string): { campaignId: string; legIndex: number; from: string; to: string; startDay: number; status: string; spentCents: number }[] {
-    return this.attempts.filter((a) => a.person?.id === subject).map((a) => ({ campaignId: a.campaign.id, legIndex: a.legIndex, from: a.from, to: a.to, startDay: a.startDay, status: a.status, spentCents: a.spentCents }));
+  attemptsOf(subject: string): { campaignId: string; from: string; to: string; startDay: number; status: string; spentCents: number }[] {
+    return this.attempts.filter((a) => a.person?.id === subject).map((a) => ({ campaignId: a.campaign.id, from: a.from, to: a.to, startDay: a.startDay, status: a.status, spentCents: a.spentCents }));
   }
 
   /** Attempts of a campaign: the leg, the Unit it started from, when, and how it ended. */
-  campaignAttempts(campaignId: string): { legIndex: number; startUnit: string | null; startDay: number; status: string; subject: string | null }[] {
-    return this.attempts.filter((a) => a.campaign.id === campaignId).map((a) => ({ legIndex: a.legIndex, startUnit: a.startUnit, startDay: a.startDay, status: a.status, subject: a.person?.id ?? null }));
+  campaignAttempts(campaignId: string): { from: OutcomeId; to: OutcomeId; startUnit: string | null; startDay: number; status: string; subject: string | null }[] {
+    return this.attempts.filter((a) => a.campaign.id === campaignId).map((a) => ({ from: a.from, to: a.to, startUnit: a.startUnit, startDay: a.startDay, status: a.status, subject: a.person?.id ?? null }));
   }
 
   /**
    * What a leg costs and yields across the fleet today (every campaign with this leg),
    * for proposing funnels to a new campaign. Null when no campaign ran it yet.
    */
-  fleetLegEstimate(from: OutcomeId, to: OutcomeId): { costPerAttempt: number; yieldRate: number; label: "measured" } | null {
+  fleetStepEstimate(from: OutcomeId, to: OutcomeId): { costPerAttempt: number; yieldRate: number; label: "measured" } | null {
     let att = 0;
-    let s = 0;
+    let y = 0;
     let c = 0;
     for (const campaign of this.campaigns()) {
-      const legs = this.legEstimates(campaign);
-      for (const l of legs) {
-        if (l.from !== from || l.to !== to || l.yieldRate === null || l.costPerAttempt === null) continue;
-        att += l.attempts;
-        s += l.yieldRate * l.attempts;
-        c += l.costPerAttempt * l.attempts;
-      }
+      if (!this.playsFor(campaign, from, to).length) continue;
+      const l = this.stepEstimate(campaign, from, to);
+      if (l.yieldRate === null || l.costPerAttempt === null || l.attempts === 0) continue;
+      att += l.attempts;
+      y += l.yieldRate * l.attempts;
+      c += l.costPerAttempt * l.attempts;
     }
     if (att === 0) return null;
-    return { costPerAttempt: c / att, yieldRate: s / att, label: "measured" };
+    return { costPerAttempt: c / att, yieldRate: y / att, label: "measured" };
   }
+
 
   /** Number of attempts of a campaign (or of every campaign). */
   attemptCount(campaignId?: string): number {
@@ -2216,12 +2314,14 @@ export class SimulationSession {
   }
 }
 
-/** One leg a leg runs through: what it makes, and the Material of the leg it feeds (null for the leg's play). */
-export interface LegPipe {
+/** One leg a step runs through: what it makes, the script it runs most, each Material with the leg that supplies it (null: the stock or the step's start), and the Material of the leg it feeds (null for the step's play). */
+export interface StepLeg {
   legId: string;
   output: OutcomeId;
+  scriptId: string | null;
+  materials: { material: OutcomeId; leg: string | null }[];
   feeds: { leg: string; material: OutcomeId } | null;
-  /** On the chain that carries the leg's subject from its start to its end. */
+  /** On the chain that carries the step's subject from its start to its end. */
   main: boolean;
 }
 

@@ -8,7 +8,7 @@ import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
 import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
-import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
+import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar, SelectItem } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
 import { campaignLegs, legEndOfPoints, playedPipes } from "@/lib/campaigns";
 import { outcomeLabel, pipeLine, pointsOf, scopedCampaigns, targetOf, type Model, type PointRow } from "@/lib/model";
@@ -473,10 +473,10 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
           onChange={(e) => setError(dispatch({ type: "strategy", campaignId: campaign.id, pipeId: pipe.id, strategyId: e.target.value }))}
         >
           {strategies.map((s) => (
-            <option key={s.id} value={s.id}>
+            <SelectItem key={s.id} value={s.id}>
               {s.id === defaultStrategyId(pipe.id) ? "Default: every script" : s.name}
               {s.proposed ? " (proposed by a split)" : ""}
-            </option>
+            </SelectItem>
           ))}
         </select>
       </label>
@@ -506,10 +506,10 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
   );
 }
 
-/** One choice point: its options, their share of picks, the engine's belief, the hidden best. */
+/** One choice point: its candidates, their share of picks, the engine's belief, the hidden best. */
 function PointCard({ model, campaign, point }: { model: Model; campaign: Campaign; point: PointRow }) {
   const legEnd = legEndOfPoints(model, campaign).get(point.info.key) ?? targetOf(campaign);
-  const sorted = useMemo(() => [...point.options].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.options]);
+  const sorted = useMemo(() => [...point.candidates].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.candidates]);
   return (
     <div className="k-card overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-3">
@@ -528,7 +528,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
         <table className="mt-2 w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Option</th>
+              <th className={TH}>Candidate</th>
               <th className={`${TH} text-right`}>Share, 7 days</th>
               <th className={`${TH} text-right`}>Value per $1</th>
               <th className={`${TH} text-right`}>$ from here</th>
@@ -538,7 +538,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
           </thead>
           <tbody>
             {sorted.map((o) => (
-              <tr key={o.option} className="k-row k-line-subtle border-b last:border-b-0">
+              <tr key={o.candidate} className="k-row k-line-subtle border-b last:border-b-0">
                 <td className={TD}>
                   <span className="flex items-center gap-2">
                     <span className="truncate">{o.label}</span>

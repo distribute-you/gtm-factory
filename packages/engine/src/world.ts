@@ -279,11 +279,11 @@ export interface WorldData {
 }
 
 /** Build a world from its data. The data is cloned: a world never edits its source. */
-export function loadWorld(data: WorldData, options: { seed?: number | string; Catalogue: typeof import("./catalogue").Catalogue }): WorldSpec {
+export function loadWorld(data: WorldData, candidates: { seed?: number | string; Catalogue: typeof import("./catalogue").Catalogue }): WorldSpec {
   const copy = JSON.parse(JSON.stringify(data)) as WorldData;
   return {
-    seed: options.seed ?? copy.seed,
-    catalogue: new options.Catalogue(copy.catalogue),
+    seed: candidates.seed ?? copy.seed,
+    catalogue: new candidates.Catalogue(copy.catalogue),
     clients: copy.clients,
     attributes: copy.attributes,
     truth: copy.truth,

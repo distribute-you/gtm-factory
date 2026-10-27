@@ -51,7 +51,7 @@ describe("read models", () => {
   it("lists every choice of a campaign with beliefs and the hidden best", () => {
     const points = pointsOf(model, model.campaigns[0]!);
     expect(points.length).toBeGreaterThan(5);
-    const graded = points.filter((p) => p.options.length > 1 && p.options.some((o) => o.isHiddenBest));
+    const graded = points.filter((p) => p.candidates.length > 1 && p.candidates.some((o) => o.isHiddenBest));
     expect(graded.length).toBeGreaterThan(5);
   });
 
@@ -155,7 +155,7 @@ describe("a funnel line and its plays describe the same pipes", () => {
         const picked = [...session.pickSeries(p.point, c.id).values()].some((arr) => arr.slice(-7).some((n) => n > 0));
         const onLine = drawn.includes(consumer.id);
         if (picked && !onLine) {
-          // Only a pipe the leg does not run today (another option at a Material) may be left out.
+          // Only a pipe the leg does not run today (another candidate at a Material) may be left out.
           const alternatives = session.choicePoints().filter((x) => x.campaignId === c.id && !x.point.startsWith("play:"));
           expect(alternatives.length).toBeGreaterThan(0);
         }

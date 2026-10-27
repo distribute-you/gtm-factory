@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ApiNewObjectVersion, ApiObjectDynasty, ApiObjectVersion, ApiScriptStats } from "@gtm-factory/engine";
 import { Mark } from "@/components/mark";
-import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
+import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
 import { outcomeName, pipeTitle } from "@/lib/api/labels";
@@ -170,11 +170,11 @@ function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; 
         {mode !== "upgrade" && (
           <Field label="Brand">
             <select className="k-input w-full px-1.5" style={{ font: "inherit" }} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-              <option value="">Every brand</option>
+              <SelectItem value="">Every brand</SelectItem>
               {o?.brands.map((b) => (
-                <option key={b.id} value={b.id}>
+                <SelectItem key={b.id} value={b.id}>
                   {b.name}
-                </option>
+                </SelectItem>
               ))}
             </select>
           </Field>

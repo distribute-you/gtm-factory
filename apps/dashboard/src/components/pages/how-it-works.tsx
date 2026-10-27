@@ -54,7 +54,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     kind: "point",
     title: "The Supplier rating",
     lines: [
-      "A pipe cannot judge its options from its own data: a template's replies land later, in another pipe. The Supplier rating pipe reads the ledger and the traceability and makes a Rating each tick.",
+      "A pipe cannot judge its candidates from its own data: a template's replies land later, in another pipe. The Supplier rating pipe reads the ledger and the traceability and makes a Rating each tick.",
       "The choosing pipe takes the Rating as a Material and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. The Rating's cost goes to the pipes that consume it.",
     ],
   },

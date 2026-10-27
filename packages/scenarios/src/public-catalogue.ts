@@ -4,7 +4,7 @@
  * kept to the catalogue fields only. `stripPublicReads` drops every figure that
  * is a production rate, a fleet statistic or a price, renames every channel
  * the catalogue calls "agency-*" to "managed-*", and states what each
- * reactive leg consumes in the framework's words: the steps its pipe consumes
+ * reactive leg consumes in the framework's words: the steps its scripts consume
  * (a fact another system reports is one of them) and how many days its
  * scripts wait after the Unit they consume landed.
  */
@@ -30,11 +30,10 @@ export interface PublicTransition {
   from: string | null;
   to: string;
   mode: "proactive" | "reactive";
-  /** For a reactive leg: the steps (or reported facts) its pipe consumes besides `from`; several = any one of them. */
+  /** For a reactive leg: the steps (or reported facts) its scripts consume besides `from`; several = any one of them. */
   consumes: string[];
   /** For a reactive leg that waits: the days its scripts wait after the Unit they consume landed. */
   waitDays: number | null;
-  pipe: { id: string; name: string; icon: string | null; color: string | null } | null;
 }
 
 export interface PublicChannel {
@@ -169,7 +168,6 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
     performedBy: str(c.performedBy),
     managed: c.managed === true,
     transitions: ((c.stepTransitions as Json[]) ?? []).map((t) => {
-      const pipe = t.pipe as Json | null;
       const reactive = t.mode === "reactive";
       const r = reactive ? reactions.consumesOf(str(t.triggerId)) : { consumes: [], waitDays: null };
       return {
@@ -179,7 +177,6 @@ export function stripPublicReads(channelsRead: Json, stepsRead: Json, meta: { so
         mode: reactive ? "reactive" : "proactive",
         consumes: r.consumes,
         waitDays: r.waitDays,
-        pipe: pipe ? { id: renameAgency(String(pipe.id)), name: String(pipe.name), icon: str(pipe.icon), color: str(pipe.color) } : null,
       };
     }),
   }));

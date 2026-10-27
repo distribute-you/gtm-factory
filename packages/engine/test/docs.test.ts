@@ -43,7 +43,7 @@ describe("docs/framework.md", () => {
     expect(doc).toContain(`his Verified email lands at tick **${chain.email_found}**`);
     expect(doc).toContain(`his Meeting booked lands at tick **${chain.meeting_booked}**`);
     expect(doc).toContain(`Acme spends **${money(s.days[3]!.spendCents[c.id]! / 100)}** that tick`);
-    const writers = s.runs.filter((r) => r.pipeId === "writer");
+    const writers = s.runs.filter((r) => r.legId === "writer");
     expect(s.units.filter((u) => u.outcome === "brand_context")).toHaveLength(1);
     expect(doc).toContain(`One Brand context was made for **${writers.length}** messages`);
     const researched = s.units.filter((u) => u.outcome === "company_researched").length;
@@ -84,11 +84,11 @@ describe("docs/framework.md", () => {
   it("ledger reconciliation", () => {
     const l = buildLedger(
       [
-        { id: "r1", pipeId: "sourcing", target: "lead_found", day: 0, spendCents: 1000, consumed: [] },
-        { id: "r2", pipeId: "email", target: "lead_interested", day: 1, spendCents: 600, consumed: ["o1", "o2", "o3"] },
-        { id: "r3", pipeId: "email", target: "lead_interested", day: 2, spendCents: 300, consumed: ["o1"] },
-        { id: "r4", pipeId: null, target: null, day: 0, spendCents: 500, consumed: [], support: { kind: "setup", reason: "setup" } },
-        { id: "r5", pipeId: "email", target: "lead_interested", day: 4, spendCents: 200, consumed: [], abnormalLoss: "already interested" },
+        { id: "r1", legId: "sourcing", target: "lead_found", day: 0, spendCents: 1000, consumed: [] },
+        { id: "r2", legId: "email", target: "lead_interested", day: 1, spendCents: 600, consumed: ["o1", "o2", "o3"] },
+        { id: "r3", legId: "email", target: "lead_interested", day: 2, spendCents: 300, consumed: ["o1"] },
+        { id: "r4", legId: null, target: null, day: 0, spendCents: 500, consumed: [], support: { kind: "setup", reason: "setup" } },
+        { id: "r5", legId: "email", target: "lead_interested", day: 4, spendCents: 200, consumed: [], abnormalLoss: "already interested" },
       ],
       [
         { id: "o1", outcome: "lead_found", subject: "l1", runId: "r1", day: 0 },
@@ -102,7 +102,7 @@ describe("docs/framework.md", () => {
     expect(doc).toContain(`**${money(l.reuseGainCents / 100)}**`);
     expect(doc).toContain(`**$${(l.runsProducingNone.totalCents / 100).toFixed(2)}**`);
     expect(doc).toContain(`**$${(l.totalSpendCents / 100).toFixed(2)}**`);
-    expect(doc).toContain(`**${money(l.decide.find((d) => d.pipeId === "email")!.costPerInput!)}**`);
+    expect(doc).toContain(`**${money(l.decide.find((d) => d.legId === "email")!.costPerInput!)}**`);
     expect(doc).toContain(`**${money(l.report.find((r) => r.outcome === "lead_interested")!.unitCost!)}**`);
   });
 });

@@ -32,7 +32,7 @@ export interface TrackPlace {
  *  - text_with_variables: a text with {{variables}}, versioned in its dynasty;
  *  - text: plain text;
  *  - audience: a sentence describing who, with the conditions a judge reads from it;
- *  - rating: per option at each choice point, beliefs about value per dollar (a Supplier rating);
+ *  - rating: per candidate at each choice point, beliefs about value per dollar (a Supplier rating);
  *  - list, record, image: other shapes.
  */
 export type ContentType = "text_with_variables" | "text" | "audience" | "rating" | "list" | "record" | "image";

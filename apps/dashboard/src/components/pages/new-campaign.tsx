@@ -7,7 +7,7 @@ import { START, defaultStrategyId, describeCondition, type Campaign, type Ranked
 import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
 import { linePipes, rankedLine } from "@/lib/funnels";
 import { Mark } from "@/components/mark";
-import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar } from "@/components/ui";
+import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar, SelectItem } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { campaignHref } from "./campaigns";
 import { freshCampaignId, newClient } from "@/lib/campaigns";
@@ -258,7 +258,7 @@ function Flow({ model }: { model: Model }) {
               </SectionTitle>
               <div className="k-card divide-y divide-[var(--line-subtle)]">
                 {playable.map((p) => {
-                  const options = model.catalogue.strategiesOf(p.id);
+                  const candidates = model.catalogue.strategiesOf(p.id);
                   const value = d.strategies[p.id] ?? defaultStrategyId(p.id);
                   const s = model.catalogue.strategy(value);
                   return (
@@ -269,11 +269,11 @@ function Flow({ model }: { model: Model }) {
                       </span>
                       <span className="min-w-0">
                         <select className="k-input w-full px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => set({ strategies: { ...d.strategies, [p.id]: e.target.value } })}>
-                          {options.map((o) => (
-                            <option key={o.id} value={o.id}>
+                          {candidates.map((o) => (
+                            <SelectItem key={o.id} value={o.id}>
                               {o.id === defaultStrategyId(p.id) ? "Default: every script" : o.name}
                               {o.proposed ? " (proposed by a split)" : ""}
-                            </option>
+                            </SelectItem>
                           ))}
                         </select>
                         {s && s.rules.length + (s.subject?.length ?? 0) > 0 && (

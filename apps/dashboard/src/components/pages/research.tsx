@@ -9,7 +9,7 @@ import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { headScript, optionLabel, pipeName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
+import { headScript, candidateLabel, pipeName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
 import { multiPlugged, pointGroups, recentShare } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
@@ -43,7 +43,7 @@ function Research({ model }: { model: Model }) {
             {converged} of {big} choice points back their hidden best
           </>
         }
-        sub="Every choice, made by one prioritizer. The world hides the true best option at each Material; here is how fast the Supplier rating finds it."
+        sub="Every choice, made by one prioritizer. The world hides the true best candidate at each Material; here is how fast the Supplier rating finds it."
         right={<span>Day {model.day}</span>}
       />
 
@@ -101,7 +101,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
   const info = pointInfo(model.catalogue, point);
   const conv = useMemo(() => pointGroups(model).flatMap((g) => g.points).find((p) => p.conv.point === point)?.conv ?? null, [model, point]);
   const campaigns = model.campaigns.filter((c) => conv && conv.bestByCampaign[c.id] !== undefined);
-  const series = conv ? [{ key: "s", label: "Share of picks on the hidden best option", values: shareSeries(conv), color: "var(--run)" }] : [];
+  const series = conv ? [{ key: "s", label: "Share of picks on the hidden best candidate", values: shareSeries(conv), color: "var(--run)" }] : [];
   const share = conv ? recentShare(conv) : null;
   const first = conv ? conv.daily.slice(0, 10).reduce((a, d) => ({ p: a.p + d.picks, b: a.b + d.onBest }), { p: 0, b: 0 }) : null;
   return (
@@ -128,13 +128,13 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
         const brand = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name;
         return (
           <div key={c.id} className="mt-6">
-            <SectionTitle count={row.options.length} right={<span>{brand}</span>}>
+            <SectionTitle count={row.candidates.length} right={<span>{brand}</span>}>
               {c.name}
             </SectionTitle>
             <CardTable footer="Belief = what the Rating reads today. Hidden truth = what the world really does, never read by any choice.">
               <thead>
                 <tr className="k-line-subtle border-b">
-                  <th className={TH}>Option</th>
+                  <th className={TH}>Candidate</th>
                   <th className={`${TH} text-right`}>Picks, 7 days</th>
                   <th className={`${TH} text-right`}>Belief: reaches the leg's end</th>
                   <th className={`${TH} text-right`}>Belief: $ to the end</th>
@@ -145,13 +145,13 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
                 </tr>
               </thead>
               <tbody>
-                {row.options.map((o) => {
-                  const script = headScript(model.catalogue, o.option);
+                {row.candidates.map((o) => {
+                  const script = headScript(model.catalogue, o.candidate);
                   return (
-                    <tr key={o.option} className="k-row k-line-subtle border-b last:border-0">
+                    <tr key={o.candidate} className="k-row k-line-subtle border-b last:border-0">
                       <td className={TD}>
                         <span className="flex items-center gap-2">
-                          {script ? <Mark kind={`script:${script.kind}`} id={script.dynasty} size={20} /> : <Mark kind={model.catalogue.pipe(o.option) ? "pipe" : "object"} id={o.option} size={20} />}
+                          {script ? <Mark kind={`script:${script.kind}`} id={script.dynasty} size={20} /> : <Mark kind={model.catalogue.pipe(o.candidate) ? "pipe" : "object"} id={o.candidate} size={20} />}
                           <span className="truncate font-medium">{o.label}</span>
                           {o.isHiddenBest && (
                             <span className="k-chip inline-flex items-center gap-1 text-[var(--run)]">
@@ -201,7 +201,7 @@ function MultiPlugged({ model }: { model: Model }) {
                 <Link key={i.point} href={`/research/?point=${encodeURIComponent(i.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
                   <span className="min-w-0 flex-1 truncate">{i.info.title}</span>
                   <span className="k-fg3 text-[12px]">best</span>
-                  <span className="font-medium">{i.bestScript ? optionLabel(model, i.point, i.bestScript) : "—"}</span>
+                  <span className="font-medium">{i.bestScript ? candidateLabel(model, i.point, i.bestScript) : "—"}</span>
                 </Link>
               ))}
             </div>

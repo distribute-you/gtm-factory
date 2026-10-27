@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { describeCondition, type Catalogue, type ContentType, type Pipe, type Unit, type Script } from "@gtm-factory/engine";
 import { Mark } from "./mark";
+import { SelectItem } from "./ui";
 import { billOfMaterials, diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 
@@ -304,9 +305,9 @@ function VersionPick({ versions, value, onChange }: { versions: Unit[]; value: n
   return (
     <select className="k-input px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="Version">
       {versions.map((v, i) => (
-        <option key={v.id} value={i}>
+        <SelectItem key={v.id} value={i}>
           v{v.version} · day {v.day}
-        </option>
+        </SelectItem>
       ))}
     </select>
   );

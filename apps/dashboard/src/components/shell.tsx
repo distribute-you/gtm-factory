@@ -24,6 +24,7 @@ import {
 } from "@phosphor-icons/react";
 import { NavContext } from "./nav-context";
 import { Mark } from "./mark";
+import { SelectItem } from "./ui";
 import { useSim, SPEEDS, type Speed } from "@/lib/sim";
 import { leadRows } from "@/lib/model";
 import { formatCount } from "@/lib/format";
@@ -254,9 +255,9 @@ function SimulatorBar() {
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
       <select aria-label="Scenario" className="k-input shrink-0 px-1.5" style={{ font: "inherit" }} value={scenario} onChange={(e) => setScenario(e.target.value as ScenarioId)}>
         {SCENARIO_IDS.map((id) => (
-          <option key={id} value={id}>
+          <SelectItem key={id} value={id}>
             {SCENARIOS[id].label}
-          </option>
+          </SelectItem>
         ))}
       </select>
       <span className="k-input flex w-[104px] shrink-0 items-center gap-1 px-2">

@@ -8,7 +8,7 @@ import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { companyName, factoryName, leadRows, optionLabel, outcomeLabel, personName, pipeName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
+import { companyName, factoryName, leadRows, candidateLabel, outcomeLabel, personName, pipeName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -311,13 +311,13 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
           <div>
             <p className="k-label mb-1">Traceability: the choices that led here</p>
             {choices.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No choice: a single option or another factory.</p>
+              <p className="k-fg3 text-[12px]">No choice: a single candidate or another factory.</p>
             ) : (
               <ul className="space-y-1">
                 {choices.map((d) => (
                   <li key={d.id} className="flex items-baseline gap-2 text-[12px]">
                     <span className="k-fg3 min-w-0 flex-1 truncate">{pointInfo(model.catalogue, d.point).title}</span>
-                    <span className="truncate font-medium">{optionLabel(model, d.point, d.option, d.brandId)}</span>
+                    <span className="truncate font-medium">{candidateLabel(model, d.point, d.candidate, d.brandId)}</span>
                     <span className="k-fg3 k-mono">Day {d.day}</span>
                     {d.credited && <span className="k-chip">Credited</span>}
                   </li>

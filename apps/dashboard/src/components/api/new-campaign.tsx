@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ApiCampaign, ApiNewCampaign, ApiRankedFunnel, CatalogueData } from "@gtm-factory/engine";
 import { Mark } from "@/components/mark";
-import { EmptyNote, Page, PageHeader, SectionTitle, TopBar } from "@/components/ui";
+import { EmptyNote, Page, PageHeader, SectionTitle, TopBar, SelectItem } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
 import { outcomeName, pipeTitle } from "@/lib/api/labels";
@@ -62,10 +62,10 @@ export function ApiNewCampaignPage() {
             <Field label="Brand">
               <select className="k-input w-full max-w-[360px] px-1.5" style={{ font: "inherit" }} value={brandId ?? ""} onChange={(e) => setBrandId(e.target.value)}>
                 {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
+                  <SelectItem key={b.id} value={b.id}>
                     {b.name}
                     {b.test ? " (staff test)" : ""}
-                  </option>
+                  </SelectItem>
                 ))}
               </select>
             </Field>

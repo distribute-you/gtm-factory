@@ -15,7 +15,7 @@ import {
   type Campaign,
   type Catalogue,
   type ChoiceRecord,
-  type HiddenOption,
+  type HiddenCandidate,
   type Unit,
   type OutcomeId,
   type Person,
@@ -131,7 +131,7 @@ export interface MaterialRow {
   how: string;
   /** The choice point (this pipe, this Material), when one was made. */
   point: string | null;
-  /** The option picked most over the last 7 days, every campaign. */
+  /** The candidate picked most over the last 7 days, every campaign. */
   choice: string | null;
   picks: number;
 }
@@ -165,7 +165,7 @@ export function billOfMaterials(model: Model, pipe: Pipe): MaterialRow[] {
             : m === subject
               ? "The Unit it works on: pulled or pushed"
               : "From the stock for this subject, else ordered";
-    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, point: series.size > 0 && choice ? point : null, choice: choice ? optionLabel(model, point, choice) : null, picks };
+    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, point: series.size > 0 && choice ? point : null, choice: choice ? candidateLabel(model, point, choice) : null, picks };
   });
 }
 
@@ -185,7 +185,7 @@ export interface PointInfo {
   material: OutcomeId;
   /** "Message writer · LLM completion", "Lead interested → Meeting booked". */
   title: string;
-  /** What the options are: scripts of these pipes, Units of an outcome, or plays. */
+  /** What the candidates are: scripts of these pipes, Units of an outcome, or plays. */
   sub: string;
 }
 
@@ -215,19 +215,19 @@ export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
   };
 }
 
-/** An option of a choice point in words: a script dynasty, an object dynasty, or a pipe. */
-export function optionLabel(model: Model, point: string, option: string, brandId?: string): string {
-  const s = headScript(model.catalogue, option);
+/** A candidate of a choice point in words: a script dynasty, an object dynasty, or a pipe. */
+export function candidateLabel(model: Model, point: string, candidate: string, brandId?: string): string {
+  const s = headScript(model.catalogue, candidate);
   if (s) return s.name;
-  const pipe = model.catalogue.pipe(option);
+  const pipe = model.catalogue.pipe(candidate);
   if (pipe) return pipe.name;
   const info = pointInfo(model.catalogue, point);
   const brands = brandId ? [brandId] : model.clients.map((c) => c.brand.id);
   for (const b of brands) {
-    const u = model.session.objectHead(b, info.material, option);
-    if (u) return u.name ?? humanize(option);
+    const u = model.session.objectHead(b, info.material, candidate);
+    if (u) return u.name ?? humanize(candidate);
   }
-  return humanize(option);
+  return humanize(candidate);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,13 +262,13 @@ export function campaignName(model: Model, campaign: Campaign): string {
 }
 
 /** The pipe each leg plays most today (its current choice), by leg. */
-export function legPlays(model: Model, campaign: Campaign): { from: OutcomeId; to: OutcomeId; pipeId: string | null; options: string[] }[] {
+export function legPlays(model: Model, campaign: Campaign): { from: OutcomeId; to: OutcomeId; pipeId: string | null; candidates: string[] }[] {
   const line = lineOf(model, campaign);
   return campaign.line.map((to, k) => {
     const from = line[k]!;
-    const options = model.session.playsFor(campaign, from, to).map((p) => p.id);
+    const candidates = model.session.playsFor(campaign, from, to).map((p) => p.id);
     const series = model.session.pickSeries(playPoint(from, to), campaign.id);
-    let best: string | null = options[0] ?? null;
+    let best: string | null = candidates[0] ?? null;
     let bestN = -1;
     for (const [o, arr] of series) {
       const n = arr.slice(-7).reduce((x, y) => x + y, 0);
@@ -277,7 +277,7 @@ export function legPlays(model: Model, campaign: Campaign): { from: OutcomeId; t
         best = o;
       }
     }
-    return { from, to, pipeId: best, options };
+    return { from, to, pipeId: best, candidates };
   });
 }
 
@@ -373,8 +373,8 @@ export function scopeReturn(model: Model, campaigns: readonly Campaign[]): { mea
 // Choice points: beliefs, picks, hidden truth
 // ---------------------------------------------------------------------------
 
-export interface OptionRow {
-  option: string;
+export interface CandidateRow {
+  candidate: string;
   label: string;
   /** Share of this campaign's picks over the last 7 days. */
   share: number;
@@ -387,7 +387,7 @@ export interface OptionRow {
   decisions: number;
   successes: number;
   /** Hidden: true share reaching the leg's end, true cost, true value per dollar. */
-  truth: HiddenOption | null;
+  truth: HiddenCandidate | null;
   isHiddenBest: boolean;
   isBelievedBest: boolean;
 }
@@ -395,12 +395,12 @@ export interface OptionRow {
 export interface PointRow {
   info: PointInfo;
   campaignId: string;
-  options: OptionRow[];
+  candidates: CandidateRow[];
   picks: number;
 }
 
 /** The hidden best of every point of a campaign (cached per day). */
-export function hiddenOf(model: Model, campaign: Campaign): Map<string, { best: string; options: HiddenOption[] }> {
+export function hiddenOf(model: Model, campaign: Campaign): Map<string, { best: string; candidates: HiddenCandidate[] }> {
   return memo(model, `hidden:${campaign.id}`, () => hiddenBest(model.session, campaign));
 }
 
@@ -414,7 +414,7 @@ export function pointsOf(model: Model, campaign: Campaign): PointRow[] {
   });
 }
 
-export function pointRow(model: Model, campaign: Campaign, key: string, hidden: { best: string; options: HiddenOption[] } | null): PointRow {
+export function pointRow(model: Model, campaign: Campaign, key: string, hidden: { best: string; candidates: HiddenCandidate[] } | null): PointRow {
   const info = pointInfo(model.catalogue, key);
   const series = model.session.pickSeries(key, campaign.id);
   const recent = new Map<string, number>();
@@ -427,14 +427,14 @@ export function pointRow(model: Model, campaign: Campaign, key: string, hidden: 
     all += arr.reduce((x, y) => x + y, 0);
   }
   const beliefs = model.session.beliefsAt(key, campaign.id);
-  const bestBelief = [...beliefs].sort((a, b) => b.valuePerDollar - a.valuePerDollar)[0]?.option ?? null;
-  const options: OptionRow[] = beliefs.map((b) => {
-    const truth = hidden?.options.find((h) => h.option === b.option) ?? null;
+  const bestBelief = [...beliefs].sort((a, b) => b.valuePerDollar - a.valuePerDollar)[0]?.candidate ?? null;
+  const candidates: CandidateRow[] = beliefs.map((b) => {
+    const truth = hidden?.candidates.find((h) => h.candidate === b.candidate) ?? null;
     return {
-      option: b.option,
-      label: optionLabel(model, key, b.option, campaign.brandId),
-      share: total > 0 ? (recent.get(b.option) ?? 0) / total : 0,
-      picks: series.get(b.option)?.reduce((x, y) => x + y, 0) ?? 0,
+      candidate: b.candidate,
+      label: candidateLabel(model, key, b.candidate, campaign.brandId),
+      share: total > 0 ? (recent.get(b.candidate) ?? 0) / total : 0,
+      picks: series.get(b.candidate)?.reduce((x, y) => x + y, 0) ?? 0,
       rate: b.rate,
       rateSd: b.rateSd,
       cost: b.cost,
@@ -442,11 +442,11 @@ export function pointRow(model: Model, campaign: Campaign, key: string, hidden: 
       decisions: b.decisions,
       successes: b.successes,
       truth,
-      isHiddenBest: hidden?.best === b.option,
-      isBelievedBest: bestBelief === b.option,
+      isHiddenBest: hidden?.best === b.candidate,
+      isBelievedBest: bestBelief === b.candidate,
     };
   });
-  return { info, campaignId: campaign.id, options, picks: all };
+  return { info, campaignId: campaign.id, candidates, picks: all };
 }
 
 /** Convergence of every choice point toward its hidden best (cached per day). */
@@ -470,11 +470,11 @@ export function recentChoices(model: Model, campaignIds: Set<string>, limit: num
 /** Why a choice went the way it did, in plain words. */
 export function explainChoice(model: Model, c: ChoiceRecord): string {
   const brandId = model.campaigns.find((x) => x.id === c.campaignId)?.brandId;
-  const chosen = optionLabel(model, c.point, c.chosenId, brandId);
-  const total = c.options.reduce((s, o) => s + o.picks, 0);
-  const share = total > 0 ? Math.round((100 * (c.options.find((o) => o.id === c.chosenId)?.picks ?? 0)) / total) : 0;
+  const chosen = candidateLabel(model, c.point, c.chosenId, brandId);
+  const total = c.candidates.reduce((s, o) => s + o.picks, 0);
+  const share = total > 0 ? Math.round((100 * (c.candidates.find((o) => o.id === c.chosenId)?.picks ?? 0)) / total) : 0;
   if (c.chosenId === c.bestId) return `${chosen} took ${share}% of picks: the best expected value per dollar.`;
-  return `${chosen} took ${share}% of picks while ${optionLabel(model, c.point, c.bestId, brandId)} leads on expected value: still exploring.`;
+  return `${chosen} took ${share}% of picks while ${candidateLabel(model, c.point, c.bestId, brandId)} leads on expected value: still exploring.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,14 +493,14 @@ export interface PluggedInput {
 export function pluggedAt(model: Model, pipeId: string): PluggedInput[] {
   return memo(model, `plugged:${pipeId}`, () => {
     const dynasties = new Set(model.catalogue.scripts.filter((s) => s.pipeId === pipeId).map((s) => s.dynasty));
-    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => model.session.optionsAt(p).some((o) => dynasties.has(o)));
+    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => model.session.candidatesAt(p).some((o) => dynasties.has(o)));
     return points.map((point) => {
       const score = new Map<string, number>();
       let picks = 0;
       for (const c of model.campaigns) {
         const series = model.session.pickSeries(point, c.id);
         if (series.size === 0) continue;
-        for (const b of model.session.beliefsAt(point, c.id)) if (dynasties.has(b.option)) score.set(b.option, (score.get(b.option) ?? 0) + b.valuePerDollar);
+        for (const b of model.session.beliefsAt(point, c.id)) if (dynasties.has(b.candidate)) score.set(b.candidate, (score.get(b.candidate) ?? 0) + b.valuePerDollar);
         for (const arr of series.values()) picks += arr.reduce((x, y) => x + y, 0);
       }
       const best = [...score].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;

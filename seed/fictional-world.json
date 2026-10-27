@@ -84,7 +84,7 @@
     "plural": "Leads identified",
     "subject": "lead",
     "icon": "fingerprint",
-    "description": "Who the person is, in the one id space every pipe shares."
+    "description": "Who the person is, in the one id space every leg shares."
    },
    {
     "id": "email_found",
@@ -147,8 +147,8 @@
      "track": "crm_lifecycle",
      "rank": 1
     },
-    "referencePipe": "crm_import",
-    "icon": "hand-heart"
+    "icon": "hand-heart",
+    "referenceLeg": "crm_import"
    },
    {
     "id": "meeting_booked",
@@ -235,11 +235,10 @@
     "description": "People who come by themselves."
    }
   ],
-  "pipes": [
+  "legs": [
    {
     "id": "supplier_rating",
     "name": "Supplier rating",
-    "materials": [],
     "output": "rating",
     "factory": "ours",
     "maturity": {
@@ -248,7 +247,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing pipe consumes.",
+    "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing leg consumes.",
     "icon": "chart-bar"
    },
    {
@@ -262,8 +261,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client describes its offer.",
-    "materials": []
+    "description": "The client describes its offer."
    },
    {
     "id": "icp_client",
@@ -276,10 +274,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client says who to reach.",
-    "materials": [
-     "offer_described"
-    ]
+    "description": "The client says who to reach."
    },
    {
     "id": "icp_finder",
@@ -292,10 +287,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "An AI proposes who to reach, and a finer ICP when the data shows one.",
-    "materials": [
-     "offer_described"
-    ]
+    "description": "An AI proposes who to reach, and a finer ICP when the data shows one."
    },
    {
     "id": "template_writing",
@@ -308,10 +300,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Writes message models with variables.",
-    "materials": [
-     "offer_described"
-    ]
+    "description": "Writes message models with variables."
    },
    {
     "id": "brand_context",
@@ -324,10 +313,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Summarises the brand when a script asks.",
-    "materials": [
-     "offer_described"
-    ]
+    "description": "Summarises the brand when a script asks."
    },
    {
     "id": "llm",
@@ -341,8 +327,7 @@
      "horizonDays": 0
     },
     "description": "Answers a prompt when a script asks.",
-    "icon": "sparkle",
-    "materials": []
+    "icon": "sparkle"
    },
    {
     "id": "sourcing",
@@ -355,11 +340,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Turns the market into raw records, one ICP at a time.",
-    "materials": [
-     "audience_built",
-     "rating"
-    ]
+    "description": "Turns the market into raw records, one ICP at a time."
    },
    {
     "id": "identity",
@@ -372,11 +353,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Resolves who a raw record is: dedup and merge into one id.",
-    "materials": [
-     "lead_found",
-     "rating"
-    ]
+    "description": "Resolves who a raw record is: dedup and merge into one id."
    },
    {
     "id": "email_finding",
@@ -388,11 +365,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 0,
      "horizonDays": 0
-    },
-    "materials": [
-     "lead_identified",
-     "rating"
-    ]
+    }
    },
    {
     "id": "company_research",
@@ -405,10 +378,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Reads the lead's company. One research serves every lead of a company.",
-    "materials": [
-     "lead_identified"
-    ]
+    "description": "Reads the lead's company. One research serves every lead of a company."
    },
    {
     "id": "writer",
@@ -420,15 +390,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 0,
      "horizonDays": 0
-    },
-    "materials": [
-     "email_found",
-     "company_researched",
-     "template_written",
-     "brand_context",
-     "llm_completion",
-     "rating"
-    ]
+    }
    },
    {
     "id": "cold_email",
@@ -441,16 +403,11 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "materials": [
-     "message_written",
-     "rating"
-    ],
     "description": "Our send call: hands the written message to a mailbox."
    },
    {
     "id": "email_delivery",
     "name": "Mailbox delivery",
-    "materials": [],
     "output": "message_sent",
     "factory": "mailbox",
     "webhook": true,
@@ -466,9 +423,6 @@
    {
     "id": "email_replies",
     "name": "Mailbox replies",
-    "materials": [
-     "message_queued"
-    ],
     "output": "reply_received",
     "factory": "mailbox",
     "maturity": {
@@ -490,13 +444,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 3,
      "horizonDays": 12
-    },
-    "materials": [
-     "lead_identified",
-     "template_written",
-     "llm_completion",
-     "rating"
-    ]
+    }
    },
    {
     "id": "reply_judging",
@@ -509,12 +457,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "Reads a reply and says whether the lead is interested.",
-    "materials": [
-     "reply_received",
-     "llm_completion",
-     "rating"
-    ]
+    "description": "Reads a reply and says whether the lead is interested."
    },
    {
     "id": "crm_import",
@@ -528,7 +471,6 @@
      "horizonDays": 1
     },
     "description": "A webhook: the client's CRM reports the interested leads it sees.",
-    "materials": [],
     "webhook": true
    },
    {
@@ -543,7 +485,6 @@
      "horizonDays": 1
     },
     "description": "A webhook: the mailbox reports who asked to stop.",
-    "materials": [],
     "webhook": true
    },
    {
@@ -558,7 +499,6 @@
      "horizonDays": 0
     },
     "description": "A webhook: people who come by themselves, reported as they arrive.",
-    "materials": [],
     "webhook": true
    },
    {
@@ -572,19 +512,11 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "materials": [
-     "message_sent",
-     "llm_completion",
-     "rating"
-    ],
     "description": "Writes and sends the next message in a thread. Its script waits its days since the last message."
    },
    {
     "id": "follow_up_replies",
     "name": "Mailbox follow-up replies",
-    "materials": [
-     "follow_up_queued"
-    ],
     "output": "reply_received",
     "factory": "mailbox",
     "maturity": {
@@ -606,11 +538,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 1,
      "horizonDays": 5
-    },
-    "materials": [
-     "audience_built",
-     "rating"
-    ]
+    }
    },
    {
     "id": "website",
@@ -623,11 +551,7 @@
      "delayMeanDays": 0,
      "horizonDays": 0
     },
-    "description": "The client's website turns a visit into a signup.",
-    "materials": [
-     "lead_visited",
-     "rating"
-    ]
+    "description": "The client's website turns a visit into a signup."
    },
    {
     "id": "ai_booking",
@@ -639,10 +563,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 1,
      "horizonDays": 6
-    },
-    "materials": [
-     "lead_interested"
-    ]
+    }
    },
    {
     "id": "team_booking",
@@ -654,10 +575,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 2,
      "horizonDays": 8
-    },
-    "materials": [
-     "lead_interested"
-    ]
+    }
    },
    {
     "id": "reminders",
@@ -669,10 +587,7 @@
      "outcomesRequired": 10,
      "delayMeanDays": 3,
      "horizonDays": 10
-    },
-    "materials": [
-     "meeting_booked"
-    ]
+    }
    },
    {
     "id": "closing",
@@ -684,16 +599,13 @@
      "outcomesRequired": 10,
      "delayMeanDays": 7,
      "horizonDays": 21
-    },
-    "materials": [
-     "meeting_attended"
-    ]
+    }
    }
   ],
   "scripts": [
    {
     "id": "rating_pooled",
-    "pipeId": "supplier_rating",
+    "legId": "supplier_rating",
     "dynasty": "rating_pooled",
     "version": 1,
     "name": "Pooled Thompson rating",
@@ -703,88 +615,120 @@
     },
     "costCents": 1,
     "status": "active",
-    "description": "Beliefs pooled from the script's level everywhere down to the client, with delay censoring and measured costs."
+    "description": "Beliefs pooled from the script's level everywhere down to the client, with delay censoring and measured costs.",
+    "materials": []
    },
    {
     "id": "offer_client",
-    "pipeId": "offer_description",
+    "legId": "offer_description",
     "dynasty": "offer_client",
     "version": 1,
     "name": "Client describes the offer",
     "kind": "human",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": []
    },
    {
     "id": "icp_client_states",
-    "pipeId": "icp_client",
+    "legId": "icp_client",
     "dynasty": "icp_client_states",
     "version": 1,
     "name": "Client states it",
     "kind": "human",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "icp_ai",
-    "pipeId": "icp_finder",
+    "legId": "icp_finder",
     "dynasty": "icp_ai",
     "version": 1,
     "name": "AI ICP finder",
     "kind": "ai",
     "tactics": {},
     "costCents": 200,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "tpl_copywriter",
-    "pipeId": "template_writing",
+    "legId": "template_writing",
     "dynasty": "tpl_copywriter",
     "version": 1,
     "name": "Copywriter",
     "kind": "human",
     "tactics": {},
     "costCents": 3000,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "tpl_ai",
-    "pipeId": "template_writing",
+    "legId": "template_writing",
     "dynasty": "tpl_ai",
     "version": 1,
     "name": "AI template writer",
     "kind": "ai",
     "tactics": {},
     "costCents": 50,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "ctx_short",
-    "pipeId": "brand_context",
+    "legId": "brand_context",
     "dynasty": "ctx_short",
     "version": 1,
     "name": "Short summary",
     "kind": "ai",
     "tactics": {},
     "costCents": 1,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "ctx_full",
-    "pipeId": "brand_context",
+    "legId": "brand_context",
     "dynasty": "ctx_full",
     "version": 1,
     "name": "Full summary",
     "kind": "ai",
     "tactics": {},
     "costCents": 2,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "offer_described"
+     }
+    ]
    },
    {
     "id": "glm",
-    "pipeId": "llm",
+    "legId": "llm",
     "dynasty": "glm",
     "version": 1,
     "name": "GLM",
@@ -798,11 +742,12 @@
      "name": "Zhipu",
      "color": "#3b5bdb"
     },
-    "description": "A fast, low-cost model."
+    "description": "A fast, low-cost model.",
+    "materials": []
    },
    {
     "id": "gemini_flash",
-    "pipeId": "llm",
+    "legId": "llm",
     "dynasty": "gemini_flash",
     "version": 1,
     "name": "Gemini Flash",
@@ -815,11 +760,12 @@
     "provider": {
      "name": "Google",
      "color": "#1a73e8"
-    }
+    },
+    "materials": []
    },
    {
     "id": "gemini_pro",
-    "pipeId": "llm",
+    "legId": "llm",
     "dynasty": "gemini_pro",
     "version": 1,
     "name": "Gemini Pro",
@@ -832,11 +778,12 @@
     "provider": {
      "name": "Google",
      "color": "#1a73e8"
-    }
+    },
+    "materials": []
    },
    {
     "id": "src_filters",
-    "pipeId": "sourcing",
+    "legId": "sourcing",
     "dynasty": "src_filters",
     "version": 1,
     "name": "Cold filters",
@@ -849,11 +796,19 @@
     "provider": {
      "name": "Apollo",
      "color": "#f1c40f"
-    }
+    },
+    "materials": [
+     {
+      "outcome": "audience_built"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "src_filters_30",
-    "pipeId": "sourcing",
+    "legId": "sourcing",
     "dynasty": "src_filters_30",
     "version": 1,
     "name": "Cold filters, fresh data",
@@ -866,11 +821,19 @@
     "provider": {
      "name": "Apollo",
      "color": "#f1c40f"
-    }
+    },
+    "materials": [
+     {
+      "outcome": "audience_built"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "src_signals",
-    "pipeId": "sourcing",
+    "legId": "sourcing",
     "dynasty": "src_signals",
     "version": 1,
     "name": "Buying signals",
@@ -879,33 +842,57 @@
      "recontact_days": 90
     },
     "costCents": 25,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "audience_built"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "id_email",
-    "pipeId": "identity",
+    "legId": "identity",
     "dynasty": "id_email",
     "version": 1,
     "name": "Email and domain match",
     "kind": "rules",
     "tactics": {},
     "costCents": 1,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_found"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "id_merge",
-    "pipeId": "identity",
+    "legId": "identity",
     "dynasty": "id_merge",
     "version": 1,
     "name": "Name, company and title merge",
     "kind": "rules",
     "tactics": {},
     "costCents": 3,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_found"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "ef_pattern",
-    "pipeId": "email_finding",
+    "legId": "email_finding",
     "dynasty": "ef_pattern",
     "version": 1,
     "name": "Pattern and verify",
@@ -914,11 +901,19 @@
      "retry_days": 30
     },
     "costCents": 3,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_identified"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "ef_lookup",
-    "pipeId": "email_finding",
+    "legId": "email_finding",
     "dynasty": "ef_lookup",
     "version": 1,
     "name": "Provider lookup",
@@ -927,33 +922,51 @@
      "retry_days": 30
     },
     "costCents": 5,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_identified"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "cr_site",
-    "pipeId": "company_research",
+    "legId": "company_research",
     "dynasty": "cr_site",
     "version": 1,
     "name": "Website reader",
     "kind": "ai",
     "tactics": {},
     "costCents": 2,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_identified"
+     }
+    ]
    },
    {
     "id": "cr_deep",
-    "pipeId": "company_research",
+    "legId": "company_research",
     "dynasty": "cr_deep",
     "version": 1,
     "name": "Deep research",
     "kind": "ai",
     "tactics": {},
     "costCents": 12,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_identified"
+     }
+    ]
    },
    {
     "id": "wr_short",
-    "pipeId": "writer",
+    "legId": "writer",
     "dynasty": "wr_short",
     "version": 1,
     "name": "Short writer",
@@ -962,11 +975,31 @@
      "researches_first": false
     },
     "costCents": 2,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "email_found"
+     },
+     {
+      "outcome": "company_researched"
+     },
+     {
+      "outcome": "template_written"
+     },
+     {
+      "outcome": "brand_context"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "wr_research",
-    "pipeId": "writer",
+    "legId": "writer",
     "dynasty": "wr_research",
     "version": 1,
     "name": "Research-led writer",
@@ -975,114 +1008,188 @@
      "researches_first": true
     },
     "costCents": 3,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "email_found"
+     },
+     {
+      "outcome": "company_researched"
+     },
+     {
+      "outcome": "template_written"
+     },
+     {
+      "outcome": "brand_context"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "ce_now",
-    "pipeId": "cold_email",
+    "legId": "cold_email",
     "dynasty": "ce_now",
     "version": 1,
     "name": "Send now",
     "kind": "rules",
     "tactics": {
-     "send_window": "now"
+     "send_window": "now",
+     "channel": "Cold email"
     },
     "costCents": 4,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "message_written"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "ce_morning",
-    "pipeId": "cold_email",
+    "legId": "cold_email",
     "dynasty": "ce_morning",
     "version": 1,
     "name": "Send at local morning",
     "kind": "rules",
     "tactics": {
-     "send_window": "morning"
+     "send_window": "morning",
+     "channel": "Cold email"
     },
     "costCents": 4,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "message_written"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "mb_send",
-    "pipeId": "email_delivery",
+    "legId": "email_delivery",
     "dynasty": "mb_send",
     "version": 1,
     "name": "Mailbox send report",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": []
    },
    {
     "id": "mb_replies",
-    "pipeId": "email_replies",
+    "legId": "email_replies",
     "dynasty": "mb_replies",
     "version": 1,
     "name": "Mailbox inbox",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "message_queued"
+     }
+    ]
    },
    {
     "id": "li_connect",
-    "pipeId": "linkedin",
+    "legId": "linkedin",
     "dynasty": "li_connect",
     "version": 1,
     "name": "Connect and message",
     "kind": "rules",
-    "tactics": {},
+    "tactics": {
+     "channel": "LinkedIn"
+    },
     "costCents": 40,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_identified"
+     },
+     {
+      "outcome": "template_written"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "rj_ai",
-    "pipeId": "reply_judging",
+    "legId": "reply_judging",
     "dynasty": "rj_ai",
     "version": 1,
     "name": "AI reply judge",
     "kind": "ai",
     "tactics": {},
     "costCents": 5,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "reply_received"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "crm_sync",
-    "pipeId": "crm_import",
+    "legId": "crm_import",
     "dynasty": "crm_sync",
     "version": 1,
     "name": "CRM sync",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": []
    },
    {
     "id": "mb_sync",
-    "pipeId": "opt_outs",
+    "legId": "opt_outs",
     "dynasty": "mb_sync",
     "version": 1,
     "name": "Mailbox sync",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": []
    },
    {
     "id": "org_inbound",
-    "pipeId": "organic",
+    "legId": "organic",
     "dynasty": "org_inbound",
     "version": 1,
     "name": "Inbound",
     "kind": "human",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": []
    },
    {
     "id": "fu_bump",
-    "pipeId": "follow_up",
+    "legId": "follow_up",
     "dynasty": "fu_bump",
     "version": 1,
     "name": "Short bump",
@@ -1091,11 +1198,22 @@
      "wait_days": 4
     },
     "costCents": 2,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "message_sent"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "fu_angle",
-    "pipeId": "follow_up",
+    "legId": "follow_up",
     "dynasty": "fu_angle",
     "version": 1,
     "name": "New angle",
@@ -1104,124 +1222,213 @@
      "wait_days": 4
     },
     "costCents": 3,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "message_sent"
+     },
+     {
+      "outcome": "llm_completion"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "mb_fu_replies",
-    "pipeId": "follow_up_replies",
+    "legId": "follow_up_replies",
     "dynasty": "mb_fu_replies",
     "version": 1,
     "name": "Mailbox inbox",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "follow_up_queued"
+     }
+    ]
    },
    {
     "id": "ad_search",
-    "pipeId": "ads",
+    "legId": "ads",
     "dynasty": "ad_search",
     "version": 1,
     "name": "Search ads",
     "kind": "rules",
     "tactics": {
-     "recontact_days": 365
+     "recontact_days": 365,
+     "channel": "Ads"
     },
     "costCents": 25,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "audience_built"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "ad_social",
-    "pipeId": "ads",
+    "legId": "ads",
     "dynasty": "ad_social",
     "version": 1,
     "name": "Social ads",
     "kind": "rules",
     "tactics": {
-     "recontact_days": 365
+     "recontact_days": 365,
+     "channel": "Ads"
     },
     "costCents": 20,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "audience_built"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "web_signup",
-    "pipeId": "website",
+    "legId": "website",
     "dynasty": "web_signup",
     "version": 1,
     "name": "Signup page",
     "kind": "rules",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_visited"
+     },
+     {
+      "outcome": "rating"
+     }
+    ]
    },
    {
     "id": "bk_link",
-    "pipeId": "ai_booking",
+    "legId": "ai_booking",
     "dynasty": "bk_link",
     "version": 1,
     "name": "Calendar link",
     "kind": "ai",
     "tactics": {},
     "costCents": 10,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_interested"
+     }
+    ]
    },
    {
     "id": "bk_slots",
-    "pipeId": "ai_booking",
+    "legId": "ai_booking",
     "dynasty": "bk_slots",
     "version": 1,
     "name": "Two-slot proposal",
     "kind": "ai",
     "tactics": {},
     "costCents": 15,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_interested"
+     }
+    ]
    },
    {
     "id": "tb_rep",
-    "pipeId": "team_booking",
+    "legId": "team_booking",
     "dynasty": "tb_rep",
     "version": 1,
     "name": "Sales rep calls",
     "kind": "human",
     "tactics": {},
     "costCents": 400,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "lead_interested"
+     }
+    ]
    },
    {
     "id": "rm_email",
-    "pipeId": "reminders",
+    "legId": "reminders",
     "dynasty": "rm_email",
     "version": 1,
     "name": "Email reminder",
     "kind": "rules",
     "tactics": {},
     "costCents": 5,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "meeting_booked"
+     }
+    ]
    },
    {
     "id": "rm_sms",
-    "pipeId": "reminders",
+    "legId": "reminders",
     "dynasty": "rm_sms",
     "version": 1,
     "name": "Email and SMS",
     "kind": "rules",
     "tactics": {},
     "costCents": 12,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "meeting_booked"
+     }
+    ]
    },
    {
     "id": "cl_call",
-    "pipeId": "closing",
+    "legId": "closing",
     "dynasty": "cl_call",
     "version": 1,
     "name": "Closing call",
     "kind": "human",
     "tactics": {},
     "costCents": 0,
-    "status": "active"
+    "status": "active",
+    "materials": [
+     {
+      "outcome": "meeting_attended"
+     }
+    ]
    }
   ],
   "tactics": [
+   {
+    "id": "channel",
+    "name": "Channel",
+    "type": {
+     "kind": "list",
+     "values": [
+      "Cold email",
+      "LinkedIn",
+      "Ads"
+     ]
+    },
+    "describes": [
+     "script"
+    ],
+    "source": "data",
+    "description": "The channel a script works on. A campaign that wants only some channels says so in its strategy."
+   },
    {
     "id": "country",
     "name": "Country",
@@ -1393,7 +1600,7 @@
      "script"
     ],
     "source": "data",
-    "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every option its prior."
+    "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every candidate its prior."
    },
    {
     "id": "age_days",
@@ -1413,7 +1620,7 @@
    {
     "id": "identity#recontact-60",
     "name": "Recontact after 60 days or more",
-    "pipeId": "identity",
+    "legId": "identity",
     "rules": [
      {
       "conditions": [
@@ -1430,7 +1637,7 @@
    {
     "id": "writer#pro-models",
     "name": "Pro models only",
-    "pipeId": "writer",
+    "legId": "writer",
     "rules": [
      {
       "conditions": [
@@ -1447,7 +1654,7 @@
    {
     "id": "reply_judging#no-opt-outs",
     "name": "Never write to people who asked to stop",
-    "pipeId": "reply_judging",
+    "legId": "reply_judging",
     "rules": [],
     "subject": [
      {
@@ -1461,7 +1668,7 @@
    {
     "id": "writer#fresh-context",
     "name": "Brand context younger than 30 days",
-    "pipeId": "writer",
+    "legId": "writer",
     "rules": [
      {
       "material": "brand_context",
@@ -1513,31 +1720,34 @@
      "brandId": "brand-1",
      "offerId": "offer-1",
      "name": "Paid clients from cold outreach",
-     "line": [
-      "lead_interested",
-      "meeting_booked",
-      "meeting_attended",
-      "paid_client"
-     ],
+     "start": "start",
+     "target": "paid_client",
      "dailyBudgetCents": 3000,
      "status": "running",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "channel",
+       "values": [
+        "Cold email",
+        "LinkedIn"
+       ]
+      }
+     ],
      "strategies": {
       "reply_judging": "reply_judging#no-opt-outs"
-     },
-     "start": "start"
+     }
     },
     {
      "id": "campaign-1f",
      "brandId": "brand-1",
      "offerId": "offer-1",
      "name": "Follow-ups after each message sent",
-     "line": [
-      "lead_interested"
-     ],
+     "start": "message_sent",
+     "target": "lead_interested",
      "dailyBudgetCents": 1500,
      "status": "running",
-     "strategies": {},
-     "start": "message_sent"
+     "strategies": {}
     }
    ],
    "seeds": [
@@ -1660,17 +1870,24 @@
      "brandId": "brand-2",
      "offerId": "offer-2",
      "name": "Meetings from cold outreach",
-     "line": [
-      "lead_interested",
-      "meeting_booked"
-     ],
+     "start": "start",
+     "target": "meeting_booked",
      "dailyBudgetCents": 2500,
      "status": "running",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "channel",
+       "values": [
+        "Cold email",
+        "LinkedIn"
+       ]
+      }
+     ],
      "strategies": {
       "identity": "identity#recontact-60",
       "writer": "writer#fresh-context"
-     },
-     "start": "start"
+     }
     }
    ],
    "seeds": [
@@ -1793,31 +2010,34 @@
      "brandId": "brand-3",
      "offerId": "offer-3",
      "name": "Paid clients, pro models for writing",
-     "line": [
-      "lead_interested",
-      "meeting_booked",
-      "meeting_attended",
-      "paid_client"
-     ],
+     "start": "start",
+     "target": "paid_client",
      "dailyBudgetCents": 2500,
      "status": "running",
+     "conditions": [
+      {
+       "op": "in",
+       "tactic": "channel",
+       "values": [
+        "Cold email",
+        "LinkedIn"
+       ]
+      }
+     ],
      "strategies": {
       "writer": "writer#pro-models"
-     },
-     "start": "start"
+     }
     },
     {
      "id": "campaign-3f",
      "brandId": "brand-3",
      "offerId": "offer-3",
      "name": "Follow-ups after each message sent",
-     "line": [
-      "lead_interested"
-     ],
+     "start": "message_sent",
+     "target": "lead_interested",
      "dailyBudgetCents": 1200,
      "status": "running",
-     "strategies": {},
-     "start": "message_sent"
+     "strategies": {}
     }
    ],
    "seeds": [
@@ -1937,17 +2157,18 @@
      "brandId": "brand-4",
      "offerId": "offer-4",
      "name": "Paid clients from ads",
-     "line": [
-      "lead_visited",
-      "lead_interested",
-      "meeting_booked",
-      "meeting_attended",
-      "paid_client"
-     ],
+     "start": "start",
+     "target": "paid_client",
      "dailyBudgetCents": 2500,
      "status": "running",
-     "strategies": {},
-     "start": "start"
+     "conditions": [
+      {
+       "op": "equals",
+       "tactic": "channel",
+       "value": "Ads"
+      }
+     ],
+     "strategies": {}
     }
    ],
    "seeds": [
@@ -2097,7 +2318,7 @@
   }
  ],
  "truth": {
-  "pipes": {
+  "legs": {
    "offer_description": {
     "base": 1,
     "delayMeanDays": 0,
@@ -2534,7 +2755,7 @@
    "icon": "note-pencil"
   },
   {
-   "kind": "pipe",
+   "kind": "leg",
    "id": "llm",
    "label": "LLMs",
    "icon": "sparkle"

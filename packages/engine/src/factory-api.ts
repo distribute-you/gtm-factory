@@ -151,7 +151,7 @@ export interface ApiCampaign {
   factory?: string;
 }
 
-export interface ApiOption {
+export interface ApiCandidate {
   id: string;
   label: string;
   /** Mean of the belief about the share of decisions reaching the leg's end. */
@@ -172,7 +172,7 @@ export interface ApiChoicePoint {
   legId: string;
   material: OutcomeId | null;
   label: string;
-  options: ApiOption[];
+  candidates: ApiCandidate[];
 }
 
 export interface ApiChoice {
@@ -185,8 +185,8 @@ export interface ApiChoice {
   pointLabel: string;
   chosen: string;
   chosenLabel: string;
-  /** Each option as scored at the moment of the choice (one Thompson draw). */
-  options: { id: string; label: string; meanScore: number; sampledScore: number }[];
+  /** Each candidate as scored at the moment of the choice (one Thompson draw). */
+  candidates: { id: string; label: string; meanScore: number; sampledScore: number }[];
   /** Why, in plain words. */
   reason: string;
   /** Reached the end of its leg (credited through traceability). */

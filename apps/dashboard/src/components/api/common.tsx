@@ -368,17 +368,17 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
       {open && (
         <tr className="k-line-subtle border-b">
           <td colSpan={5} className="bg-[var(--bg-inset)] px-4 py-3">
-            <p className="k-label mb-1.5">Options at this draw</p>
+            <p className="k-label mb-1.5">Candidates at this draw</p>
             <table className="text-[12px]">
               <thead>
                 <tr className="k-fg3">
-                  <td className="pb-1 pr-6">Option</td>
+                  <td className="pb-1 pr-6">Candidate</td>
                   <td className="pb-1 pr-6 text-right">Value per $ (mean)</td>
                   <td className="pb-1 text-right">Value per $ (this draw)</td>
                 </tr>
               </thead>
               <tbody>
-                {choice.options.map((o) => (
+                {choice.candidates.map((o) => (
                   <tr key={o.id} className={o.id === choice.chosen ? "font-medium" : "k-fg2"}>
                     <td className="py-0.5 pr-6">{o.label}</td>
                     <td className="py-0.5 pr-6 text-right tabular-nums">{formatRoi(o.meanScore)}</td>
@@ -394,14 +394,14 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
   );
 }
 
-/** Each choice point and its options' beliefs. Rows keep the served order. */
+/** Each choice point and its candidates' beliefs. Rows keep the served order. */
 export function PointsList({ points, empty = "No choice point yet." }: { points: ApiChoicePoint[]; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.options.length)} options at this Material`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} candidates at this Material`}>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>
@@ -421,7 +421,7 @@ export function PointsList({ points, empty = "No choice point yet." }: { points:
               </tr>
             </thead>
             <tbody>
-              {p.options.map((o) => (
+              {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>{o.label}</td>
                   <td className={TDN}>{formatRoi(o.meanScore)}</td>

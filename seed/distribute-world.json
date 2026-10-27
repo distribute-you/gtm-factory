@@ -226,7 +226,7 @@
         "subject": "brand",
         "contentType": "rating",
         "icon": "chart-bar",
-        "description": "Per option at each choice point, what the ledger says about value per dollar. Made each tick by the Supplier rating."
+        "description": "Per candidate at each choice point, what the ledger says about value per dollar. Made each tick by the Supplier rating."
       },
       {
         "id": "fact:email_pushed_via_api",
@@ -284,16 +284,10 @@
         "description": "Systems that report a fact through a webhook."
       }
     ],
-    "pipes": [
+    "legs": [
       {
         "id": "lead_found>lead_interested",
         "name": "Lead to lead interested",
-        "materials": [
-          "lead_found",
-          "template_written",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -308,12 +302,6 @@
       {
         "id": "lead_found>lead_visited",
         "name": "Lead to lead visited",
-        "materials": [
-          "lead_found",
-          "template_written",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_visited",
         "factory": "ours",
         "maturity": {
@@ -328,12 +316,6 @@
       {
         "id": "lead_interested>paid_client",
         "name": "Lead interested to paid client",
-        "materials": [
-          "lead_interested",
-          "template_written",
-          "llm_completion",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -348,12 +330,6 @@
       {
         "id": "start>lead_interested@fact:whatsapp_number_given",
         "name": "Start to lead interested after whatsapp number given",
-        "materials": [
-          "fact:whatsapp_number_given",
-          "template_written",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -368,9 +344,6 @@
       {
         "id": "start>lead_visited",
         "name": "Start to lead visited",
-        "materials": [
-          "rating"
-        ],
         "output": "lead_visited",
         "factory": "ours",
         "maturity": {
@@ -385,9 +358,6 @@
       {
         "id": "start>lead_interested",
         "name": "Start to lead interested",
-        "materials": [
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -402,9 +372,6 @@
       {
         "id": "start>meeting_booked",
         "name": "Start to meeting booked",
-        "materials": [
-          "rating"
-        ],
         "output": "meeting_booked",
         "factory": "ours",
         "maturity": {
@@ -419,11 +386,6 @@
       {
         "id": "lead_interested>meeting_booked",
         "name": "Lead interested to meeting booked",
-        "materials": [
-          "lead_interested",
-          "llm_completion",
-          "rating"
-        ],
         "output": "meeting_booked",
         "factory": "ours",
         "maturity": {
@@ -438,10 +400,6 @@
       {
         "id": "lead_visited>meeting_booked",
         "name": "Lead visited to meeting booked",
-        "materials": [
-          "lead_visited",
-          "rating"
-        ],
         "output": "meeting_booked",
         "factory": "ours",
         "maturity": {
@@ -456,9 +414,6 @@
       {
         "id": "team:lead_interested>meeting_booked",
         "name": "Your team: Lead interested to meeting booked",
-        "materials": [
-          "lead_interested"
-        ],
         "output": "meeting_booked",
         "factory": "client_team",
         "maturity": {
@@ -473,9 +428,6 @@
       {
         "id": "team:lead_visited>meeting_booked",
         "name": "Your team: Lead visited to meeting booked",
-        "materials": [
-          "lead_visited"
-        ],
         "output": "meeting_booked",
         "factory": "client_team",
         "maturity": {
@@ -490,10 +442,6 @@
       {
         "id": "meeting_booked>meeting_attended",
         "name": "Meeting booked to meeting attended",
-        "materials": [
-          "meeting_booked",
-          "rating"
-        ],
         "output": "meeting_attended",
         "factory": "ours",
         "maturity": {
@@ -508,9 +456,6 @@
       {
         "id": "team:meeting_booked>meeting_attended",
         "name": "Your team: Meeting booked to meeting attended",
-        "materials": [
-          "meeting_booked"
-        ],
         "output": "meeting_attended",
         "factory": "client_team",
         "maturity": {
@@ -525,10 +470,6 @@
       {
         "id": "meeting_attended>paid_client",
         "name": "Meeting attended to paid client",
-        "materials": [
-          "meeting_attended",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -543,9 +484,6 @@
       {
         "id": "team:meeting_attended>paid_client",
         "name": "Your team: Meeting attended to paid client",
-        "materials": [
-          "meeting_attended"
-        ],
         "output": "paid_client",
         "factory": "client_team",
         "maturity": {
@@ -560,9 +498,6 @@
       {
         "id": "team:lead_found>paid_client",
         "name": "Your team: Lead to paid client",
-        "materials": [
-          "lead_found"
-        ],
         "output": "paid_client",
         "factory": "client_team",
         "maturity": {
@@ -577,9 +512,6 @@
       {
         "id": "team:industry_update_video>paid_client",
         "name": "Your team: Industry update video to paid client",
-        "materials": [
-          "industry_update_video"
-        ],
         "output": "paid_client",
         "factory": "client_team",
         "maturity": {
@@ -594,9 +526,6 @@
       {
         "id": "team:lead_interested>paid_client",
         "name": "Your team: Lead interested to paid client",
-        "materials": [
-          "lead_interested"
-        ],
         "output": "paid_client",
         "factory": "client_team",
         "maturity": {
@@ -611,11 +540,6 @@
       {
         "id": "lead_interested>booking_call",
         "name": "Lead interested to booking call",
-        "materials": [
-          "lead_interested",
-          "llm_completion",
-          "rating"
-        ],
         "output": "booking_call",
         "factory": "ours",
         "maturity": {
@@ -630,9 +554,6 @@
       {
         "id": "team:booking_call>meeting_booked",
         "name": "Your team: Booking call to meeting booked",
-        "materials": [
-          "booking_call"
-        ],
         "output": "meeting_booked",
         "factory": "client_team",
         "maturity": {
@@ -647,9 +568,6 @@
       {
         "id": "team:lead_visited>lead_interested",
         "name": "Your team: Lead visited to lead interested",
-        "materials": [
-          "lead_visited"
-        ],
         "output": "lead_interested",
         "factory": "client_team",
         "maturity": {
@@ -664,9 +582,6 @@
       {
         "id": "team:lead_visited>purchase",
         "name": "Your team: Lead visited to direct purchase",
-        "materials": [
-          "lead_visited"
-        ],
         "output": "purchase",
         "factory": "client_team",
         "maturity": {
@@ -681,9 +596,6 @@
       {
         "id": "team:purchase>paid_client",
         "name": "Your team: Direct purchase to paid client",
-        "materials": [
-          "purchase"
-        ],
         "output": "paid_client",
         "factory": "client_team",
         "maturity": {
@@ -698,12 +610,6 @@
       {
         "id": "lead_interested>paid_client@fact:follow_up_due",
         "name": "Lead interested to paid client after follow-up due",
-        "materials": [
-          "fact:follow_up_due",
-          "lead_interested",
-          "llm_completion",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -718,12 +624,6 @@
       {
         "id": "lead_interested>paid_client@fact:github_issue_in_prod",
         "name": "Lead interested to paid client after github issue in prod",
-        "materials": [
-          "fact:github_issue_in_prod",
-          "lead_interested",
-          "llm_completion",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -738,11 +638,6 @@
       {
         "id": "start>lead_interested@fact:follow_up_due",
         "name": "Start to lead interested after follow-up due",
-        "materials": [
-          "fact:follow_up_due",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -757,11 +652,6 @@
       {
         "id": "lead_visited>lead_interested",
         "name": "Lead visited to lead interested",
-        "materials": [
-          "lead_visited",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -776,11 +666,6 @@
       {
         "id": "start>paid_client@lead_interested",
         "name": "Start to paid client after lead interested",
-        "materials": [
-          "lead_interested",
-          "llm_completion",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -795,10 +680,6 @@
       {
         "id": "start>lead_found",
         "name": "Start to lead",
-        "materials": [
-          "audience_built",
-          "rating"
-        ],
         "output": "lead_found",
         "factory": "ours",
         "maturity": {
@@ -813,9 +694,6 @@
       {
         "id": "start>industry_update_video",
         "name": "Start to industry update video",
-        "materials": [
-          "rating"
-        ],
         "output": "industry_update_video",
         "factory": "ours",
         "maturity": {
@@ -830,12 +708,6 @@
       {
         "id": "start>lead_interested@fact:email_pushed_via_api",
         "name": "Start to lead interested after email pushed via api",
-        "materials": [
-          "fact:email_pushed_via_api",
-          "template_written",
-          "llm_completion",
-          "rating"
-        ],
         "output": "lead_interested",
         "factory": "ours",
         "maturity": {
@@ -850,11 +722,6 @@
       {
         "id": "start>paid_client@fact:hot_lead",
         "name": "Start to paid client after hot lead",
-        "materials": [
-          "fact:hot_lead",
-          "llm_completion",
-          "rating"
-        ],
         "output": "paid_client",
         "factory": "ours",
         "maturity": {
@@ -869,7 +736,6 @@
       {
         "id": "icp_client",
         "name": "ICP from the client",
-        "materials": [],
         "output": "audience_built",
         "factory": "client_team",
         "maturity": {
@@ -884,7 +750,6 @@
       {
         "id": "icp_finder",
         "name": "ICP finder",
-        "materials": [],
         "output": "audience_built",
         "factory": "ours",
         "maturity": {
@@ -899,7 +764,6 @@
       {
         "id": "template_writing",
         "name": "Template writing",
-        "materials": [],
         "output": "template_written",
         "factory": "ours",
         "maturity": {
@@ -914,7 +778,6 @@
       {
         "id": "llm",
         "name": "LLM",
-        "materials": [],
         "output": "llm_completion",
         "factory": "ours",
         "maturity": {
@@ -929,7 +792,6 @@
       {
         "id": "supplier_rating",
         "name": "Supplier rating",
-        "materials": [],
         "output": "rating",
         "factory": "ours",
         "maturity": {
@@ -938,13 +800,12 @@
           "delayMeanDays": 0,
           "horizonDays": 0
         },
-        "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing pipe consumes.",
+        "description": "An auxiliary cost center: reads the ledger and the traceability, and makes each tick the Rating every choosing leg consumes.",
         "icon": "chart-bar"
       },
       {
         "id": "webhook:email_pushed_via_api",
         "name": "Email Pushed Via API (webhook)",
-        "materials": [],
         "output": "fact:email_pushed_via_api",
         "factory": "other_systems",
         "webhook": true,
@@ -960,7 +821,6 @@
       {
         "id": "webhook:follow_up_due",
         "name": "Follow-up Due (webhook)",
-        "materials": [],
         "output": "fact:follow_up_due",
         "factory": "other_systems",
         "webhook": true,
@@ -976,7 +836,6 @@
       {
         "id": "webhook:github_issue_in_prod",
         "name": "GitHub Issue In Prod (webhook)",
-        "materials": [],
         "output": "fact:github_issue_in_prod",
         "factory": "other_systems",
         "webhook": true,
@@ -992,7 +851,6 @@
       {
         "id": "webhook:hot_lead",
         "name": "Hot Lead (webhook)",
-        "materials": [],
         "output": "fact:hot_lead",
         "factory": "other_systems",
         "webhook": true,
@@ -1008,7 +866,6 @@
       {
         "id": "webhook:whatsapp_number_given",
         "name": "WhatsApp Number Given (webhook)",
-        "materials": [],
         "output": "fact:whatsapp_number_given",
         "factory": "other_systems",
         "webhook": true,
@@ -1025,11 +882,12 @@
     "scripts": [
       {
         "id": "llm_glm",
-        "pipeId": "llm",
+        "legId": "llm",
         "dynasty": "llm_glm",
         "version": 1,
         "name": "GLM",
         "kind": "ai",
+        "materials": [],
         "tactics": {
           "tier": "fast"
         },
@@ -1042,11 +900,12 @@
       },
       {
         "id": "llm_gemini_flash",
-        "pipeId": "llm",
+        "legId": "llm",
         "dynasty": "llm_gemini_flash",
         "version": 1,
         "name": "Gemini Flash",
         "kind": "ai",
+        "materials": [],
         "tactics": {
           "tier": "fast"
         },
@@ -1059,11 +918,12 @@
       },
       {
         "id": "llm_gemini_pro",
-        "pipeId": "llm",
+        "legId": "llm",
         "dynasty": "llm_gemini_pro",
         "version": 1,
         "name": "Gemini Pro",
         "kind": "ai",
+        "materials": [],
         "tactics": {
           "tier": "pro"
         },
@@ -1076,11 +936,12 @@
       },
       {
         "id": "llm_claude_sonnet",
-        "pipeId": "llm",
+        "legId": "llm",
         "dynasty": "llm_claude_sonnet",
         "version": 1,
         "name": "Claude Sonnet",
         "kind": "ai",
+        "materials": [],
         "tactics": {
           "tier": "pro"
         },
@@ -1093,55 +954,60 @@
       },
       {
         "id": "tpl_ai",
-        "pipeId": "template_writing",
+        "legId": "template_writing",
         "dynasty": "tpl_ai",
         "version": 1,
         "name": "AI template writer",
         "kind": "ai",
+        "materials": [],
         "tactics": {},
         "costCents": 50,
         "status": "active"
       },
       {
         "id": "tpl_copywriter",
-        "pipeId": "template_writing",
+        "legId": "template_writing",
         "dynasty": "tpl_copywriter",
         "version": 1,
         "name": "Copywriter",
         "kind": "human",
+        "materials": [],
         "tactics": {},
         "costCents": 3000,
         "status": "active"
       },
       {
         "id": "icp_client_states",
-        "pipeId": "icp_client",
+        "legId": "icp_client",
         "dynasty": "icp_client_states",
         "version": 1,
         "name": "Client states it",
         "kind": "human",
+        "materials": [],
         "tactics": {},
         "costCents": 0,
         "status": "active"
       },
       {
         "id": "icp_ai",
-        "pipeId": "icp_finder",
+        "legId": "icp_finder",
         "dynasty": "icp_ai",
         "version": 1,
         "name": "AI ICP finder",
         "kind": "ai",
+        "materials": [],
         "tactics": {},
         "costCents": 200,
         "status": "active"
       },
       {
         "id": "rating_pooled",
-        "pipeId": "supplier_rating",
+        "legId": "supplier_rating",
         "dynasty": "rating_pooled",
         "version": 1,
         "name": "Pooled Thompson rating",
         "kind": "rules",
+        "materials": [],
         "tactics": {
           "reads_evidence": true
         },
@@ -1150,11 +1016,25 @@
       },
       {
         "id": "sales-cold-email-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "sales-cold-email-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Sales Cold Email Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Cold Email Outreach",
           "personalized": false
@@ -1164,11 +1044,25 @@
       },
       {
         "id": "sales-cold-email-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "sales-cold-email-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Sales Cold Email Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Cold Email Outreach",
           "personalized": true
@@ -1178,11 +1072,25 @@
       },
       {
         "id": "sales-cold-email-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "sales-cold-email-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Sales Cold Email Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Cold Email Outreach",
           "personalized": false
@@ -1192,11 +1100,25 @@
       },
       {
         "id": "sales-cold-email-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "sales-cold-email-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Sales Cold Email Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Cold Email Outreach",
           "personalized": true
@@ -1206,11 +1128,25 @@
       },
       {
         "id": "feedback-request-cold-email-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "feedback-request-cold-email-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Sales Feedback Request Cold Email Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Feedback Request Cold Email Outreach",
           "personalized": false
@@ -1220,11 +1156,25 @@
       },
       {
         "id": "feedback-request-cold-email-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "feedback-request-cold-email-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Sales Feedback Request Cold Email Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Sales Feedback Request Cold Email Outreach",
           "personalized": true
@@ -1234,11 +1184,19 @@
       },
       {
         "id": "cold-call-outreach|lead_found_to_conversation#team",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-call-outreach|lead_found_to_conversation#team",
         "version": 1,
         "name": "Cold Call Outreach, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Call Outreach"
         },
@@ -1247,11 +1205,19 @@
       },
       {
         "id": "cold-sms-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-sms-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold SMS Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold SMS Outreach",
           "personalized": false
@@ -1261,11 +1227,19 @@
       },
       {
         "id": "cold-sms-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-sms-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold SMS Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold SMS Outreach",
           "personalized": true
@@ -1275,11 +1249,19 @@
       },
       {
         "id": "cold-sms-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-sms-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold SMS Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold SMS Outreach",
           "personalized": false
@@ -1289,11 +1271,19 @@
       },
       {
         "id": "cold-sms-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-sms-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold SMS Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold SMS Outreach",
           "personalized": true
@@ -1303,11 +1293,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-whatsapp-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": false
@@ -1317,11 +1321,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-whatsapp-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": true
@@ -1331,11 +1349,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-whatsapp-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": false
@@ -1345,11 +1377,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-whatsapp-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": true
@@ -1359,11 +1405,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|signup_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client",
+        "legId": "lead_interested>paid_client",
         "dynasty": "cold-whatsapp-outreach|signup_to_paid_client#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "wait_days": 1,
@@ -1374,11 +1434,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|signup_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client",
+        "legId": "lead_interested>paid_client",
         "dynasty": "cold-whatsapp-outreach|signup_to_paid_client#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "wait_days": 1,
@@ -1389,11 +1463,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|start_to_signup#short",
-        "pipeId": "start>lead_interested@fact:whatsapp_number_given",
+        "legId": "start>lead_interested@fact:whatsapp_number_given",
         "dynasty": "cold-whatsapp-outreach|start_to_signup#short",
         "version": 1,
         "name": "Cold WhatsApp Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:whatsapp_number_given"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": false
@@ -1403,11 +1491,25 @@
       },
       {
         "id": "cold-whatsapp-outreach|start_to_signup#research",
-        "pipeId": "start>lead_interested@fact:whatsapp_number_given",
+        "legId": "start>lead_interested@fact:whatsapp_number_given",
         "dynasty": "cold-whatsapp-outreach|start_to_signup#research",
         "version": 1,
         "name": "Cold WhatsApp Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:whatsapp_number_given"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold WhatsApp Outreach",
           "personalized": true
@@ -1417,11 +1519,19 @@
       },
       {
         "id": "cold-linkedin-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-linkedin-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold LinkedIn Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold LinkedIn Outreach",
           "personalized": false
@@ -1431,11 +1541,19 @@
       },
       {
         "id": "cold-linkedin-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-linkedin-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold LinkedIn Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold LinkedIn Outreach",
           "personalized": true
@@ -1445,11 +1563,19 @@
       },
       {
         "id": "cold-linkedin-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-linkedin-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold LinkedIn Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold LinkedIn Outreach",
           "personalized": false
@@ -1459,11 +1585,19 @@
       },
       {
         "id": "cold-linkedin-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-linkedin-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold LinkedIn Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold LinkedIn Outreach",
           "personalized": true
@@ -1473,11 +1607,19 @@
       },
       {
         "id": "cold-x-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-x-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold X Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold X Outreach",
           "personalized": false
@@ -1487,11 +1629,19 @@
       },
       {
         "id": "cold-x-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-x-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold X Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold X Outreach",
           "personalized": true
@@ -1501,11 +1651,19 @@
       },
       {
         "id": "cold-x-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-x-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold X Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold X Outreach",
           "personalized": false
@@ -1515,11 +1673,19 @@
       },
       {
         "id": "cold-x-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-x-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold X Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold X Outreach",
           "personalized": true
@@ -1529,11 +1695,19 @@
       },
       {
         "id": "cold-instagram-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-instagram-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold Instagram Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Instagram Outreach",
           "personalized": false
@@ -1543,11 +1717,19 @@
       },
       {
         "id": "cold-instagram-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-instagram-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold Instagram Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Instagram Outreach",
           "personalized": true
@@ -1557,11 +1739,19 @@
       },
       {
         "id": "cold-instagram-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-instagram-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold Instagram Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Instagram Outreach",
           "personalized": false
@@ -1571,11 +1761,19 @@
       },
       {
         "id": "cold-instagram-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-instagram-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold Instagram Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Instagram Outreach",
           "personalized": true
@@ -1585,11 +1783,19 @@
       },
       {
         "id": "cold-reddit-outreach|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-reddit-outreach|lead_found_to_conversation#short",
         "version": 1,
         "name": "Cold Reddit Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Reddit Outreach",
           "personalized": false
@@ -1599,11 +1805,19 @@
       },
       {
         "id": "cold-reddit-outreach|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "cold-reddit-outreach|lead_found_to_conversation#research",
         "version": 1,
         "name": "Cold Reddit Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Reddit Outreach",
           "personalized": true
@@ -1613,11 +1827,19 @@
       },
       {
         "id": "cold-reddit-outreach|lead_found_to_website_visit#short",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-reddit-outreach|lead_found_to_website_visit#short",
         "version": 1,
         "name": "Cold Reddit Outreach, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Reddit Outreach",
           "personalized": false
@@ -1627,11 +1849,19 @@
       },
       {
         "id": "cold-reddit-outreach|lead_found_to_website_visit#research",
-        "pipeId": "lead_found>lead_visited",
+        "legId": "lead_found>lead_visited",
         "dynasty": "cold-reddit-outreach|lead_found_to_website_visit#research",
         "version": 1,
         "name": "Cold Reddit Outreach, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Cold Reddit Outreach",
           "personalized": true
@@ -1641,11 +1871,16 @@
       },
       {
         "id": "google-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "google-ads|start_to_website_visit#short",
         "version": 1,
         "name": "Google Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Google Ads",
           "personalized": false
@@ -1655,11 +1890,16 @@
       },
       {
         "id": "google-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "google-ads|start_to_website_visit#research",
         "version": 1,
         "name": "Google Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Google Ads",
           "personalized": true
@@ -1669,11 +1909,16 @@
       },
       {
         "id": "google-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "google-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "Google Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Google Ads",
           "personalized": false
@@ -1683,11 +1928,16 @@
       },
       {
         "id": "google-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "google-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "Google Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Google Ads",
           "personalized": true
@@ -1697,11 +1947,16 @@
       },
       {
         "id": "meta-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "meta-ads|start_to_website_visit#short",
         "version": 1,
         "name": "Meta Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": false
@@ -1711,11 +1966,16 @@
       },
       {
         "id": "meta-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "meta-ads|start_to_website_visit#research",
         "version": 1,
         "name": "Meta Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": true
@@ -1725,11 +1985,16 @@
       },
       {
         "id": "meta-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "meta-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "Meta Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": false
@@ -1739,11 +2004,16 @@
       },
       {
         "id": "meta-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "meta-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "Meta Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": true
@@ -1753,11 +2023,16 @@
       },
       {
         "id": "meta-ads|start_to_meeting_booked#short",
-        "pipeId": "start>meeting_booked",
+        "legId": "start>meeting_booked",
         "dynasty": "meta-ads|start_to_meeting_booked#short",
         "version": 1,
         "name": "Meta Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": false
@@ -1767,11 +2042,16 @@
       },
       {
         "id": "meta-ads|start_to_meeting_booked#research",
-        "pipeId": "start>meeting_booked",
+        "legId": "start>meeting_booked",
         "dynasty": "meta-ads|start_to_meeting_booked#research",
         "version": 1,
         "name": "Meta Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Meta Ads",
           "personalized": true
@@ -1781,11 +2061,16 @@
       },
       {
         "id": "linkedin-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "linkedin-ads|start_to_website_visit#short",
         "version": 1,
         "name": "LinkedIn Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": false
@@ -1795,11 +2080,16 @@
       },
       {
         "id": "linkedin-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "linkedin-ads|start_to_website_visit#research",
         "version": 1,
         "name": "LinkedIn Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": true
@@ -1809,11 +2099,16 @@
       },
       {
         "id": "linkedin-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "linkedin-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "LinkedIn Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": false
@@ -1823,11 +2118,16 @@
       },
       {
         "id": "linkedin-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "linkedin-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "LinkedIn Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": true
@@ -1837,11 +2137,16 @@
       },
       {
         "id": "linkedin-ads|start_to_meeting_booked#short",
-        "pipeId": "start>meeting_booked",
+        "legId": "start>meeting_booked",
         "dynasty": "linkedin-ads|start_to_meeting_booked#short",
         "version": 1,
         "name": "LinkedIn Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": false
@@ -1851,11 +2156,16 @@
       },
       {
         "id": "linkedin-ads|start_to_meeting_booked#research",
-        "pipeId": "start>meeting_booked",
+        "legId": "start>meeting_booked",
         "dynasty": "linkedin-ads|start_to_meeting_booked#research",
         "version": 1,
         "name": "LinkedIn Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Ads",
           "personalized": true
@@ -1865,11 +2175,16 @@
       },
       {
         "id": "tiktok-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "tiktok-ads|start_to_website_visit#short",
         "version": 1,
         "name": "TikTok Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "TikTok Ads",
           "personalized": false
@@ -1879,11 +2194,16 @@
       },
       {
         "id": "tiktok-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "tiktok-ads|start_to_website_visit#research",
         "version": 1,
         "name": "TikTok Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "TikTok Ads",
           "personalized": true
@@ -1893,11 +2213,16 @@
       },
       {
         "id": "tiktok-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "tiktok-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "TikTok Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "TikTok Ads",
           "personalized": false
@@ -1907,11 +2232,16 @@
       },
       {
         "id": "tiktok-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "tiktok-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "TikTok Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "TikTok Ads",
           "personalized": true
@@ -1921,11 +2251,16 @@
       },
       {
         "id": "youtube-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "youtube-ads|start_to_website_visit#short",
         "version": 1,
         "name": "YouTube Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "YouTube Ads",
           "personalized": false
@@ -1935,11 +2270,16 @@
       },
       {
         "id": "youtube-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "youtube-ads|start_to_website_visit#research",
         "version": 1,
         "name": "YouTube Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "YouTube Ads",
           "personalized": true
@@ -1949,11 +2289,16 @@
       },
       {
         "id": "youtube-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "youtube-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "YouTube Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "YouTube Ads",
           "personalized": false
@@ -1963,11 +2308,16 @@
       },
       {
         "id": "youtube-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "youtube-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "YouTube Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "YouTube Ads",
           "personalized": true
@@ -1977,11 +2327,16 @@
       },
       {
         "id": "x-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "x-ads|start_to_website_visit#short",
         "version": 1,
         "name": "X Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "X Ads",
           "personalized": false
@@ -1991,11 +2346,16 @@
       },
       {
         "id": "x-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "x-ads|start_to_website_visit#research",
         "version": 1,
         "name": "X Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "X Ads",
           "personalized": true
@@ -2005,11 +2365,16 @@
       },
       {
         "id": "reddit-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "reddit-ads|start_to_website_visit#short",
         "version": 1,
         "name": "Reddit Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Reddit Ads",
           "personalized": false
@@ -2019,11 +2384,16 @@
       },
       {
         "id": "reddit-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "reddit-ads|start_to_website_visit#research",
         "version": 1,
         "name": "Reddit Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Reddit Ads",
           "personalized": true
@@ -2033,11 +2403,16 @@
       },
       {
         "id": "reddit-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "reddit-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "Reddit Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Reddit Ads",
           "personalized": false
@@ -2047,11 +2422,16 @@
       },
       {
         "id": "reddit-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "reddit-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "Reddit Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Reddit Ads",
           "personalized": true
@@ -2061,11 +2441,16 @@
       },
       {
         "id": "bing-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "bing-ads|start_to_website_visit#short",
         "version": 1,
         "name": "Bing Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Bing Ads",
           "personalized": false
@@ -2075,11 +2460,16 @@
       },
       {
         "id": "bing-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "bing-ads|start_to_website_visit#research",
         "version": 1,
         "name": "Bing Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Bing Ads",
           "personalized": true
@@ -2089,11 +2479,16 @@
       },
       {
         "id": "bing-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "bing-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "Bing Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Bing Ads",
           "personalized": false
@@ -2103,11 +2498,16 @@
       },
       {
         "id": "bing-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "bing-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "Bing Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Bing Ads",
           "personalized": true
@@ -2117,11 +2517,16 @@
       },
       {
         "id": "quora-ads|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "quora-ads|start_to_website_visit#short",
         "version": 1,
         "name": "Quora Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Quora Ads",
           "personalized": false
@@ -2131,11 +2536,16 @@
       },
       {
         "id": "quora-ads|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "quora-ads|start_to_website_visit#research",
         "version": 1,
         "name": "Quora Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Quora Ads",
           "personalized": true
@@ -2145,11 +2555,16 @@
       },
       {
         "id": "quora-ads|start_to_form_submitted#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "quora-ads|start_to_form_submitted#short",
         "version": 1,
         "name": "Quora Ads, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Quora Ads",
           "personalized": false
@@ -2159,11 +2574,16 @@
       },
       {
         "id": "quora-ads|start_to_form_submitted#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "quora-ads|start_to_form_submitted#research",
         "version": 1,
         "name": "Quora Ads, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Quora Ads",
           "personalized": true
@@ -2173,11 +2593,16 @@
       },
       {
         "id": "newsletter-sponsorships|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "newsletter-sponsorships|start_to_website_visit#short",
         "version": 1,
         "name": "Newsletter Sponsorships, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Newsletter Sponsorships",
           "personalized": false
@@ -2187,11 +2612,16 @@
       },
       {
         "id": "newsletter-sponsorships|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "newsletter-sponsorships|start_to_website_visit#research",
         "version": 1,
         "name": "Newsletter Sponsorships, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Newsletter Sponsorships",
           "personalized": true
@@ -2201,11 +2631,16 @@
       },
       {
         "id": "podcast-sponsorships|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "podcast-sponsorships|start_to_website_visit#short",
         "version": 1,
         "name": "Podcast Sponsorships, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Podcast Sponsorships",
           "personalized": false
@@ -2215,11 +2650,16 @@
       },
       {
         "id": "podcast-sponsorships|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "podcast-sponsorships|start_to_website_visit#research",
         "version": 1,
         "name": "Podcast Sponsorships, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Podcast Sponsorships",
           "personalized": true
@@ -2229,11 +2669,16 @@
       },
       {
         "id": "creator-sponsorships|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "creator-sponsorships|start_to_website_visit#short",
         "version": 1,
         "name": "Creator Sponsorships, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Creator Sponsorships",
           "personalized": false
@@ -2243,11 +2688,16 @@
       },
       {
         "id": "creator-sponsorships|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "creator-sponsorships|start_to_website_visit#research",
         "version": 1,
         "name": "Creator Sponsorships, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Creator Sponsorships",
           "personalized": true
@@ -2257,11 +2707,16 @@
       },
       {
         "id": "paid-directory-listings|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "paid-directory-listings|start_to_website_visit#short",
         "version": 1,
         "name": "Paid Software Directory Listings, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Paid Software Directory Listings",
           "personalized": false
@@ -2271,11 +2726,16 @@
       },
       {
         "id": "paid-directory-listings|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "paid-directory-listings|start_to_website_visit#research",
         "version": 1,
         "name": "Paid Software Directory Listings, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Paid Software Directory Listings",
           "personalized": true
@@ -2285,11 +2745,16 @@
       },
       {
         "id": "seo-content|start_to_website_visit#team",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "seo-content|start_to_website_visit#team",
         "version": 1,
         "name": "SEO Content, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "SEO Content"
         },
@@ -2298,11 +2763,16 @@
       },
       {
         "id": "press-placements|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "press-placements|start_to_website_visit#short",
         "version": 1,
         "name": "Press Placements, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Press Placements",
           "personalized": false
@@ -2312,11 +2782,16 @@
       },
       {
         "id": "press-placements|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "press-placements|start_to_website_visit#research",
         "version": 1,
         "name": "Press Placements, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Press Placements",
           "personalized": true
@@ -2326,11 +2801,16 @@
       },
       {
         "id": "podcast-guesting|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "podcast-guesting|start_to_website_visit#short",
         "version": 1,
         "name": "Podcast Guesting, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Podcast Guesting",
           "personalized": false
@@ -2340,11 +2820,16 @@
       },
       {
         "id": "podcast-guesting|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "podcast-guesting|start_to_website_visit#research",
         "version": 1,
         "name": "Podcast Guesting, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Podcast Guesting",
           "personalized": true
@@ -2354,11 +2839,16 @@
       },
       {
         "id": "affiliate-programme|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "affiliate-programme|start_to_website_visit#short",
         "version": 1,
         "name": "Affiliate Programme, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Affiliate Programme",
           "personalized": false
@@ -2368,11 +2858,16 @@
       },
       {
         "id": "affiliate-programme|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "affiliate-programme|start_to_website_visit#research",
         "version": 1,
         "name": "Affiliate Programme, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Affiliate Programme",
           "personalized": true
@@ -2382,11 +2877,16 @@
       },
       {
         "id": "organic-linkedin-publishing|start_to_conversation#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-linkedin-publishing|start_to_conversation#short",
         "version": 1,
         "name": "LinkedIn Posting, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Posting",
           "personalized": false
@@ -2396,11 +2896,16 @@
       },
       {
         "id": "organic-linkedin-publishing|start_to_conversation#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-linkedin-publishing|start_to_conversation#research",
         "version": 1,
         "name": "LinkedIn Posting, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Posting",
           "personalized": true
@@ -2410,11 +2915,16 @@
       },
       {
         "id": "organic-linkedin-publishing|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-linkedin-publishing|start_to_website_visit#short",
         "version": 1,
         "name": "LinkedIn Posting, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Posting",
           "personalized": false
@@ -2424,11 +2934,16 @@
       },
       {
         "id": "organic-linkedin-publishing|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-linkedin-publishing|start_to_website_visit#research",
         "version": 1,
         "name": "LinkedIn Posting, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Posting",
           "personalized": true
@@ -2438,11 +2953,16 @@
       },
       {
         "id": "organic-x-publishing|start_to_conversation#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-x-publishing|start_to_conversation#short",
         "version": 1,
         "name": "Organic X Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic X Publishing",
           "personalized": false
@@ -2452,11 +2972,16 @@
       },
       {
         "id": "organic-x-publishing|start_to_conversation#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-x-publishing|start_to_conversation#research",
         "version": 1,
         "name": "Organic X Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic X Publishing",
           "personalized": true
@@ -2466,11 +2991,16 @@
       },
       {
         "id": "organic-x-publishing|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-x-publishing|start_to_website_visit#short",
         "version": 1,
         "name": "Organic X Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic X Publishing",
           "personalized": false
@@ -2480,11 +3010,16 @@
       },
       {
         "id": "organic-x-publishing|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-x-publishing|start_to_website_visit#research",
         "version": 1,
         "name": "Organic X Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic X Publishing",
           "personalized": true
@@ -2494,11 +3029,16 @@
       },
       {
         "id": "organic-reddit-publishing|start_to_conversation#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-reddit-publishing|start_to_conversation#short",
         "version": 1,
         "name": "Organic Reddit Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic Reddit Publishing",
           "personalized": false
@@ -2508,11 +3048,16 @@
       },
       {
         "id": "organic-reddit-publishing|start_to_conversation#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-reddit-publishing|start_to_conversation#research",
         "version": 1,
         "name": "Organic Reddit Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic Reddit Publishing",
           "personalized": true
@@ -2522,11 +3067,16 @@
       },
       {
         "id": "organic-reddit-publishing|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-reddit-publishing|start_to_website_visit#short",
         "version": 1,
         "name": "Organic Reddit Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic Reddit Publishing",
           "personalized": false
@@ -2536,11 +3086,16 @@
       },
       {
         "id": "organic-reddit-publishing|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-reddit-publishing|start_to_website_visit#research",
         "version": 1,
         "name": "Organic Reddit Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic Reddit Publishing",
           "personalized": true
@@ -2550,11 +3105,16 @@
       },
       {
         "id": "organic-youtube-publishing|start_to_conversation#short",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-youtube-publishing|start_to_conversation#short",
         "version": 1,
         "name": "Organic YouTube Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic YouTube Publishing",
           "personalized": false
@@ -2564,11 +3124,16 @@
       },
       {
         "id": "organic-youtube-publishing|start_to_conversation#research",
-        "pipeId": "start>lead_interested",
+        "legId": "start>lead_interested",
         "dynasty": "organic-youtube-publishing|start_to_conversation#research",
         "version": 1,
         "name": "Organic YouTube Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic YouTube Publishing",
           "personalized": true
@@ -2578,11 +3143,16 @@
       },
       {
         "id": "organic-youtube-publishing|start_to_website_visit#short",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-youtube-publishing|start_to_website_visit#short",
         "version": 1,
         "name": "Organic YouTube Publishing, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic YouTube Publishing",
           "personalized": false
@@ -2592,11 +3162,16 @@
       },
       {
         "id": "organic-youtube-publishing|start_to_website_visit#research",
-        "pipeId": "start>lead_visited",
+        "legId": "start>lead_visited",
         "dynasty": "organic-youtube-publishing|start_to_website_visit#research",
         "version": 1,
         "name": "Organic YouTube Publishing, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Organic YouTube Publishing",
           "personalized": true
@@ -2606,11 +3181,22 @@
       },
       {
         "id": "ai-meeting-booking|conversation_to_meeting_booked#short",
-        "pipeId": "lead_interested>meeting_booked",
+        "legId": "lead_interested>meeting_booked",
         "dynasty": "ai-meeting-booking|conversation_to_meeting_booked#short",
         "version": 1,
         "name": "AI Meeting Booking, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Meeting Booking",
           "personalized": false
@@ -2620,11 +3206,22 @@
       },
       {
         "id": "ai-meeting-booking|conversation_to_meeting_booked#research",
-        "pipeId": "lead_interested>meeting_booked",
+        "legId": "lead_interested>meeting_booked",
         "dynasty": "ai-meeting-booking|conversation_to_meeting_booked#research",
         "version": 1,
         "name": "AI Meeting Booking, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Meeting Booking",
           "personalized": true
@@ -2634,11 +3231,22 @@
       },
       {
         "id": "ai-meeting-booking|form_submitted_to_meeting_booked#short",
-        "pipeId": "lead_interested>meeting_booked",
+        "legId": "lead_interested>meeting_booked",
         "dynasty": "ai-meeting-booking|form_submitted_to_meeting_booked#short",
         "version": 1,
         "name": "AI Meeting Booking, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Meeting Booking",
           "personalized": false
@@ -2648,11 +3256,22 @@
       },
       {
         "id": "ai-meeting-booking|form_submitted_to_meeting_booked#research",
-        "pipeId": "lead_interested>meeting_booked",
+        "legId": "lead_interested>meeting_booked",
         "dynasty": "ai-meeting-booking|form_submitted_to_meeting_booked#research",
         "version": 1,
         "name": "AI Meeting Booking, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Meeting Booking",
           "personalized": true
@@ -2662,11 +3281,19 @@
       },
       {
         "id": "managed-meeting-booking|conversation_to_meeting_booked#team",
-        "pipeId": "lead_interested>meeting_booked",
+        "legId": "lead_interested>meeting_booked",
         "dynasty": "managed-meeting-booking|conversation_to_meeting_booked#team",
         "version": 1,
         "name": "Managed Meeting Booking, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Meeting Booking"
         },
@@ -2675,11 +3302,19 @@
       },
       {
         "id": "managed-meeting-booking|website_visit_to_meeting_booked#team",
-        "pipeId": "lead_visited>meeting_booked",
+        "legId": "lead_visited>meeting_booked",
         "dynasty": "managed-meeting-booking|website_visit_to_meeting_booked#team",
         "version": 1,
         "name": "Managed Meeting Booking, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Meeting Booking"
         },
@@ -2688,11 +3323,16 @@
       },
       {
         "id": "your-team-meeting-booking|conversation_to_meeting_booked#team",
-        "pipeId": "team:lead_interested>meeting_booked",
+        "legId": "team:lead_interested>meeting_booked",
         "dynasty": "your-team-meeting-booking|conversation_to_meeting_booked#team",
         "version": 1,
         "name": "Your Team Meeting Booking",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Meeting Booking"
         },
@@ -2701,11 +3341,16 @@
       },
       {
         "id": "your-team-meeting-booking|website_visit_to_meeting_booked#team",
-        "pipeId": "team:lead_visited>meeting_booked",
+        "legId": "team:lead_visited>meeting_booked",
         "dynasty": "your-team-meeting-booking|website_visit_to_meeting_booked#team",
         "version": 1,
         "name": "Your Team Meeting Booking",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Meeting Booking"
         },
@@ -2714,11 +3359,16 @@
       },
       {
         "id": "your-team-meeting-booking|form_submitted_to_meeting_booked#team",
-        "pipeId": "team:lead_interested>meeting_booked",
+        "legId": "team:lead_interested>meeting_booked",
         "dynasty": "your-team-meeting-booking|form_submitted_to_meeting_booked#team",
         "version": 1,
         "name": "Your Team Meeting Booking",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Meeting Booking"
         },
@@ -2727,11 +3377,19 @@
       },
       {
         "id": "managed-meeting-attendance|meeting_booked_to_meeting_attended#team",
-        "pipeId": "meeting_booked>meeting_attended",
+        "legId": "meeting_booked>meeting_attended",
         "dynasty": "managed-meeting-attendance|meeting_booked_to_meeting_attended#team",
         "version": 1,
         "name": "Managed Meeting Attendance, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "meeting_booked"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Meeting Attendance"
         },
@@ -2740,11 +3398,16 @@
       },
       {
         "id": "your-team-meeting-attendance|meeting_booked_to_meeting_attended#team",
-        "pipeId": "team:meeting_booked>meeting_attended",
+        "legId": "team:meeting_booked>meeting_attended",
         "dynasty": "your-team-meeting-attendance|meeting_booked_to_meeting_attended#team",
         "version": 1,
         "name": "Your Team Meeting Attendance",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "meeting_booked"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Meeting Attendance"
         },
@@ -2753,11 +3416,19 @@
       },
       {
         "id": "managed-closing-calls|meeting_attended_to_paid_client#team",
-        "pipeId": "meeting_attended>paid_client",
+        "legId": "meeting_attended>paid_client",
         "dynasty": "managed-closing-calls|meeting_attended_to_paid_client#team",
         "version": 1,
         "name": "Managed Closing Calls, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "meeting_attended"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Closing Calls"
         },
@@ -2766,11 +3437,16 @@
       },
       {
         "id": "your-team-closing-calls|meeting_attended_to_paid_client#team",
-        "pipeId": "team:meeting_attended>paid_client",
+        "legId": "team:meeting_attended>paid_client",
         "dynasty": "your-team-closing-calls|meeting_attended_to_paid_client#team",
         "version": 1,
         "name": "Your Team Closing Calls",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "meeting_attended"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Closing Calls"
         },
@@ -2779,11 +3455,16 @@
       },
       {
         "id": "your-team-closing-calls|lead_found_to_paid_client#team",
-        "pipeId": "team:lead_found>paid_client",
+        "legId": "team:lead_found>paid_client",
         "dynasty": "your-team-closing-calls|lead_found_to_paid_client#team",
         "version": 1,
         "name": "Your Team Closing Calls",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Closing Calls"
         },
@@ -2792,11 +3473,16 @@
       },
       {
         "id": "your-team-closing-calls|industry_update_video_to_paid_client#team",
-        "pipeId": "team:industry_update_video>paid_client",
+        "legId": "team:industry_update_video>paid_client",
         "dynasty": "your-team-closing-calls|industry_update_video_to_paid_client#team",
         "version": 1,
         "name": "Your Team Closing Calls",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "industry_update_video"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Closing Calls"
         },
@@ -2805,11 +3491,19 @@
       },
       {
         "id": "managed-signup-conversion|signup_to_paid_client#team",
-        "pipeId": "lead_interested>paid_client",
+        "legId": "lead_interested>paid_client",
         "dynasty": "managed-signup-conversion|signup_to_paid_client#team",
         "version": 1,
         "name": "Managed Signup Conversion, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Signup Conversion"
         },
@@ -2818,11 +3512,19 @@
       },
       {
         "id": "managed-signup-conversion|form_submitted_to_paid_client#team",
-        "pipeId": "lead_interested>paid_client",
+        "legId": "lead_interested>paid_client",
         "dynasty": "managed-signup-conversion|form_submitted_to_paid_client#team",
         "version": 1,
         "name": "Managed Signup Conversion, our team",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Managed Signup Conversion"
         },
@@ -2831,11 +3533,16 @@
       },
       {
         "id": "your-team-signup-conversion|signup_to_paid_client#team",
-        "pipeId": "team:lead_interested>paid_client",
+        "legId": "team:lead_interested>paid_client",
         "dynasty": "your-team-signup-conversion|signup_to_paid_client#team",
         "version": 1,
         "name": "Your Team Signup Conversion",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Signup Conversion"
         },
@@ -2844,11 +3551,16 @@
       },
       {
         "id": "your-team-signup-conversion|form_submitted_to_paid_client#team",
-        "pipeId": "team:lead_interested>paid_client",
+        "legId": "team:lead_interested>paid_client",
         "dynasty": "your-team-signup-conversion|form_submitted_to_paid_client#team",
         "version": 1,
         "name": "Your Team Signup Conversion",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Signup Conversion"
         },
@@ -2857,11 +3569,22 @@
       },
       {
         "id": "ai-instant-call|conversation_to_booking_call#short",
-        "pipeId": "lead_interested>booking_call",
+        "legId": "lead_interested>booking_call",
         "dynasty": "ai-instant-call|conversation_to_booking_call#short",
         "version": 1,
         "name": "AI Instant Call, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Instant Call",
           "personalized": false
@@ -2871,11 +3594,22 @@
       },
       {
         "id": "ai-instant-call|conversation_to_booking_call#research",
-        "pipeId": "lead_interested>booking_call",
+        "legId": "lead_interested>booking_call",
         "dynasty": "ai-instant-call|conversation_to_booking_call#research",
         "version": 1,
         "name": "AI Instant Call, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Instant Call",
           "personalized": true
@@ -2885,11 +3619,22 @@
       },
       {
         "id": "ai-instant-call|form_submitted_to_booking_call#short",
-        "pipeId": "lead_interested>booking_call",
+        "legId": "lead_interested>booking_call",
         "dynasty": "ai-instant-call|form_submitted_to_booking_call#short",
         "version": 1,
         "name": "AI Instant Call, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Instant Call",
           "personalized": false
@@ -2899,11 +3644,22 @@
       },
       {
         "id": "ai-instant-call|form_submitted_to_booking_call#research",
-        "pipeId": "lead_interested>booking_call",
+        "legId": "lead_interested>booking_call",
         "dynasty": "ai-instant-call|form_submitted_to_booking_call#research",
         "version": 1,
         "name": "AI Instant Call, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Instant Call",
           "personalized": true
@@ -2913,11 +3669,16 @@
       },
       {
         "id": "your-team-booking-calls|booking_call_to_meeting_booked#team",
-        "pipeId": "team:booking_call>meeting_booked",
+        "legId": "team:booking_call>meeting_booked",
         "dynasty": "your-team-booking-calls|booking_call_to_meeting_booked#team",
         "version": 1,
         "name": "Your Team Booking Calls",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "booking_call"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Booking Calls"
         },
@@ -2926,11 +3687,16 @@
       },
       {
         "id": "your-team-reply-closing|conversation_to_paid_client#team",
-        "pipeId": "team:lead_interested>paid_client",
+        "legId": "team:lead_interested>paid_client",
         "dynasty": "your-team-reply-closing|conversation_to_paid_client#team",
         "version": 1,
         "name": "Your Team Reply Closing",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Reply Closing"
         },
@@ -2939,11 +3705,16 @@
       },
       {
         "id": "your-team-website|website_visit_to_signup#team",
-        "pipeId": "team:lead_visited>lead_interested",
+        "legId": "team:lead_visited>lead_interested",
         "dynasty": "your-team-website|website_visit_to_signup#team",
         "version": 1,
         "name": "Your Team Website",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Website"
         },
@@ -2952,11 +3723,16 @@
       },
       {
         "id": "your-team-website|website_visit_to_form_submitted#team",
-        "pipeId": "team:lead_visited>lead_interested",
+        "legId": "team:lead_visited>lead_interested",
         "dynasty": "your-team-website|website_visit_to_form_submitted#team",
         "version": 1,
         "name": "Your Team Website",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Website"
         },
@@ -2965,11 +3741,16 @@
       },
       {
         "id": "your-team-website|website_visit_to_purchase#team",
-        "pipeId": "team:lead_visited>purchase",
+        "legId": "team:lead_visited>purchase",
         "dynasty": "your-team-website|website_visit_to_purchase#team",
         "version": 1,
         "name": "Your Team Website",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Website"
         },
@@ -2978,11 +3759,16 @@
       },
       {
         "id": "your-team-order-delivery|purchase_to_paid_client#team",
-        "pipeId": "team:purchase>paid_client",
+        "legId": "team:purchase>paid_client",
         "dynasty": "your-team-order-delivery|purchase_to_paid_client#team",
         "version": 1,
         "name": "Your Team Order Delivery",
         "kind": "human",
+        "materials": [
+          {
+            "outcome": "purchase"
+          }
+        ],
         "tactics": {
           "channel": "Your Team Order Delivery"
         },
@@ -2991,11 +3777,25 @@
       },
       {
         "id": "ai-follow-up-email|signup_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client@fact:follow_up_due",
+        "legId": "lead_interested>paid_client@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|signup_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:follow_up_due"
+          },
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": false
@@ -3005,11 +3805,25 @@
       },
       {
         "id": "ai-follow-up-email|signup_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client@fact:follow_up_due",
+        "legId": "lead_interested>paid_client@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|signup_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:follow_up_due"
+          },
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": true
@@ -3019,11 +3833,25 @@
       },
       {
         "id": "ai-follow-up-email|conversation_to_paid_client#short",
-        "pipeId": "lead_interested>paid_client@fact:github_issue_in_prod",
+        "legId": "lead_interested>paid_client@fact:github_issue_in_prod",
         "dynasty": "ai-follow-up-email|conversation_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:github_issue_in_prod"
+          },
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": false
@@ -3033,11 +3861,25 @@
       },
       {
         "id": "ai-follow-up-email|conversation_to_paid_client#research",
-        "pipeId": "lead_interested>paid_client@fact:github_issue_in_prod",
+        "legId": "lead_interested>paid_client@fact:github_issue_in_prod",
         "dynasty": "ai-follow-up-email|conversation_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:github_issue_in_prod"
+          },
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": true
@@ -3047,11 +3889,22 @@
       },
       {
         "id": "ai-follow-up-email|lead_found_to_conversation#short",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "ai-follow-up-email|lead_found_to_conversation#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": false
@@ -3061,11 +3914,22 @@
       },
       {
         "id": "ai-follow-up-email|lead_found_to_conversation#research",
-        "pipeId": "lead_found>lead_interested",
+        "legId": "lead_found>lead_interested",
         "dynasty": "ai-follow-up-email|lead_found_to_conversation#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_found"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": true
@@ -3075,11 +3939,22 @@
       },
       {
         "id": "ai-follow-up-email|start_to_conversation#short",
-        "pipeId": "start>lead_interested@fact:follow_up_due",
+        "legId": "start>lead_interested@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|start_to_conversation#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:follow_up_due"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": false
@@ -3089,11 +3964,22 @@
       },
       {
         "id": "ai-follow-up-email|start_to_conversation#research",
-        "pipeId": "start>lead_interested@fact:follow_up_due",
+        "legId": "start>lead_interested@fact:follow_up_due",
         "dynasty": "ai-follow-up-email|start_to_conversation#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:follow_up_due"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "personalized": true
@@ -3103,11 +3989,22 @@
       },
       {
         "id": "ai-follow-up-email|website_visit_to_signup#short",
-        "pipeId": "lead_visited>lead_interested",
+        "legId": "lead_visited>lead_interested",
         "dynasty": "ai-follow-up-email|website_visit_to_signup#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "wait_days": 0.0208,
@@ -3118,11 +4015,22 @@
       },
       {
         "id": "ai-follow-up-email|website_visit_to_signup#research",
-        "pipeId": "lead_visited>lead_interested",
+        "legId": "lead_visited>lead_interested",
         "dynasty": "ai-follow-up-email|website_visit_to_signup#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_visited"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "wait_days": 0.0208,
@@ -3133,11 +4041,22 @@
       },
       {
         "id": "ai-follow-up-email|start_to_paid_client#short",
-        "pipeId": "start>paid_client@lead_interested",
+        "legId": "start>paid_client@lead_interested",
         "dynasty": "ai-follow-up-email|start_to_paid_client#short",
         "version": 1,
         "name": "AI Follow-up Email, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "wait_days": 0.0208,
@@ -3148,11 +4067,22 @@
       },
       {
         "id": "ai-follow-up-email|start_to_paid_client#research",
-        "pipeId": "start>paid_client@lead_interested",
+        "legId": "start>paid_client@lead_interested",
         "dynasty": "ai-follow-up-email|start_to_paid_client#research",
         "version": 1,
         "name": "AI Follow-up Email, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "lead_interested"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Follow-up Email",
           "wait_days": 0.0208,
@@ -3163,11 +4093,19 @@
       },
       {
         "id": "lead-sourcing|start_to_lead_found#fresh",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "lead-sourcing|start_to_lead_found#fresh",
         "version": 1,
         "name": "Lead Sourcing, fresh data",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Lead Sourcing",
           "recontact_days": 30
@@ -3177,11 +4115,19 @@
       },
       {
         "id": "lead-sourcing|start_to_lead_found#standard",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "lead-sourcing|start_to_lead_found#standard",
         "version": 1,
         "name": "Lead Sourcing, standard",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Lead Sourcing",
           "recontact_days": 90
@@ -3191,11 +4137,19 @@
       },
       {
         "id": "sourcing-apollo-cold-filters|start_to_lead_found#fresh",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-apollo-cold-filters|start_to_lead_found#fresh",
         "version": 1,
         "name": "Apollo Cold Filters, fresh data",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Apollo Cold Filters",
           "recontact_days": 30
@@ -3205,11 +4159,19 @@
       },
       {
         "id": "sourcing-apollo-cold-filters|start_to_lead_found#standard",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-apollo-cold-filters|start_to_lead_found#standard",
         "version": 1,
         "name": "Apollo Cold Filters, standard",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Apollo Cold Filters",
           "recontact_days": 90
@@ -3219,11 +4181,19 @@
       },
       {
         "id": "sourcing-apollo-buying-signals|start_to_lead_found#fresh",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-apollo-buying-signals|start_to_lead_found#fresh",
         "version": 1,
         "name": "Apollo Buying Signals, fresh data",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Apollo Buying Signals",
           "recontact_days": 30
@@ -3233,11 +4203,19 @@
       },
       {
         "id": "sourcing-apollo-buying-signals|start_to_lead_found#standard",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-apollo-buying-signals|start_to_lead_found#standard",
         "version": 1,
         "name": "Apollo Buying Signals, standard",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Apollo Buying Signals",
           "recontact_days": 90
@@ -3247,11 +4225,19 @@
       },
       {
         "id": "sourcing-linkedin-engagement-signals|start_to_lead_found#fresh",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-linkedin-engagement-signals|start_to_lead_found#fresh",
         "version": 1,
         "name": "LinkedIn Engagement Signals, fresh data",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Engagement Signals",
           "recontact_days": 30
@@ -3261,11 +4247,19 @@
       },
       {
         "id": "sourcing-linkedin-engagement-signals|start_to_lead_found#standard",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-linkedin-engagement-signals|start_to_lead_found#standard",
         "version": 1,
         "name": "LinkedIn Engagement Signals, standard",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "LinkedIn Engagement Signals",
           "recontact_days": 90
@@ -3275,11 +4269,19 @@
       },
       {
         "id": "sourcing-crm-contacts|start_to_lead_found#fresh",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-crm-contacts|start_to_lead_found#fresh",
         "version": 1,
         "name": "Your CRM Contacts, fresh data",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Your CRM Contacts",
           "recontact_days": 30
@@ -3289,11 +4291,19 @@
       },
       {
         "id": "sourcing-crm-contacts|start_to_lead_found#standard",
-        "pipeId": "start>lead_found",
+        "legId": "start>lead_found",
         "dynasty": "sourcing-crm-contacts|start_to_lead_found#standard",
         "version": 1,
         "name": "Your CRM Contacts, standard",
         "kind": "rules",
+        "materials": [
+          {
+            "outcome": "audience_built"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Your CRM Contacts",
           "recontact_days": 90
@@ -3303,11 +4313,16 @@
       },
       {
         "id": "social-post|start_to_industry_update_video#short",
-        "pipeId": "start>industry_update_video",
+        "legId": "start>industry_update_video",
         "dynasty": "social-post|start_to_industry_update_video#short",
         "version": 1,
         "name": "Social post, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Social post",
           "personalized": false
@@ -3317,11 +4332,16 @@
       },
       {
         "id": "social-post|start_to_industry_update_video#research",
-        "pipeId": "start>industry_update_video",
+        "legId": "start>industry_update_video",
         "dynasty": "social-post|start_to_industry_update_video#research",
         "version": 1,
         "name": "Social post, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Social post",
           "personalized": true
@@ -3331,11 +4351,25 @@
       },
       {
         "id": "email-sending|start_to_conversation#short",
-        "pipeId": "start>lead_interested@fact:email_pushed_via_api",
+        "legId": "start>lead_interested@fact:email_pushed_via_api",
         "dynasty": "email-sending|start_to_conversation#short",
         "version": 1,
         "name": "Email Sending, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:email_pushed_via_api"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Email Sending",
           "personalized": false
@@ -3345,11 +4379,25 @@
       },
       {
         "id": "email-sending|start_to_conversation#research",
-        "pipeId": "start>lead_interested@fact:email_pushed_via_api",
+        "legId": "start>lead_interested@fact:email_pushed_via_api",
         "dynasty": "email-sending|start_to_conversation#research",
         "version": 1,
         "name": "Email Sending, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:email_pushed_via_api"
+          },
+          {
+            "outcome": "template_written"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "Email Sending",
           "personalized": true
@@ -3359,11 +4407,22 @@
       },
       {
         "id": "ai-lead-proposal|start_to_paid_client#short",
-        "pipeId": "start>paid_client@fact:hot_lead",
+        "legId": "start>paid_client@fact:hot_lead",
         "dynasty": "ai-lead-proposal|start_to_paid_client#short",
         "version": 1,
         "name": "AI Lead Proposal, short and direct",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:hot_lead"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Lead Proposal",
           "personalized": false
@@ -3373,11 +4432,22 @@
       },
       {
         "id": "ai-lead-proposal|start_to_paid_client#research",
-        "pipeId": "start>paid_client@fact:hot_lead",
+        "legId": "start>paid_client@fact:hot_lead",
         "dynasty": "ai-lead-proposal|start_to_paid_client#research",
         "version": 1,
         "name": "AI Lead Proposal, researches first",
         "kind": "ai",
+        "materials": [
+          {
+            "outcome": "fact:hot_lead"
+          },
+          {
+            "outcome": "llm_completion"
+          },
+          {
+            "outcome": "rating"
+          }
+        ],
         "tactics": {
           "channel": "AI Lead Proposal",
           "personalized": true
@@ -3452,7 +4522,7 @@
           "script"
         ],
         "source": "data",
-        "description": "The channel a script works on: a pipe is a leg, and scripts of every channel compete on it."
+        "description": "The channel a script works on: scripts of every channel compete on a leg."
       },
       {
         "id": "wait_days",
@@ -3490,7 +4560,7 @@
           "script"
         ],
         "source": "data",
-        "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every option its prior."
+        "description": "A Supplier rating script that reads the ledger and the traceability, or one that gives every candidate its prior."
       },
       {
         "id": "country",
@@ -3614,26 +4684,7 @@
         "source": "data"
       }
     ],
-    "strategies": [
-      {
-        "id": "lead_found>lead_interested#cold-email-only",
-        "name": "Cold email only",
-        "pipeId": "lead_found>lead_interested",
-        "rules": [
-          {
-            "conditions": [
-              {
-                "op": "in",
-                "tactic": "channel",
-                "values": [
-                  "Sales Cold Email Outreach"
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ]
+    "strategies": []
   },
   "clients": [
     {
@@ -3669,12 +4720,7 @@
           "offerId": "offer-1",
           "name": "Paid clients from cold outreach",
           "start": "start",
-          "line": [
-            "lead_interested",
-            "meeting_booked",
-            "meeting_attended",
-            "paid_client"
-          ],
+          "target": "paid_client",
           "dailyBudgetCents": 3000,
           "status": "running",
           "strategies": {}
@@ -3780,13 +4826,9 @@
           "id": "campaign-2",
           "brandId": "brand-2",
           "offerId": "offer-2",
-          "name": "Signups from the website",
+          "name": "Paid clients from the website",
           "start": "start",
-          "line": [
-            "lead_visited",
-            "lead_interested",
-            "paid_client"
-          ],
+          "target": "paid_client",
           "dailyBudgetCents": 2500,
           "status": "running",
           "strategies": {}
@@ -3797,9 +4839,7 @@
           "offerId": "offer-2",
           "name": "Follow-ups after each website visit",
           "start": "lead_visited",
-          "line": [
-            "lead_interested"
-          ],
+          "target": "lead_interested",
           "dailyBudgetCents": 800,
           "status": "running",
           "strategies": {}
@@ -3904,10 +4944,7 @@
           "offerId": "offer-3",
           "name": "Replies closed by the team",
           "start": "start",
-          "line": [
-            "lead_interested",
-            "paid_client"
-          ],
+          "target": "paid_client",
           "dailyBudgetCents": 2000,
           "status": "running",
           "strategies": {}
@@ -4015,15 +5052,17 @@
           "offerId": "offer-4",
           "name": "Meetings from cold email",
           "start": "start",
-          "line": [
-            "lead_interested",
-            "meeting_booked"
-          ],
+          "target": "meeting_booked",
           "dailyBudgetCents": 2000,
           "status": "running",
-          "strategies": {
-            "lead_found>lead_interested": "lead_found>lead_interested#cold-email-only"
-          }
+          "strategies": {},
+          "conditions": [
+            {
+              "op": "equals",
+              "tactic": "channel",
+              "value": "Sales Cold Email Outreach"
+            }
+          ]
         }
       ],
       "seeds": [
@@ -4154,7 +5193,7 @@
     }
   ],
   "truth": {
-    "pipes": {
+    "legs": {
       "lead_found>lead_interested": {
         "base": 0.023,
         "delayMeanDays": 3.5,
@@ -5113,7 +6152,7 @@
       "icon": "note-pencil"
     },
     {
-      "kind": "pipe",
+      "kind": "leg",
       "id": "llm",
       "label": "LLMs",
       "icon": "sparkle"

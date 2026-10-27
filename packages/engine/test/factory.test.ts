@@ -20,7 +20,7 @@ const picksOf = (point: string, campaignId: string) => {
 };
 
 describe("the universal prioritizer converges", () => {
-  it("every choice point with 200 picks or more ends with 80% or more on the hidden best option, share rising", () => {
+  it("every choice point with 200 picks or more ends with 80% or more on the hidden best candidate, share rising", () => {
     const big = conv.filter((pc) => pc.picks >= 200);
     expect(big.length).toBeGreaterThanOrEqual(12);
     for (const pc of big) {
@@ -76,10 +76,10 @@ describe("credit through traceability", () => {
     const fresh = new SimulationSession(defaultWorld());
     fresh.run(15);
     const point = "writer|llm_completion";
-    const before = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "glm")!;
+    const before = fresh.beliefsAt(point, "campaign-1").find((b) => b.candidate === "glm")!;
     fresh.catalogue.fork("glm", { id: "glm-terse", dynasty: "glm-terse", name: "GLM, terse prompt", kind: "ai", tactics: { tier: "fast" }, costCents: 1 });
     fresh.catalogue.upgrade("gemini_flash", { id: "gemini-flash-2", name: "Gemini Flash 2" });
-    const flashBefore = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "gemini_flash")!;
+    const flashBefore = fresh.beliefsAt(point, "campaign-1").find((b) => b.candidate === "gemini_flash")!;
     // Before the fork has any decision of its own, its belief is its parent's.
     const at = fresh.belief.bind(fresh);
     const parent = at(point, "glm", ["glm", "gemini_flash", "gemini_pro", "glm-terse"], "brand-1", fresh.day);
@@ -87,11 +87,11 @@ describe("credit through traceability", () => {
     expect(child.posterior.alpha / (child.posterior.alpha + child.posterior.beta)).toBeCloseTo(parent.posterior.alpha / (parent.posterior.alpha + parent.posterior.beta), 2);
     fresh.run(1);
     expect(before.rate).toBeGreaterThan(0);
-    // The upgrade is the same option: its stats carry on, its new version runs.
-    const flashAfter = fresh.beliefsAt(point, "campaign-1").find((b) => b.option === "gemini_flash")!;
+    // The upgrade is the same candidate: its stats carry on, its new version runs.
+    const flashAfter = fresh.beliefsAt(point, "campaign-1").find((b) => b.candidate === "gemini_flash")!;
     expect(flashAfter.decisions).toBeGreaterThan(flashBefore.decisions * 0.9);
     expect(flashAfter.decisions).toBeGreaterThan(0);
-    const ran = fresh.runs.filter((r) => r.day === fresh.day - 1 && r.pipeId === "llm").map((r) => r.scriptId);
+    const ran = fresh.runs.filter((r) => r.day === fresh.day - 1 && r.legId === "llm").map((r) => r.scriptId);
     expect(ran).not.toContain("gemini_flash");
   }, 60_000);
 
@@ -100,12 +100,12 @@ describe("credit through traceability", () => {
     fresh.run(10);
     const outcome = "template_written";
     const before = fresh.objectDynasties("brand-1", outcome);
-    const statsBefore = fresh.beliefsAt(`writer|${outcome}`, "campaign-1").find((b) => b.option === "tpl-intro")!;
+    const statsBefore = fresh.beliefsAt(`writer|${outcome}`, "campaign-1").find((b) => b.candidate === "tpl-intro")!;
     const v2 = fresh.addObjectVersion("brand-1", outcome, "tpl-intro", { text: "Hi {{first_name}}, {{company}} could {{benefit}}. Open to a call?" });
     expect(v2.version).toBe(2);
     expect(fresh.objectDynasties("brand-1", outcome)).toEqual(before);
     expect(fresh.objectHead("brand-1", outcome, "tpl-intro")?.id).toBe(v2.id);
-    const statsAfter = fresh.beliefsAt(`writer|${outcome}`, "campaign-1").find((b) => b.option === "tpl-intro")!;
+    const statsAfter = fresh.beliefsAt(`writer|${outcome}`, "campaign-1").find((b) => b.candidate === "tpl-intro")!;
     expect(statsAfter.decisions).toBe(statsBefore.decisions);
     fresh.run(5);
     const consumed = fresh.units.filter((o) => o.outcome === "message_written" && o.brandId === "brand-1" && o.day >= 12).map((o) => o.materials[outcome]);
@@ -131,7 +131,7 @@ describe("one script per run", () => {
     const perRun = new Map<string, number>();
     for (const o of s.units) perRun.set(o.runId, (perRun.get(o.runId) ?? 0) + 1);
     for (const r of s.runs) {
-      if (!r.pipeId) continue;
+      if (!r.legId) continue;
       expect(r.scriptId).toBeDefined();
       expect(perRun.get(r.id) ?? 0).toBeLessThanOrEqual(1);
     }
@@ -154,7 +154,7 @@ describe("ICPs and templates are competing Units", () => {
 });
 
 describe("the choice lives on the Material", () => {
-  it("the same LLM pipe plugged at two Materials converges to two different scripts", () => {
+  it("the same LLM leg plugged at two Materials converges to two different scripts", () => {
     const writer = conv.find((x) => x.point === "writer|llm_completion")!;
     const judge = conv.find((x) => x.point === "reply_judging|llm_completion")!;
     expect(new Set(Object.values(writer.bestByCampaign))).toEqual(new Set(["glm"]));
@@ -182,13 +182,13 @@ describe("the choice lives on the Material", () => {
 });
 
 describe("the Campaign orders production", () => {
-  it("pull serves the most advanced Units first: a Unit landing at a lead state of the line is taken into the next leg the day it lands", () => {
+  it("pull serves the most advanced Units first: a Unit landing at a lead state of the tree is taken into its next step the day it lands", () => {
     let taken = 0;
     for (const c of s.campaigns().filter((x) => s.isProactive(x))) {
       for (const a of s.campaignAttempts(c.id)) {
-        if (a.legIndex === 0) continue;
+        if (a.from === c.start) continue;
         const u = s.unit(a.startUnit!)!;
-        expect(u.outcome, c.id).toBe(c.line[a.legIndex - 1]);
+        expect(u.outcome, c.id).toBe(a.from);
         expect(a.startDay - u.day, `${c.id} ${u.id}`).toBeLessThanOrEqual(1);
         taken++;
       }
@@ -206,12 +206,12 @@ describe("the Campaign orders production", () => {
     expect(Math.max(...made)).toBeLessThanOrEqual(40);
     expect(made.reduce((x, y) => x + y, 0)).toBeGreaterThan(200);
     for (let d = 0; d < 12; d++) {
-      const sourcing = v.runs.filter((r) => r.day === d && r.campaignId === c2.id && r.pipeId && v.catalogue.createsSubjects(v.catalogue.pipe(r.pipeId)!)).length;
+      const sourcing = v.runs.filter((r) => r.day === d && r.campaignId === c2.id && r.legId && v.catalogue.createsSubjects(v.catalogue.leg(r.legId)!)).length;
       expect(sourcing, `day ${d}`).toBeLessThanOrEqual(made[d]!);
     }
   }, 60_000);
 
-  it("a reactive campaign pushes each landed Unit of its start outcome into its first pipe, as far as its budget allows", () => {
+  it("a reactive campaign pushes each landed Unit of its start outcome up its tree, as far as its budget allows", () => {
     const follow = s.campaign("campaign-1f")!;
     expect(follow.start).toBe("message_sent");
     const sent = s.units.filter((u) => u.outcome === "message_sent" && u.brandId === follow.brandId);
@@ -230,8 +230,8 @@ describe("the Campaign orders production", () => {
     expect(z.runs.filter((r) => r.campaignId === "campaign-1f").length).toBe(0);
   }, 60_000);
 
-  it("the follow-up pipe waits its days since the last message through its script's tactic: no trigger", () => {
-    const runs = s.runs.filter((r) => r.pipeId === "follow_up");
+  it("the follow-up leg waits its days since the last message through its script's tactic: no trigger", () => {
+    const runs = s.runs.filter((r) => r.legId === "follow_up");
     expect(runs.length).toBeGreaterThan(500);
     for (const r of runs) {
       const sent = r.consumed.map((id) => s.unit(id)!).find((u) => u.outcome === "message_sent")!;
@@ -244,9 +244,9 @@ describe("the Campaign orders production", () => {
 });
 
 describe("the ledger is the common stock", () => {
-  it("two producers feeding one outcome share one stock: a later leg serves itself Units from both", () => {
+  it("two producers feeding one outcome share one stock: a later step serves itself Units from both", () => {
     const producers = new Set<string>();
-    for (const a of s.campaignAttempts("campaign-1")) if (a.legIndex === 1) producers.add(s.unit(a.startUnit!)!.pipeId ?? "");
+    for (const a of s.campaignAttempts("campaign-1")) if (a.from === "lead_interested") producers.add(s.unit(a.startUnit!)!.legId ?? "");
     expect(producers.has("reply_judging")).toBe(true);
     expect([...producers].filter((p) => p !== "reply_judging").length).toBeGreaterThanOrEqual(1);
   });
@@ -258,7 +258,7 @@ describe("the ledger is the common stock", () => {
     const fresh = ctx("brand-2");
     expect(fresh.length).toBeGreaterThanOrEqual(2);
     for (let i = 1; i < fresh.length; i++) expect(fresh[i]!.day - fresh[i - 1]!.day).toBeGreaterThanOrEqual(30);
-    for (const r of s.runs.filter((x) => x.pipeId === "writer" && x.campaignId === "campaign-2")) {
+    for (const r of s.runs.filter((x) => x.legId === "writer" && x.campaignId === "campaign-2")) {
       const used = r.consumed.map((id) => s.unit(id)!).find((u) => u.outcome === "brand_context")!;
       // Served while younger than 30 days; the writer runs it at most a tick later.
       expect(r.day - used.day).toBeLessThanOrEqual(30);
@@ -267,14 +267,14 @@ describe("the ledger is the common stock", () => {
 });
 
 describe("the Supplier rating", () => {
-  it("makes a Rating each tick that every choosing pipe consumes, and the Rating drives the choice", () => {
+  it("makes a Rating each tick that every choosing leg consumes, and the Rating drives the choice", () => {
     const ratings = s.units.filter((u) => u.outcome === "rating" && u.brandId === "brand-1");
     expect(ratings.length).toBe(60);
-    for (const r of s.runs.filter((x) => x.pipeId === "writer" && x.day === 40)) {
+    for (const r of s.runs.filter((x) => x.legId === "writer" && x.day === 40)) {
       const rating = r.consumed.map((id) => s.unit(id)!).find((u) => u.outcome === "rating")!;
       expect(r.day - rating.day).toBeLessThanOrEqual(1);
     }
-    // The same world with a Rating that reads no evidence: every option stays at its prior.
+    // The same world with a Rating that reads no evidence: every candidate stays at its prior.
     const data = worldData();
     data.catalogue.scripts.find((x) => x.id === "rating_pooled")!.tactics.reads_evidence = false;
     const flat = new SimulationSession(worldFromData(data));
@@ -291,7 +291,7 @@ describe("the Supplier rating", () => {
 });
 
 describe("other factories", () => {
-  it("are counted, and add no value to our pipes' return", () => {
+  it("are counted, and add no value to our legs' return", () => {
     const organic = s.units.filter((o) => o.factory === "organic");
     expect(organic.length).toBeGreaterThan(20);
     let ours = 0;
@@ -303,7 +303,7 @@ describe("other factories", () => {
     expect(ours).toBeGreaterThan(other);
   });
 
-  it("measure reliability against the reference pipe, and there is no Reporter object anywhere", () => {
+  it("measure reliability against the reference leg, and there is no Reporter object anywhere", () => {
     const rel = s.reliability();
     expect(rel.find((r) => r.producer === "crm_import")?.isReference).toBe(true);
     const judge = rel.find((r) => r.producer === "reply_judging")!;

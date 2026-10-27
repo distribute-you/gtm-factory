@@ -428,3 +428,8 @@ export const TDN = "px-3 py-2 first:pl-4 last:pr-4 align-middle text-right tabul
 export function LearningTag() {
   return <span className="k-chip">Learning</span>;
 }
+
+/** One entry of a native `<select>`: the HTML element, the only place it is written. */
+export function SelectItem(props: React.OptionHTMLAttributes<HTMLOptionElement>) {
+  return <option {...props} />;
+}

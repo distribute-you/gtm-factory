@@ -9,7 +9,7 @@ import { BillOfMaterials, ProviderLogo, ScriptCard, tacticValueText } from "@/co
 import { Mark } from "@/components/mark";
 import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { factoryName, headScript, optionLabel, outcomeLabel, pipeLine, pipeName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
+import { factoryName, headScript, candidateLabel, outcomeLabel, pipeLine, pipeName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
 import { factoryFigures } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 import { pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
@@ -125,7 +125,7 @@ function PinButton({ pin }: { pin: Pin }) {
 }
 
 const SUBJECT: Record<string, string> = { lead: "A lead", company: "A company", brand: "The brand", run: "The run that asked" };
-const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", rating: "Beliefs per option", list: "A list", record: "A record", image: "An image" };
+const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", rating: "Beliefs per candidate", list: "A list", record: "A record", image: "An image" };
 
 function Outcomes({ model }: { model: Model }) {
   const c = model.catalogue;
@@ -279,7 +279,7 @@ function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClos
             <Link key={p.point} href={`/research/?point=${encodeURIComponent(p.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
               <span className="min-w-0 flex-1 truncate">{p.info.title}</span>
               <span className="k-fg3 text-[12px]">best</span>
-              <span className="font-medium">{p.bestScript ? optionLabel(model, p.point, p.bestScript) : "—"}</span>
+              <span className="font-medium">{p.bestScript ? candidateLabel(model, p.point, p.bestScript) : "—"}</span>
             </Link>
           ))}
         </div>
