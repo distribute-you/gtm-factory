@@ -195,7 +195,7 @@ export interface PointInfo {
   consumer: string;
   /** The outcome called: its Engine's scripts (or the brand's Units) compete. */
   material: OutcomeId;
-  /** Uniform: "<Engine> · its script" or "<Engine> · Material <outcome>". */
+  /** Uniform: "<Engine> · scripts" or "<Outcome> · Units". */
   title: string;
   /** Who asks for it. */
   sub: string;
@@ -213,8 +213,8 @@ export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
     kind,
     consumer,
     material,
-    title: kind === "unit" ? `${consumer === "campaign" ? "Campaign" : engineName(catalogue, consumer)} · Material ${outcomeLabel(catalogue, material)}` : `${engineName(catalogue, material)} · its script`,
-    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material)} to serve` : `Which script makes it, for ${asker}`,
+    title: kind === "unit" ? `${outcomeLabel(catalogue, material)} · Units` : `${engineName(catalogue, material)} · scripts`,
+    sub: `for ${asker}`,
   };
 }
 

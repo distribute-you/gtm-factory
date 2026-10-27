@@ -407,9 +407,9 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
               </tr>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>{word}</th>
-                <th className={`${TH} text-right`}>Value per $</th>
-                <th className={`${TH} text-right`}>Rate</th>
-                <th className={`${TH} text-right`}>Cost to next milestone</th>
+                <th className={`${TH} text-right`}>Share this week</th>
+                <th className={`${TH} text-right`}>$ per outcome</th>
+                <th className={`${TH} text-right`}>% reach the next milestone</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
@@ -419,9 +419,9 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>{o.label}</td>
-                  <td className={TDN}>{formatRoi(o.meanScore)}</td>
+                  <td className={TDN}>{formatRatePct(o.share)}</td>
+                  <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
                   <td className={TDN}>{formatRatePct(o.rateMean)}</td>
-                  <td className={TDN}>{formatCents(o.costMeanCents)}</td>
                   <td className={TDN}>{formatCount(o.picks)}</td>
                   <td className={TDN}>{formatCount(o.successes)}</td>
                   <td className={TDN}>{formatCents(o.spentCents)}</td>
@@ -435,36 +435,25 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
   );
 }
 
-/**
- * A pick card's uniform title, one glyph per object type: "<Engine> · its script" when the
- * scripts of the called outcome's Engine compete, "<Engine> · Material <outcome>" when the
- * brand's Units compete for the calling Engine.
- */
+/** A card's uniform title: "<Engine> · <n> scripts", or "<Outcome> · <n> Units" when the brand's Units compete. */
 export function ApiPointTitle({ point, catalogue }: { point: ApiCandidates; catalogue?: CatalogueData | null }) {
   const unit = point.kind === "unit";
-  const engine = unit ? point.consumer : point.material;
   const font = { fontFamily: "var(--font-geist-sans)" };
+  const n = point.candidates.length;
   return (
     <span className="inline-flex items-center gap-1.5 normal-case">
-      <Mark kind="engine" id={engine} size={18} />
+      <Mark kind={unit ? "material" : "engine"} id={point.material} size={18} />
       <span className="k-fg text-[13px] font-medium tracking-normal" style={font}>
-        {engineTitle(catalogue, engine)}
+        {unit ? outcomeName(catalogue, point.material) : engineTitle(catalogue, point.material)}
       </span>
       <span className="k-fg4">·</span>
-      {unit ? (
-        <>
-          <Mark kind="material" id={point.material} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
-            Material {outcomeName(catalogue, point.material)}
-          </span>
-        </>
-      ) : (
-        <>
-          <Mark kind="script" id={`scripts:${point.id}`} size={14} />
-          <span className="k-fg2 text-[13px] tracking-normal" style={font}>
-            its script
-          </span>
-        </>
+      <span className="k-fg2 text-[13px] tracking-normal" style={font}>
+        {n} {unit ? (n === 1 ? "Unit" : "Units") : n === 1 ? "script" : "scripts"}
+      </span>
+      {point.consumer !== "campaign" && (
+        <span className="k-fg3 text-[12px] tracking-normal" style={font}>
+          for {engineTitle(catalogue, point.consumer)}
+        </span>
       )}
     </span>
   );

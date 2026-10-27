@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type OutcomeId, type PlanNode } from "@gtm-factory/core";
 import { MaterialsBadge, OutcomeChip, PlanLineView, RoutingName } from "@/components/plan-line";
+import { PlanFlow, type FlowStep } from "@/components/plan-flow";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
@@ -290,7 +291,7 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
 
       <section className="mb-8">
         <SectionTitle count={points.length} right={<span>In the order they are made for each subject</span>}>
-          Picks
+          Scripts per Engine
         </SectionTitle>
         {points.length === 0 ? (
           <div className="k-card">
@@ -314,62 +315,46 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
   );
 }
 
-/**
- * The Plan of this tick as a tree: from the Target down, each outcome with the script its Engine
- * runs now, and under it every outcome that script calls. Beside each script, the scripts that
- * actually made that outcome over the last 7 days: their share of the Units and cost per Unit.
- */
+/** The Plan of this tick as a vertical workflow: the start, each Engine on the subject's chain, the Target. */
 function PlanTree({ model, campaign }: { model: Model; campaign: Campaign }) {
-  const plan = model.session.planOf(campaign);
+  const line = campaignPlanLine(model, campaign);
   const branches = planBranches(model, campaign);
+  const c = model.catalogue;
+  const steps: FlowStep[] = line.parts.map((p) => {
+    const script = p.scriptId ? c.script(p.scriptId) : undefined;
+    const subject = script ? c.subjectOf(script) : null;
+    return {
+      outcome: p.outcome,
+      label: outcomeLabel(c, p.outcome),
+      icon: c.outcome(p.outcome)?.icon,
+      script: script ? { name: script.name, kind: script.kind, dynasty: script.dynasty } : null,
+      candidates: p.candidates,
+      branches: (branches.get(p.outcome) ?? []).map((b) => ({ name: c.script(b.scriptId)?.name ?? b.scriptId, share: b.share, costPerUnit: b.costPerUnit })),
+      sides: p.materials.filter((m) => m.outcome !== subject).map((m) => ({ outcome: m.outcome, label: outcomeLabel(c, m.outcome), icon: c.outcome(m.outcome)?.icon, from: providerOf(model, m) })),
+    };
+  });
   return (
     <section className="mb-8">
       <SectionTitle right={<span>Recomputed at every tick; shares over the last 7 days</span>}>Plan</SectionTitle>
-      <div className="k-card py-1.5" data-testid="campaign-plan">
-        {plan ? <PlanRow model={model} node={plan} branches={branches} depth={0} consumer="campaign" /> : <EmptyNote>No Plan yet. Press Run.</EmptyNote>}
-      </div>
+      {steps.length === 0 ? (
+        <div className="k-card">
+          <EmptyNote>No Plan yet. Press Run.</EmptyNote>
+        </div>
+      ) : (
+        <PlanFlow start={campaign.start} startLabel={outcomeLabel(c, campaign.start)} steps={steps} target={campaign.target} />
+      )}
     </section>
   );
 }
 
-function PlanRow({ model, node, branches, depth, consumer }: { model: Model; node: PlanNode; branches: Map<OutcomeId, { scriptId: string; units: number; share: number; costPerUnit: number | null }[]>; depth: number; consumer: string }) {
+/** Where a Material's Provider gets it, in words. */
+function providerOf(model: Model, node: PlanNode): string {
   const script = node.scriptId ? model.catalogue.script(node.scriptId) : undefined;
-  const made = branches.get(node.outcome) ?? [];
+  if (script) return script.name;
   const o = model.catalogue.outcome(node.outcome);
-  const leaf = !script ? (o?.contentType === "rating" ? "Today's Rating" : o?.subject === "brand" && node.candidates > 0 ? `${plural(node.candidates, "Unit", "Units")} of the brand` : node.outcome === START ? "The market" : "From the stock") : null;
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pr-4 text-[13px]" style={{ paddingLeft: 16 + depth * 22 }} data-plan-node={`${consumer}|${node.outcome}`}>
-        <span className="w-[190px] shrink-0">
-          <OutcomeChip model={model} outcome={node.outcome} />
-        </span>
-        {script ? (
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Mark kind={`script:${script.kind}`} id={script.dynasty} size={16} />
-            <span className="truncate font-medium">{script.name}</span>
-            {node.candidates > 1 && <span className="k-fg3 text-[12px]">best of {node.candidates}</span>}
-            {node.materials.length > 0 && <MaterialsBadge model={model} part={{ outcome: node.outcome, scriptId: node.scriptId, materials: node.materials }} />}
-          </span>
-        ) : (
-          <span className="k-fg3 text-[12px]">{leaf}</span>
-        )}
-        {made.length > 0 && (
-          <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] tabular-nums">
-            {made.slice(0, 3).map((b) => (
-              <span key={b.scriptId} className="inline-flex items-center gap-1">
-                <span className="font-medium">{formatRatePct(b.share)}</span>
-                <span className="k-fg3">{model.catalogue.script(b.scriptId)?.name ?? b.scriptId}</span>
-                <span className="k-fg3">at {b.costPerUnit != null ? formatUsd(b.costPerUnit) : "—"}</span>
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
-      {node.materials.map((m) => (
-        <PlanRow key={`${node.outcome}|${m.outcome}`} model={model} node={m} branches={branches} depth={depth + 1} consumer={node.outcome} />
-      ))}
-    </>
-  );
+  if (o?.contentType === "rating") return "Today's Rating";
+  if (o?.subject === "brand" && node.candidates > 0) return node.candidates === 1 ? "The brand's Unit" : `${node.candidates} brand Units`;
+  return "The stock";
 }
 
 function Kpi({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
@@ -575,7 +560,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
     <div className="k-card overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-3">
         <div className="flex min-w-0 items-center gap-2">
-          <PointTitle model={model} info={point.info} />
+          <PointTitle model={model} info={point.info} count={point.candidates.length} />
           <span className="k-fg3 truncate text-[12px]">{point.info.sub}</span>
         </div>
         <span className="k-fg3 text-[12px]">
@@ -587,10 +572,9 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>{candidateWord(point.info.kind)}</th>
-              <th className={`${TH} text-right`}>Share, 7 days</th>
-              <th className={`${TH} text-right`}>Value per $1</th>
-              <th className={`${TH} text-right`}>$ from here</th>
-              <th className={`${TH} text-right`}>% reach the milestone</th>
+              <th className={`${TH} text-right`}>Share this week</th>
+              <th className={`${TH} text-right`}>$ per outcome</th>
+              <th className={`${TH} text-right`}>% reach the next milestone</th>
               <th className={TH}>Hidden truth</th>
             </tr>
           </thead>
@@ -611,8 +595,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
                     {formatRatePct(o.share)}
                   </span>
                 </td>
-                <td className={TDN}>{o.cost < 0.005 ? <span className="k-fg3">Costs us nothing</span> : formatUsd(o.valuePerDollar)}</td>
-                <td className={TDN}>{formatUsd(o.cost)}</td>
+                <td className={TDN}>{o.cost < 0.005 ? <span className="k-fg3">Costs us nothing</span> : o.rate > 0 ? formatUsd(o.cost / o.rate) : <span className="k-fg4">—</span>}</td>
                 <td className={TDN}>
                   {formatRatePct(o.rate)}
                   <span className="k-fg3 ml-1 text-[11px]">± {formatRatePct(o.rateSd)}</span>
@@ -638,26 +621,15 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
   );
 }
 
-/** A pick card's uniform title: "<Engine> · its script" or "<Engine> · Material <outcome>", one glyph per object type. */
-export function PointTitle({ model, info }: { model: Model; info: PointInfo }) {
+/** A card's uniform title: "<Engine> · <n> scripts", or "<Outcome> · <n> Units" when the brand's Units compete. */
+export function PointTitle({ model, info, count }: { model: Model; info: PointInfo; count: number }) {
   const unit = info.kind === "unit";
-  const engine = unit ? info.consumer : info.material;
   return (
     <Link href={`/research/?point=${encodeURIComponent(info.key)}`} className="inline-flex min-w-0 items-center gap-1.5 text-[14px] font-medium hover:underline">
-      {engine === "campaign" ? <Mark kind="campaign" id="campaign" size={20} /> : <Mark kind="engine" id={engine} icon={model.catalogue.outcome(engine)?.icon} size={20} />}
-      <span className="truncate">{engine === "campaign" ? "Campaign" : engineName(model.catalogue, engine)}</span>
+      {unit ? <Mark kind="material" id={info.material} icon={model.catalogue.outcome(info.material)?.icon} size={20} /> : <Mark kind="engine" id={info.material} icon={model.catalogue.outcome(info.material)?.icon} size={20} />}
+      <span className="truncate">{unit ? outcomeLabel(model.catalogue, info.material) : engineName(model.catalogue, info.material)}</span>
       <span className="k-fg4">·</span>
-      {unit ? (
-        <>
-          <Mark kind="material" id={info.material} size={16} />
-          <span className="truncate">Material {outcomeLabel(model.catalogue, info.material)}</span>
-        </>
-      ) : (
-        <>
-          <Mark kind="script" id={`scripts:${info.key}`} size={16} />
-          <span>its script</span>
-        </>
-      )}
+      <span className="k-fg2 font-normal">{plural(count, unit ? "Unit" : "script", unit ? "Units" : "scripts")}</span>
     </Link>
   );
 }

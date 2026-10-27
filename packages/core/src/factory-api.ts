@@ -222,6 +222,8 @@ export interface ApiCandidate {
   costMeanCents: number;
   /** Value per dollar at the means. */
   meanScore: number;
+  /** Its share of the picks made here over the last 7 days. */
+  share: number;
   /** Decisions made and reached so far. */
   picks: number;
   successes: number;
