@@ -89,6 +89,8 @@ A script that wants a fresh piece asks again: `if (context.ageDays > 90) context
 
 **Storage.** An Engine's storage holds only its scripts' notes ("no email found for this lead", "picked this person on day 12") and references to ledger Units, never copies. It is shared by the scripts of that Engine and read by nobody else. Business rules such as "Days before recontact" or "Days before retry" are tactics the script reads and enforces in its own code.
 
+**Replay: porting existing code without losing anything.** Code moved into a script from another system is proven against what that system really did. A recorded case holds the Units the work started from, every vendor call it made in order (the answer, and the request when it was recorded) and what it produced. `replayCase(code, case)` runs the script on those Units with a vendor that answers from the record, then checks the same calls, in the same order, with the same requests, and the same result. A ported script is done only when every one of its cases matches. Cases from a real system hold real personal data: a hosted GTM Factory keeps them in its database, never in this repository.
+
 **One run, one script.** When a run does not produce its outcome, no other script is tried on that subject. A script may embed a fallback of its own, and it is then simply a different script.
 
 ## 5. Pull, push and the Plan
