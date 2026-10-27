@@ -48,7 +48,7 @@ export function ApiCampaignsPage() {
                   <tbody>
                     {campaigns.map((c) => (
                       <tr key={c.id} className="k-row k-line-subtle border-b last:border-b-0">
-                        <td className={TD}>
+                        <td className={`${TD} max-w-0`}>
                           <Link href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="flex min-w-0 items-center gap-2.5">
                             <Mark kind="funnel" id={c.funnelId} size={28} />
                             <span className="min-w-0">
