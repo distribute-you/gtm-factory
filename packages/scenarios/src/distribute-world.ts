@@ -48,9 +48,9 @@ function baseYield(from: string | undefined, to: string, id: string): number {
   if (to === "lead_found") return 1;
   if (to === "lead_interested") return from === "lead_visited" ? r(0.05, 0.12) : from === "lead_found" ? r(0.01, 0.04) : r(0.005, 0.02);
   if (to === "lead_visited") return from === "lead_found" ? r(0.03, 0.08) : r(0.01, 0.04);
-  if (to === "meeting_booked") return from === "lead_interested" ? r(0.3, 0.6) : r(0.2, 0.5);
+  if (to === "meeting_booked") return from === "lead_interested" ? r(0.3, 0.6) : from === "lead_visited" ? r(0.03, 0.08) : r(0.001, 0.004);
   if (to === "meeting_attended") return r(0.6, 0.85);
-  if (to === "paid_client") return from === "meeting_attended" ? r(0.15, 0.35) : r(0.05, 0.15);
+  if (to === "paid_client") return from === "meeting_attended" ? r(0.15, 0.35) : from === "lead_interested" ? r(0.05, 0.15) : r(0.0005, 0.002);
   return r(0.2, 0.6);
 }
 
@@ -124,8 +124,12 @@ export function buildDistributeWorld(pub: PublicCatalogue, how: DistributeWorldP
   cat.scripts = scripts;
   for (const p of cat.legs) truthLegs[p.id] = { base: baseYield(fromOf.get(p.id), p.output, p.id), delayMeanDays: p.maturity.delayMeanDays, horizonDays: p.maturity.horizonDays };
   cat.tactics = [...cat.tactics, ...LEAD_TACTICS, ...SCRIPT_TACTICS, ...BRAND_TACTICS];
-  // A strategy that keeps one channel: the client who wants cold email only says it in its campaign.
-  const coldEmail: Condition[] = [{ op: "equals", tactic: CHANNEL_TACTIC, value: t.channelName("sales-cold-email-outreach")! }];
+  // A campaign's strategy keeps the channels its client wants: "Channel is one of these".
+  const channelsOf = (...types: string[]) => pub.channels.filter((c) => types.includes(c.channelType ?? "")).map((c) => c.name);
+  const only = (names: string[]): Condition[] => [{ op: "in", tactic: CHANNEL_TACTIC, values: names }];
+  const outreach = only(channelsOf("sourcing", "outbound", "conversion"));
+  const coldEmail = only([t.channelName("sales-cold-email-outreach")!, ...channelsOf("sourcing", "conversion")]);
+  const inbound = only(channelsOf("paid", "earned", "pr", "conversion"));
 
   const seeds = (brand: string, sellsTo: string): SeedUnit[] => [
     { outcome: ICP, scriptId: "icp_client_states", dynasty: "icp-client", version: 1, name: "The client's ICP", text: "Founders and heads of growing companies.", conditions: [{ op: "in", tactic: "seniority", values: ["founder", "head"] }] },
@@ -157,12 +161,12 @@ export function buildDistributeWorld(pub: PublicCatalogue, how: DistributeWorldP
     ...extra,
   });
   const clients: WorldClient[] = [
-    client(1, "Northwind Analytics", "Mid-market", { lifetimeRevenue: 900 }, [camp(1, "", "Paid clients from cold outreach", "paid_client", 3000)]),
+    client(1, "Northwind Analytics", "Mid-market", { lifetimeRevenue: 900 }, [camp(1, "", "Paid clients from cold outreach", "paid_client", 3000, { conditions: outreach })]),
     client(2, "Bluepeak Logistics", "Mid-market", { lifetimeRevenue: 400, outcomeValues: { lead_interested: 30 } }, [
-      camp(2, "", "Paid clients from the website", "paid_client", 2500),
+      camp(2, "", "Paid clients from ads and content", "paid_client", 2500, { conditions: inbound }),
       camp(2, "f", "Follow-ups after each website visit", "lead_interested", 800, { start: t.outcomeOfStep("website_visit")! }),
     ]),
-    client(3, "Lumen Dental Labs", "SMB", { lifetimeRevenue: 1500 }, [camp(3, "", "Replies closed by the team", "paid_client", 2000)]),
+    client(3, "Lumen Dental Labs", "SMB", { lifetimeRevenue: 1500 }, [camp(3, "", "Replies closed by the team", "paid_client", 2000, { conditions: outreach })]),
     client(4, "Copperleaf Studio", "SMB", { lifetimeRevenue: 1200, outcomeValues: { meeting_booked: 150 } }, [camp(4, "", "Meetings from cold email", "meeting_booked", 2000, { conditions: coldEmail })]),
   ];
 

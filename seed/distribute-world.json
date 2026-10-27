@@ -4723,7 +4723,46 @@
           "target": "paid_client",
           "dailyBudgetCents": 3000,
           "status": "running",
-          "strategies": {}
+          "strategies": {},
+          "conditions": [
+            {
+              "op": "in",
+              "tactic": "channel",
+              "values": [
+                "Sales Cold Email Outreach",
+                "Sales Feedback Request Cold Email Outreach",
+                "Cold Call Outreach",
+                "Cold SMS Outreach",
+                "Cold WhatsApp Outreach",
+                "Cold LinkedIn Outreach",
+                "Cold X Outreach",
+                "Cold Instagram Outreach",
+                "Cold Reddit Outreach",
+                "AI Meeting Booking",
+                "Managed Meeting Booking",
+                "Your Team Meeting Booking",
+                "Managed Meeting Attendance",
+                "Your Team Meeting Attendance",
+                "Managed Closing Calls",
+                "Your Team Closing Calls",
+                "Managed Signup Conversion",
+                "Your Team Signup Conversion",
+                "AI Instant Call",
+                "Your Team Booking Calls",
+                "Your Team Reply Closing",
+                "Your Team Website",
+                "Your Team Order Delivery",
+                "AI Follow-up Email",
+                "Lead Sourcing",
+                "Apollo Cold Filters",
+                "Apollo Buying Signals",
+                "LinkedIn Engagement Signals",
+                "Your CRM Contacts",
+                "Email Sending",
+                "AI Lead Proposal"
+              ]
+            }
+          ]
         }
       ],
       "seeds": [
@@ -4826,12 +4865,58 @@
           "id": "campaign-2",
           "brandId": "brand-2",
           "offerId": "offer-2",
-          "name": "Paid clients from the website",
+          "name": "Paid clients from ads and content",
           "start": "start",
           "target": "paid_client",
           "dailyBudgetCents": 2500,
           "status": "running",
-          "strategies": {}
+          "strategies": {},
+          "conditions": [
+            {
+              "op": "in",
+              "tactic": "channel",
+              "values": [
+                "Google Ads",
+                "Meta Ads",
+                "LinkedIn Ads",
+                "TikTok Ads",
+                "YouTube Ads",
+                "X Ads",
+                "Reddit Ads",
+                "Bing Ads",
+                "Quora Ads",
+                "Newsletter Sponsorships",
+                "Podcast Sponsorships",
+                "Creator Sponsorships",
+                "Paid Software Directory Listings",
+                "SEO Content",
+                "Press Placements",
+                "Podcast Guesting",
+                "Affiliate Programme",
+                "LinkedIn Posting",
+                "Organic X Publishing",
+                "Organic Reddit Publishing",
+                "Organic YouTube Publishing",
+                "AI Meeting Booking",
+                "Managed Meeting Booking",
+                "Your Team Meeting Booking",
+                "Managed Meeting Attendance",
+                "Your Team Meeting Attendance",
+                "Managed Closing Calls",
+                "Your Team Closing Calls",
+                "Managed Signup Conversion",
+                "Your Team Signup Conversion",
+                "AI Instant Call",
+                "Your Team Booking Calls",
+                "Your Team Reply Closing",
+                "Your Team Website",
+                "Your Team Order Delivery",
+                "AI Follow-up Email",
+                "Social post",
+                "AI Lead Proposal"
+              ]
+            }
+          ]
         },
         {
           "id": "campaign-2f",
@@ -4947,7 +5032,46 @@
           "target": "paid_client",
           "dailyBudgetCents": 2000,
           "status": "running",
-          "strategies": {}
+          "strategies": {},
+          "conditions": [
+            {
+              "op": "in",
+              "tactic": "channel",
+              "values": [
+                "Sales Cold Email Outreach",
+                "Sales Feedback Request Cold Email Outreach",
+                "Cold Call Outreach",
+                "Cold SMS Outreach",
+                "Cold WhatsApp Outreach",
+                "Cold LinkedIn Outreach",
+                "Cold X Outreach",
+                "Cold Instagram Outreach",
+                "Cold Reddit Outreach",
+                "AI Meeting Booking",
+                "Managed Meeting Booking",
+                "Your Team Meeting Booking",
+                "Managed Meeting Attendance",
+                "Your Team Meeting Attendance",
+                "Managed Closing Calls",
+                "Your Team Closing Calls",
+                "Managed Signup Conversion",
+                "Your Team Signup Conversion",
+                "AI Instant Call",
+                "Your Team Booking Calls",
+                "Your Team Reply Closing",
+                "Your Team Website",
+                "Your Team Order Delivery",
+                "AI Follow-up Email",
+                "Lead Sourcing",
+                "Apollo Cold Filters",
+                "Apollo Buying Signals",
+                "LinkedIn Engagement Signals",
+                "Your CRM Contacts",
+                "Email Sending",
+                "AI Lead Proposal"
+              ]
+            }
+          ]
         }
       ],
       "seeds": [
@@ -5058,9 +5182,32 @@
           "strategies": {},
           "conditions": [
             {
-              "op": "equals",
+              "op": "in",
               "tactic": "channel",
-              "value": "Sales Cold Email Outreach"
+              "values": [
+                "Sales Cold Email Outreach",
+                "AI Meeting Booking",
+                "Managed Meeting Booking",
+                "Your Team Meeting Booking",
+                "Managed Meeting Attendance",
+                "Your Team Meeting Attendance",
+                "Managed Closing Calls",
+                "Your Team Closing Calls",
+                "Managed Signup Conversion",
+                "Your Team Signup Conversion",
+                "AI Instant Call",
+                "Your Team Booking Calls",
+                "Your Team Reply Closing",
+                "Your Team Website",
+                "Your Team Order Delivery",
+                "AI Follow-up Email",
+                "Lead Sourcing",
+                "Apollo Cold Filters",
+                "Apollo Buying Signals",
+                "LinkedIn Engagement Signals",
+                "Your CRM Contacts",
+                "AI Lead Proposal"
+              ]
             }
           ]
         }
@@ -5225,7 +5372,7 @@
         "horizonDays": 0
       },
       "start>meeting_booked": {
-        "base": 0.455,
+        "base": 0.004,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5235,7 +5382,7 @@
         "horizonDays": 0
       },
       "lead_visited>meeting_booked": {
-        "base": 0.456,
+        "base": 0.073,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5245,7 +5392,7 @@
         "horizonDays": 0
       },
       "team:lead_visited>meeting_booked": {
-        "base": 0.248,
+        "base": 0.038,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5270,12 +5417,12 @@
         "horizonDays": 0
       },
       "team:lead_found>paid_client": {
-        "base": 0.108,
+        "base": 0.001,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
       "team:industry_update_video>paid_client": {
-        "base": 0.122,
+        "base": 0.002,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5290,7 +5437,7 @@
         "horizonDays": 0
       },
       "team:booking_call>meeting_booked": {
-        "base": 0.449,
+        "base": 0.003,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5305,17 +5452,17 @@
         "horizonDays": 0
       },
       "team:purchase>paid_client": {
-        "base": 0.139,
+        "base": 0.002,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
       "lead_interested>paid_client@fact:follow_up_due": {
-        "base": 0.119,
+        "base": 0.002,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
       "lead_interested>paid_client@fact:github_issue_in_prod": {
-        "base": 0.094,
+        "base": 0.001,
         "delayMeanDays": 0,
         "horizonDays": 0
       },
@@ -5350,7 +5497,7 @@
         "horizonDays": 21
       },
       "start>paid_client@fact:hot_lead": {
-        "base": 0.135,
+        "base": 0.002,
         "delayMeanDays": 0,
         "horizonDays": 0
       },

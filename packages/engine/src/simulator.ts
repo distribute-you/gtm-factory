@@ -592,6 +592,7 @@ export class SimulationSession {
       // All campaigns run each tick, each on its own budget, each on the tree rebuilt for this tick.
       for (const campaign of order) {
         this.rebuildTree(campaign);
+        this.notePath(campaign, day);
         if (this.isProactive(campaign)) this.pull(campaign, day);
         else this.advanceOpen(campaign, day);
       }
@@ -719,8 +720,33 @@ export class SimulationSession {
     return this.trees.get(campaign.id)!.get(from) ?? null;
   }
 
-  /** The sales path this tick's tree runs: the lead states from the start to the Target (a view). */
+  /** Count the path this tick's tree runs, per day: the view reads the one used most. */
+  private notePath(campaign: Campaign, day: number): void {
+    const key = this.treePath(campaign).join(">");
+    if (!key) return;
+    let days = this.pathsUsed.get(campaign.id);
+    if (!days) this.pathsUsed.set(campaign.id, (days = []));
+    const m = (days[day] ??= new Map<string, number>());
+    m.set(key, (m.get(key) ?? 0) + 1);
+  }
+
+  private readonly pathsUsed = new Map<string, Map<string, number>[]>();
+
+  /**
+   * The sales path of a campaign (a view): the lead states its tree went
+   * through most over the last 7 days, else the path of this tick's tree.
+   */
   pathOf(campaign: Campaign): OutcomeId[] {
+    const days = this.pathsUsed.get(campaign.id) ?? [];
+    const n = new Map<string, number>();
+    for (let d = Math.max(0, this.dayIndex - 7); d <= this.dayIndex; d++) for (const [k, v] of days[d] ?? []) n.set(k, (n.get(k) ?? 0) + v);
+    let best: string | null = null;
+    for (const [k, v] of n) if (best === null || v > n.get(best)! || (v === n.get(best)! && k < best)) best = k;
+    return best ? best.split(">") : this.treePath(campaign);
+  }
+
+  /** The lead states this tick's tree runs, from the start to the Target. */
+  treePath(campaign: Campaign): OutcomeId[] {
     const line: OutcomeId[] = [];
     let x: OutcomeId | null = campaign.start;
     while (x && x !== campaign.target && line.length < 20) {
