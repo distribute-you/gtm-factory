@@ -116,7 +116,7 @@
 }
 .v2-root .k-input:focus-within { outline: 1px solid color-mix(in oklab, var(--accent) 60%, transparent); outline-offset: -1px; }
 /* The call to action a selling screen exists for (the sign-up wall): 48px tall, never
-   missed. Sign-up choices are k-cta-dark, all the same: Google's own dark theme (#131314,
+   missed. Sign-up buttons are k-cta-dark, all the same: Google's own dark theme (#131314,
    #8E918F stroke, standard G; its guidelines forbid a brand-colour fill), and email
    dressed alike, never one blue and one not.
    Tailwind height utilities lose to the 28px controls above (this file is unlayered),

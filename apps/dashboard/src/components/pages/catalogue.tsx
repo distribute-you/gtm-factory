@@ -11,14 +11,13 @@ import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD,
 import { PageSkeleton } from "./today";
 import { candidateLabel, engineLine, engineName, headScript, outcomeLabel, pluggedAt, scriptFigures, type Model } from "@/lib/model";
 import { performerFigures } from "@/lib/engine-pages";
-import { campaignsOnRouting } from "@/lib/plan";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 import { pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
 import { useSim } from "@/lib/sim";
 
-const TABS = ["outcomes", "engines", "scripts", "routings", "tactics", "strategies", "performers"] as const;
+const TABS = ["outcomes", "engines", "scripts", "tactics", "strategies", "performers"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { outcomes: "Outcomes", engines: "Engines", scripts: "Scripts", routings: "Routings", tactics: "Tactics", strategies: "Strategies", performers: "Performed by" };
+const TAB_LABEL: Record<Tab, string> = { outcomes: "Outcomes", engines: "Engines", scripts: "Scripts", tactics: "Tactics", strategies: "Strategies", performers: "Performed by" };
 
 export function CataloguePage() {
   const { model } = useSim();
@@ -42,7 +41,6 @@ function Catalogue({ model }: { model: Model }) {
     outcomes: c.outcomes.filter((x) => !x.retired).length,
     engines: c.engines().length,
     scripts: new Set(c.scripts.filter((s) => s.status === "active").map((s) => s.dynasty)).size,
-    routings: (c.routings ?? []).length,
     tactics: c.tactics.filter((t) => !t.retired).length,
     strategies: c.strategies.filter((s) => !s.retired).length,
     performers: performers.length,
@@ -61,43 +59,10 @@ function Catalogue({ model }: { model: Model }) {
       {tab === "outcomes" && <Outcomes model={model} />}
       {tab === "engines" && <Engines model={model} />}
       {tab === "scripts" && <Scripts model={model} />}
-      {tab === "routings" && <Routings model={model} />}
       {tab === "tactics" && <Tactics model={model} />}
       {tab === "strategies" && <Strategies model={model} />}
       {tab === "performers" && <Performers model={model} />}
     </>
-  );
-}
-
-/** Routings (lines of milestones from a start to a Target): named on first sight, never renamed. */
-function Routings({ model }: { model: Model }) {
-  const c = model.catalogue;
-  const routings = c.routings ?? [];
-  return (
-    <div className="space-y-3">
-      <p className="k-fg2 text-[13px]">A Routing is the ordered milestones a Plan passes through, from its start (Start, the market, or any outcome) to its Target. It gets a short name the first time it is seen, and keeps it.</p>
-      {routings.length === 0 ? (
-        <div className="k-card">
-          <EmptyNote>No Routing has been run yet.</EmptyNote>
-        </div>
-      ) : (
-        <div className="k-card divide-y divide-[var(--line-subtle)]">
-          {routings.map((r) => {
-            const running = campaignsOnRouting(model, r.id);
-            return (
-              <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <Mark kind="routing" id={r.id} size={20} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium">{r.name}</span>
-                  <span className="k-fg3 block truncate text-[12px]">{[r.start, ...r.line].map((o) => outcomeLabel(c, o)).join(" → ")}</span>
-                </span>
-                <span className="k-fg3 text-[12px] tabular-nums">{running.length === 0 ? "No campaign today" : `${formatCount(running.length)} campaign${running.length > 1 ? "s" : ""} today`}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
   );
 }
 

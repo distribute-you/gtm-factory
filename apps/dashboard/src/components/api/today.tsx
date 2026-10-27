@@ -91,7 +91,7 @@ function Today({ o }: { o: ApiOverview }) {
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{c.name}</span>
                         <span className="k-fg3 block truncate text-[12px]">
-                          {brandName(c.brandId)} · {c.routing?.name ?? "Not run yet"}
+                          {brandName(c.brandId)}: {c.line.length > 0 ? c.line.map((x) => outcomeName(o.catalogue, x)).join(" → ") : "Not run yet"}
                         </span>
                       </span>
                     </Link>

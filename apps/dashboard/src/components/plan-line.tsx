@@ -19,7 +19,7 @@ export function PlanLineView({ model, campaign, line: given, size = "sm", scroll
   if (!line) return null;
   const icon = size === "md" ? 18 : 14;
   const drawn = (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${size === "md" ? "text-[13px]" : "text-[12px]"}`} data-routing={line.routing.id}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${size === "md" ? "text-[13px]" : "text-[12px]"}`}>
       <OutcomeChip model={model} outcome={line.start} size={icon} />
       {line.parts.map((p) => {
         const script = p.scriptId ? model.catalogue.script(p.scriptId) : undefined;
@@ -114,19 +114,6 @@ function MaterialRow({ model, node, consumer }: { model: Model; node: PlanNode; 
         <span className="k-fg2">{from}</span>
       </span>
     </li>
-  );
-}
-
-/** The Routing a campaign's Plan passes through, with its short name. */
-export function RoutingName({ model, campaign, line: given }: { model: Model; campaign?: Campaign; line?: PlanLine | null }) {
-  const line = given ?? (campaign ? campaignPlanLine(model, campaign) : null);
-  if (!line) return null;
-  return (
-    <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
-      <Mark kind="routing" id={line.routing.id} size={16} />
-      <span className="k-fg3 shrink-0">Routing:</span>
-      <span className="truncate font-medium">{line.routing.name}</span>
-    </span>
   );
 }
 

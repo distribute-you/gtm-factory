@@ -142,10 +142,7 @@ function PlanCard({ plan, rank, catalogue, on, onPick }: { plan: ApiPlanPreview;
             {rank === 0 && <span className="k-chip">Best value per dollar</span>}
             <span className="k-chip">{plan.label === "measured" ? "Measured" : "Expected"}</span>
           </div>
-          <p className="k-fg3 mt-0.5 inline-flex items-center gap-1.5 text-[12px]">
-            <Mark kind="routing" id={plan.routing.id} size={14} />
-            Routing: {plan.routing.name}
-          </p>
+          <p className="k-fg3 mt-0.5 text-[12px]">Passes through {plan.line.map((o) => outcomeName(catalogue, o)).join(", ")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="k-chip">{outcomeName(catalogue, START)}</span>
             {plan.milestones.map((m) => (

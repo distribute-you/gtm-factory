@@ -17,7 +17,7 @@ const pct = (x: number, digits: number) => `${(x * 100).toFixed(digits)}%`;
 
 describe("the words", () => {
   it("no dash, none of the retired words, and the product name is the only factory", () => {
-    const retired = [/\bchoices?\b/i, /\bchosen\b/i, /\bpipes?\b/i, /\blegs?\b/i, /\bsteps?\b/i, /\bplays?\b/i, /\bspecifications?\b/i, /\boptions?\b/i, /\bsales funnels?\b/i, /\bsales paths?\b/i, /(?<!GTM |-)\bfactor(y|ies)\b(?!-)/i];
+    const retired = [/\broutings?\b/i, /\bchoices?\b/i, /\bchosen\b/i, /\bpipes?\b/i, /\blegs?\b/i, /\bsteps?\b/i, /\bplays?\b/i, /\bspecifications?\b/i, /\boptions?\b/i, /\bsales funnels?\b/i, /\bsales paths?\b/i, /(?<!GTM |-)\bfactor(y|ies)\b(?!-)/i];
     for (const [name, text] of [["framework.md", doc], ["api.md", api], ["README.md", readme]] as const) {
       expect(text, name).not.toMatch(/[–—]/);
       for (const w of retired) expect(text, `${name} ${w}`).not.toMatch(w);
@@ -25,14 +25,14 @@ describe("the words", () => {
   });
 
   it("defines every object of the model and states the six decisions", () => {
-    for (const o of ["Outcome", "Unit", "Engine", "Script", "Provider", "Run", "Campaign", "Plan", "Routing", "Track"]) expect(doc).toContain(`| **${o}** |`);
+    for (const o of ["Outcome", "Unit", "Engine", "Script", "Provider", "Run", "Campaign", "Plan", "Track"]) expect(doc).toContain(`| **${o}** |`);
     expect(doc).toContain("# GTM Factory v7");
     expect(doc).toContain("1. **One Engine per outcome.**");
     expect(doc).toContain("2. **No written manifest.**");
     expect(doc).toContain("`get()`, with no argument");
     expect(doc).toContain("`pull()` and `push(unit)`");
     expect(doc).toContain("4. **Freshness is the script's job.**");
-    expect(doc).toContain("5. **The names.** Engine, Provider, Plan, Routing, Track.");
+    expect(doc).toContain("5. **The names.** Engine, Provider, Plan, Track.");
     expect(doc).toContain("6. **\"Performed by\" is a tactic of scripts.**");
   });
 });
@@ -76,7 +76,8 @@ describe("the worked examples", () => {
     expect(doc).toContain(`Lead interested, made by the website signup, performed by the client's team (**${interested.candidates}** script)`);
     expect(doc).toContain(`Lead visited, made by the search ads script (**${visited.candidates}** scripts compete)`);
     expect(doc).toContain(`the ICP, served from the stock (**${icp.candidates}** ICP dynasties compete)`);
-    expect(doc).toContain(`Its Routing is "${s.routingOf(c).name}".`);
+    const passes = s.milestoneLine(c).map((o) => s.catalogue.outcome(o)!.label);
+    expect(doc).toContain(`It passes through ${passes.slice(0, -1).join(", ")} and ${passes[passes.length - 1]}.`);
     const costs = s.milestoneCosts(c);
     const label = (o: string) => s.catalogue.outcome(o)!.label;
     for (const m of costs) expect(doc).toContain(`| ${label(m.to)} | **${m.attemptsPerTarget!.toFixed(1)}** | **${money(m.costFromStart!)}** |`);
@@ -91,7 +92,7 @@ describe("the worked examples", () => {
     expect(f.start).toBe("message_sent");
     expect(f.target).toBe("lead_interested");
     expect(doc).toContain(`"${f.brief}"`);
-    expect(doc).toContain(`Its Routing is "${s.routingOf(f).name}", and the next Engine its Plan names is ${s.catalogue.outcome(s.planOf(f)!.materials[0]!.materials[0]!.outcome)!.label}.`);
+    expect(doc).toContain(`The next Engine its Plan names is ${s.catalogue.outcome(s.planOf(f)!.materials[0]!.materials[0]!.outcome)!.label}.`);
     const won = s.units.find((u) => u.outcome === "lead_interested" && u.campaignId === f.id)!;
     const push = s.pushes.find((p) => p.campaignId === f.id && p.subject === won.subject)!;
     const day = (o: string) => s.units.find((u) => u.subject === won.subject && u.outcome === o && (u.campaignId === f.id || o === "message_sent"))!.day;

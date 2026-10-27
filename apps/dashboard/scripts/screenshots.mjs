@@ -52,7 +52,6 @@ export const PAGES = [
   ["catalogue-scripts", "/catalogue/?tab=scripts"],
   ["catalogue-tactics", "/catalogue/?tab=tactics"],
   ["catalogue-strategies", "/catalogue/?tab=strategies"],
-  ["catalogue-routings", "/catalogue/?tab=routings"],
   ["ledger", "/ledger/"],
   ["how-it-works", "/how-it-works/"],
 ];

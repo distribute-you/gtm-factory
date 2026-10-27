@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { PlanFlow, type FlowNode } from "@/components/plan-flow";
+import { Flows, PlanTree, type FlowView, type TreeNode } from "@/components/plan-tree";
 import { START, type ApiCampaign, type ApiCampaignDetail, type ApiPlanNode, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
@@ -106,16 +105,30 @@ export function ApiCampaignPage() {
   );
 }
 
-/** The chain that carries the subject in a Plan, from the start up to the Target. */
-function chainOf(plan: ApiPlanNode | null, start: string, catalogue: CatalogueData | undefined): ApiPlanNode[] {
-  const subjects = new Set((catalogue?.outcomes ?? []).filter((o) => o.subject === "lead" || o.subject === "company").map((o) => o.id));
-  const out: ApiPlanNode[] = [];
-  let node: ApiPlanNode | undefined = plan ?? undefined;
-  for (let guard = 0; node && node.outcome !== start && node.scriptId && guard < 50; guard++) {
-    out.unshift(node);
-    node = node.materials.find((m) => subjects.has(m.outcome));
-  }
-  return out;
+/** The Plan tree a page draws, from the served one. */
+function treeOf(catalogue: CatalogueData | undefined, n: ApiPlanNode): TreeNode {
+  return {
+    outcome: n.outcome,
+    label: outcomeName(catalogue, n.outcome),
+    icon: catalogue?.outcomes.find((o) => o.id === n.outcome)?.icon,
+    candidates: n.candidates,
+    branches: n.branches.map((b) => {
+      const s = catalogue?.scripts.find((x) => x.id === b.scriptId);
+      return {
+        key: b.scriptId,
+        name: s?.name ?? scriptTitle(catalogue, b.scriptId),
+        kind: s?.kind ?? "rules",
+        dynasty: s?.dynasty ?? b.scriptId,
+        units: b.units,
+        share: b.share,
+        costPerUnit: b.costPerUnitCents != null ? b.costPerUnitCents / 100 : null,
+        current: b.current,
+        inputs: b.inputs.map((i) => ({ label: i.label, versions: i.versions.map((v) => ({ label: v.label, share: v.share })) })),
+        sameBelow: b.sameBelow,
+        children: b.children.map((c) => treeOf(catalogue, c)),
+      };
+    }),
+  };
 }
 
 function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: CatalogueData | undefined }) {
@@ -125,9 +138,9 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
   const targetPlural = outcomePluralName(catalogue, c.target);
   const proactive = c.start === START;
   const targetIcon = catalogue?.outcomes.find((o) => o.id === c.target)?.icon;
-  const chain = chainOf(d.plan, c.start, catalogue);
-  // The milestones of the Routing, then every outcome counted off them.
-  const line = d.milestones.length > 0 ? d.milestones.map((s) => s.to) : Object.keys(c.counts);
+  // The milestones its Plan passes through, then every outcome counted off them.
+  const line = c.line.length > 0 ? c.line : d.milestones.length > 0 ? d.milestones.map((s) => s.to) : Object.keys(c.counts);
+  const flows: FlowView[] = d.flows.map((f) => ({ from: f.from, fromLabel: outcomeName(catalogue, f.from), to: f.to, toLabel: outcomeName(catalogue, f.to), subjects: f.subjects, by: f.by.map((b) => ({ name: b.name, subjects: b.subjects, share: b.share })) }));
   const verdicts = Object.entries(c.verdicts ?? {});
   const caps = Object.entries(c.caps ?? {});
   return (
@@ -187,26 +200,10 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
         )}
       </div>
 
-      <div className="k-card mb-3 px-4 py-3" data-testid="campaign-routing">
-        <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
-          <Mark kind="routing" id={c.routing?.id ?? c.id} size={16} />
-          <span className="k-fg3 shrink-0">Routing:</span>
-          <span className="truncate font-medium">{c.routing?.name ?? "Not run yet"}</span>
-        </span>
-        {chain.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px]" data-testid="plan-line">
-            <OutcomeTag catalogue={catalogue} id={c.start} />
-            {chain.map((n) => (
-              <span key={n.outcome} className="inline-flex flex-wrap items-center gap-1.5">
-                <span className="k-fg4">→</span>
-                <ScriptTag catalogue={catalogue} node={n} />
-                <span className="k-fg4">→</span>
-                <OutcomeTag catalogue={catalogue} id={n.outcome} />
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <section className="mb-6">
+        <SectionTitle right={<span>Last 7 days, by the script that got them there</span>}>What its people went through</SectionTitle>
+        <Flows flows={flows} unit="people" />
+      </section>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <StatTile label="Spent in total">
@@ -225,7 +222,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
 
       {d.milestones.length > 0 && (
         <section className="mt-8">
-          <SectionTitle count={d.milestones.length}>Milestones of the Routing</SectionTitle>
+          <SectionTitle count={d.milestones.length}>Milestones</SectionTitle>
           <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
@@ -262,14 +259,8 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       )}
 
       <section className="mt-8">
-        <SectionTitle right={<span>Recomputed at every tick; shares and costs over the last 7 days</span>}>Plan</SectionTitle>
-        {chain.length > 0 ? (
-          <PlanFlow start={c.start} startLabel={outcomeName(catalogue, c.start)} target={c.target} nodes={chain.map((n) => flowNode(catalogue, n))} />
-        ) : (
-          <div className="k-card">
-            <EmptyNote>No Plan yet: the first tick computes it.</EmptyNote>
-          </div>
-        )}
+        <SectionTitle right={<span>Recomputed at every tick; what ran over the last 7 days</span>}>Plan</SectionTitle>
+        <PlanTree root={d.plan ? treeOf(catalogue, d.plan) : null} start={c.start} startLabel={outcomeName(catalogue, c.start)} target={c.target} />
       </section>
 
       <section className="mt-8">
@@ -278,7 +269,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={d.recentPicks.length}>Why each pick was made</SectionTitle>
+        <SectionTitle count={d.recentPicks.length}>Why each one was picked</SectionTitle>
         <PicksTable picks={d.recentPicks} />
       </section>
 
@@ -300,82 +291,12 @@ function strategyName(catalogue: CatalogueData | undefined, id: string): string 
   return catalogue?.strategies.find((s) => s.id === id)?.name ?? id;
 }
 
-/** One Engine of the Plan as a workflow card: its script now, what made it this week, what its script calls. */
-function flowNode(catalogue: CatalogueData | undefined, node: ApiPlanNode): FlowNode {
-  const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
-  const subjects = new Set((catalogue?.outcomes ?? []).filter((o) => o.subject === "lead" || o.subject === "company").map((o) => o.id));
-  return {
-    outcome: node.outcome,
-    label: outcomeName(catalogue, node.outcome),
-    icon: catalogue?.outcomes.find((o) => o.id === node.outcome)?.icon,
-    script: node.scriptId ? { name: script?.name ?? scriptTitle(catalogue, node.scriptId), kind: script?.kind ?? "rules", dynasty: script?.dynasty ?? node.scriptId } : null,
-    candidates: node.candidates,
-    branches: node.branches.map((b) => ({ name: scriptTitle(catalogue, b.scriptId), share: b.share, costPerUnit: b.costPerUnitCents != null ? b.costPerUnitCents / 100 : null })),
-    sides: node.materials
-      .filter((m) => !subjects.has(m.outcome))
-      .map((m) => {
-        const o = catalogue?.outcomes.find((x) => x.id === m.outcome);
-        const from = m.scriptId ? scriptTitle(catalogue, m.scriptId) : o?.contentType === "rating" ? "Today's Rating" : o?.subject === "brand" ? (m.candidates === 1 ? "The brand's Unit" : `${formatCount(m.candidates)} brand Units`) : "The stock";
-        return { outcome: m.outcome, label: outcomeName(catalogue, m.outcome), icon: o?.icon, from };
-      }),
-  };
-}
-
 function OutcomeTag({ catalogue, id }: { catalogue: CatalogueData | undefined; id: string }) {
   const o = catalogue?.outcomes.find((x) => x.id === id);
   return (
     <span className="inline-flex items-center gap-1">
       {id === START ? <Mark kind="start" id="start" size={14} quiet /> : <Mark kind="outcome" id={id} icon={o?.icon} size={14} />}
       <span className="k-fg2">{outcomeName(catalogue, id)}</span>
-    </span>
-  );
-}
-
-/** A script on the line, with its "<n> materials" badge: the outcomes its code calls, each with the Provider it comes from. */
-function ScriptTag({ catalogue, node }: { catalogue: CatalogueData | undefined; node: ApiPlanNode }) {
-  const [open, setOpen] = useState(false);
-  const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
-  const name = script?.name ?? (node.scriptId ? scriptTitle(catalogue, node.scriptId) : engineTitle(catalogue, node.outcome));
-  return (
-    <span className="relative inline-flex items-center gap-1">
-      <Mark kind={script ? (`script:${script.kind}` as const) : "engine"} id={script?.dynasty ?? node.outcome} size={14} />
-      <span>{name}</span>
-      {node.materials.length > 0 && (
-        <button type="button" className="k-chip ml-0.5 cursor-pointer text-[11px]" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-materials={node.outcome}>
-          {plural(node.materials.length, "material", "materials")}
-        </button>
-      )}
-      {open && (
-        <span className="k-popover absolute left-0 top-full z-20 mt-1 block w-[360px] p-3" role="dialog" aria-label="Materials">
-          <span className="k-label mb-1 block">What its code calls</span>
-          <span className="mb-2 flex items-center gap-1.5 text-[13px]">
-            <Mark kind={script ? (`script:${script.kind}` as const) : "engine"} id={script?.dynasty ?? node.outcome} size={16} />
-            <span className="truncate font-medium">{name}</span>
-            <span className="k-fg3 truncate text-[12px]">makes {outcomeName(catalogue, node.outcome)}</span>
-          </span>
-          {node.materials.map((m) => {
-            const o = catalogue?.outcomes.find((x) => x.id === m.outcome);
-            const from = m.scriptId
-              ? scriptTitle(catalogue, m.scriptId)
-              : o?.subject === "brand" && m.candidates > 0
-                ? `the brand's ${m.candidates === 1 ? "Unit" : `${m.candidates} Units`}`
-                : o?.contentType === "rating"
-                  ? "today's Rating"
-                  : o?.track
-                    ? "the milestone it starts from"
-                    : "the stock";
-            return (
-              <span key={m.outcome} className="flex items-center gap-2 py-1 text-[12px]">
-                <Mark kind="material" id={m.outcome} icon={o?.icon} size={16} />
-                <span className="min-w-0 flex-1 truncate">{outcomeName(catalogue, m.outcome)}</span>
-                <span className="k-fg3 shrink-0">
-                  Provider: <span className="k-fg2">{from}</span>
-                </span>
-              </span>
-            );
-          })}
-        </span>
-      )}
     </span>
   );
 }

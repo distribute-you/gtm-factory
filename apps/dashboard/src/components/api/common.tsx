@@ -9,6 +9,7 @@ import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
 import { OURS, type ApiCampaign, type ApiPick, type ApiCandidates, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
 import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
+import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
 import { engineTitle, outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi } from "@/lib/format";
@@ -331,7 +332,7 @@ export function PicksTable({ picks, empty = "No pick made yet." }: { picks: ApiP
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
-          <th className={TH}>Material</th>
+          <th className={TH}>Picked at</th>
           <th className={TH}>Picked</th>
           <th className={`${TH} w-full`}>Why</th>
           <th className={TH}>Credited</th>
@@ -353,8 +354,8 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
         <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(pick.at)}</td>
         <td className={`${TD} whitespace-nowrap`}>
           <span className="inline-flex items-center gap-2">
-            <Mark kind="point" id={pick.place} size={16} />
-            {pick.placeLabel}
+            <Mark kind={pick.kind === "input" ? "material" : "engine"} id={pick.place} size={16} />
+            {pick.kind === "input" ? `${pick.placeLabel} used` : pick.placeLabel}
           </span>
         </td>
         <td className={`${TD} whitespace-nowrap font-medium`}>{pick.pickedLabel}</td>
@@ -396,9 +397,8 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
   return (
     <div className="space-y-3">
       {points.map((p) => {
-        const word = p.kind === "unit" ? "Unit" : "Script";
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.kind === "unit" ? "Units" : "scripts"} compete here`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} scripts compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`} colSpan={7}>
@@ -406,7 +406,7 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
                 </th>
               </tr>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`}>{word}</th>
+                <th className={`${TH} w-full`}>Script</th>
                 <th className={`${TH} text-right`}>Share this week</th>
                 <th className={`${TH} text-right`}>$ per outcome</th>
                 <th className={`${TH} text-right`}>% reach the next milestone</th>
@@ -418,7 +418,10 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
             <tbody>
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
-                  <td className={TD}>{o.label}</td>
+                  <td className={TD}>
+                    {o.label}
+                    <InputsLine inputs={o.inputs.map((i) => ({ label: i.label, versions: i.versions.map((v) => ({ label: v.label, share: v.share })) }))} className="mt-0.5" />
+                  </td>
                   <td className={TDN}>{formatRatePct(o.share)}</td>
                   <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
                   <td className={TDN}>{formatRatePct(o.rateMean)}</td>
@@ -435,9 +438,9 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
   );
 }
 
-/** A card's uniform title: "<Engine> · <n> scripts", or "<Outcome> · <n> Units" when the brand's Units compete. */
+/** A card's uniform title: "<Engine> · <n> scripts". The brand inputs each script used ride on its row. */
 export function ApiPointTitle({ point, catalogue }: { point: ApiCandidates; catalogue?: CatalogueData | null }) {
-  const unit = point.kind === "unit";
+  const unit = false;
   const font = { fontFamily: "var(--font-geist-sans)" };
   const n = point.candidates.length;
   return (

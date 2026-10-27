@@ -1,13 +1,13 @@
 /**
  * The Plan as pages draw it. A campaign's Plan is the tree recomputed at every tick: from
- * its Target down, each outcome's Engine with the script it runs now, and the Plan of
- * each outcome that script calls. The line follows the chain that carries the subject,
- * from the start up to the Target; the tree shows every outcome, with the share and cost
- * per Unit of each script that actually made it over the last 7 days.
+ * its Target down, each outcome's Engine with the script it picks now, and the Plan of
+ * each outcome that script calls. Pages show it as what ran this week (a tree: every
+ * script that made Units is a branch); a list row keeps the one line of today's picks.
  */
 
-import type { Campaign, OutcomeId, PlanNode, Routing } from "@gtm-factory/core";
-import { previewPlan, type Model } from "./model";
+import type { Campaign, OutcomeId, PlanNode, PlanTreeNode, ScriptInput } from "@gtm-factory/core";
+import type { FlowView, TreeInput, TreeNode } from "@/components/plan-tree";
+import { candidateLabel, outcomeLabel, previewPlan, type Model } from "./model";
 
 /** One Engine on the chain that carries the subject: the script it runs now and every outcome that script calls. */
 export interface ChainPart {
@@ -23,15 +23,8 @@ export interface PlanLine {
   start: OutcomeId;
   /** Engines from the start up to the Target, in the order they run. */
   parts: ChainPart[];
-  routing: Routing;
-}
-
-/** A branch of an outcome: one script's share of the Units it made over the last 7 days, and its cost per Unit. */
-export interface PlanBranch {
-  scriptId: string;
-  units: number;
-  share: number;
-  costPerUnit: number | null;
+  /** The milestones it passes through, start excluded, Target last. */
+  line: OutcomeId[];
 }
 
 function memo<T>(model: Model, key: string, f: () => T): T {
@@ -54,21 +47,48 @@ export function chainOf(model: Model, plan: PlanNode | null, start: OutcomeId): 
 
 /** A campaign's Plan this tick, drawn as its line. */
 export function campaignPlanLine(model: Model, campaign: Campaign): PlanLine {
-  return memo(model, `plan:${campaign.id}`, () => ({ start: campaign.start, parts: chainOf(model, model.session.planOf(campaign), campaign.start), routing: model.session.routingOf(campaign) }));
+  return memo(model, `plan:${campaign.id}`, () => ({ start: campaign.start, parts: chainOf(model, model.session.planOf(campaign), campaign.start), line: model.session.milestoneLine(campaign) }));
 }
 
 /** The Plan a new campaign would run today, drawn as its line. */
 export function draftPlanLine(model: Model, brandId: string, start: OutcomeId, target: OutcomeId): PlanLine & { plan: PlanNode | null } {
   const { plan, line } = previewPlan(model, brandId, start, target);
-  return { plan, start, parts: chainOf(model, plan, start), routing: model.catalogue.peekRouting(start, line) };
+  return { plan, start, parts: chainOf(model, plan, start), line };
 }
 
-/** The scripts that made each outcome of a campaign over the last 7 days, by outcome. */
-export function planBranches(model: Model, campaign: Campaign): Map<OutcomeId, PlanBranch[]> {
-  return memo(model, `branches:${campaign.id}`, () => new Map(model.session.productionTree(campaign.id).map((t) => [t.outcome, t.branches])));
+/** The brand inputs of a script as a page shows them. */
+export function inputsView(model: Model, inputs: readonly ScriptInput[]): TreeInput[] {
+  return inputs.map((i) => ({ label: outcomeLabel(model.catalogue, i.material), versions: i.versions.map((v) => ({ label: v.label, share: v.share })) }));
 }
 
-/** Campaigns whose Plan passes through a Routing today. */
-export function campaignsOnRouting(model: Model, routingId: string): Campaign[] {
-  return model.campaigns.filter((c) => campaignPlanLine(model, c).routing.id === routingId);
+/** A campaign's Plan as the tree of what ran this week. */
+export function planTreeOf(model: Model, campaign: Campaign): TreeNode | null {
+  return memo(model, `tree:${campaign.id}`, () => {
+    const view = (n: PlanTreeNode): TreeNode => ({
+      outcome: n.outcome,
+      label: outcomeLabel(model.catalogue, n.outcome),
+      icon: model.catalogue.outcome(n.outcome)?.icon,
+      candidates: n.candidates,
+      branches: n.branches.map((b) => {
+        const s = model.catalogue.script(b.scriptId);
+        return { key: b.scriptId, name: s?.name ?? b.scriptId, kind: s?.kind ?? "rules", dynasty: s?.dynasty ?? b.scriptId, units: b.units, share: b.share, costPerUnit: b.costPerUnit, current: b.current, inputs: inputsView(model, b.inputs), sameBelow: b.sameBelow, children: b.children.map(view) };
+      }),
+    });
+    const t = model.session.planTree(campaign);
+    return t ? view(t) : null;
+  });
+}
+
+/** What a campaign's subjects went through this week, milestone to milestone, by script. */
+export function flowsOf(model: Model, campaign: Campaign): FlowView[] {
+  return memo(model, `flows:${campaign.id}`, () =>
+    model.session.flows(campaign).map((f) => ({
+      from: f.from,
+      fromLabel: outcomeLabel(model.catalogue, f.from),
+      to: f.to,
+      toLabel: outcomeLabel(model.catalogue, f.to),
+      subjects: f.subjects,
+      by: f.by.map((b) => ({ name: model.catalogue.script(b.scriptId)?.name ?? candidateLabel(model, "", b.scriptId), subjects: b.subjects, share: b.share })),
+    })),
+  );
 }

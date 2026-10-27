@@ -12,7 +12,7 @@ import worldJson from "../../../../seed/fictional-world.json";
 /** The one world the simulator runs: a client starting from scratch tonight. */
 export const WORLD: WorldData = worldJson as unknown as WorldData;
 
-export type CatalogueKind = Exclude<keyof CatalogueData, "routings">;
+export type CatalogueKind = keyof CatalogueData;
 
 export type SimAction =
   | { type: "launch"; client: WorldClient }

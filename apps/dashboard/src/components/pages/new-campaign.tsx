@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
 import { START, type Campaign, type WorldClient } from "@gtm-factory/core";
-import { PlanLineView, RoutingName } from "@/components/plan-line";
+import { PlanLineView } from "@/components/plan-line";
 import { draftPlanLine } from "@/lib/plan";
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar } from "@/components/ui";
@@ -101,8 +101,8 @@ function Flow({ model }: { model: Model }) {
   const value = Number(d.value) || 0;
   const brandForPlan = client?.brand.id ?? model.clients[0]?.brand.id ?? "";
   const draft = useMemo(() => (stage === "plan" && d.target && brandForPlan ? draftPlanLine(model, brandForPlan, start.id, d.target) : null), [model, stage, d.target, brandForPlan, start.id]);
-  // A campaign of the same brand already running the same Routing: its expected return, on the same formula.
-  const sibling = draft ? model.campaigns.find((c) => c.brandId === brandForPlan && model.session.routingOf(c).id === draft.routing.id) : undefined;
+  // A campaign of the same brand already passing through the same milestones: its expected return, on the same formula.
+  const sibling = draft ? model.campaigns.find((c) => c.brandId === brandForPlan && c.start === start.id && model.session.milestoneLine(c).join(">") === draft.line.join(">")) : undefined;
   const expected = sibling ? model.session.economics(sibling.id).expected.value : null;
 
   const launch = () => {
@@ -239,7 +239,6 @@ function Flow({ model }: { model: Model }) {
               </div>
             ) : (
               <div className="k-card space-y-2.5 p-4" data-testid="draft-plan">
-                <RoutingName model={model} line={draft} />
                 <PlanLineView model={model} line={draft} size="md" />
                 <p className="k-fg3 text-[12px]">
                   {expected != null ? (

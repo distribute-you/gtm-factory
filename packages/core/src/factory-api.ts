@@ -148,8 +148,10 @@ export interface ApiPlanBranch {
   /** The script the Plan picks there this tick. */
   current: boolean;
   inputs: ApiScriptInput[];
-  /** The outcomes this script called, each a node with its own branches. */
+  /** The outcomes this script calls, each a node with its own branches. */
   children: ApiPlanNode[];
+  /** It calls the same outcomes as a sibling branch drawn in full: what runs below is not repeated. */
+  sameBelow: boolean;
 }
 
 /**

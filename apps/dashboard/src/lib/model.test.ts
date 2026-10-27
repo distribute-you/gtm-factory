@@ -6,7 +6,8 @@ import { WORLD, replay, type LoggedAction } from "./world";
 import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
 import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
-import { campaignPlanLine, draftPlanLine } from "./plan";
+import { campaignPlanLine, draftPlanLine, flowsOf, planTreeOf } from "./plan";
+import type { TreeBranch, TreeNode } from "@/components/plan-tree";
 import { OURS } from "@gtm-factory/core";
 
 describe("the world the dashboard plays", () => {
@@ -139,7 +140,7 @@ function sourceFiles(root: string): string[] {
 
 describe("the v6 vocabulary", () => {
   it("no retired word in the dashboard, the core or the scripts: product copy and code names alike", () => {
-    const words = /\b(choices?|chosen|pipes?|legs?|steps?|plays?|specifications?|options?|sales funnels?|sales paths?)\b/i;
+    const words = /\b(routings?|choices?|chosen|pipes?|legs?|steps?|plays?|specifications?|options?|sales funnels?|sales paths?)\b/i;
     const roots = [join(__dirname, ".."), join(__dirname, "../../../../packages/core/src"), join(__dirname, "../../../../scripts/src")];
     for (const root of roots) {
       for (const f of sourceFiles(root)) {
@@ -156,13 +157,13 @@ describe("a campaign's Plan line", () => {
   const { world, session } = replay(WORLD.seed, [], 20);
   const model = buildModel(world, session);
 
-  it("goes from the campaign's start to its Target, through every milestone of its Routing", () => {
+  it("goes from the campaign's start to its Target, through every milestone its Plan passes", () => {
     for (const c of model.campaigns) {
       const line = campaignPlanLine(model, c);
       expect(line.start).toBe(c.start);
       expect(line.parts.at(-1)?.outcome).toBe(c.target);
       const drawn = line.parts.map((p) => p.outcome);
-      for (const m of session.routingOf(c).line) expect(drawn).toContain(m);
+      for (const m of session.milestoneLine(c)) expect(drawn).toContain(m);
       for (const p of line.parts) expect(model.catalogue.script(p.scriptId!)?.outcome).toBe(p.outcome);
     }
   });
@@ -174,9 +175,22 @@ describe("a campaign's Plan line", () => {
     expect(line.parts.map((p) => p.outcome)).toEqual(["follow_up_queued", "reply_received", "lead_interested"]);
   });
 
-  it("a new campaign's Plan has a Routing with a name", () => {
+  it("a new campaign's Plan reaches its Target", () => {
     const d = draftPlanLine(model, model.clients[0]!.brand.id, "start", "meeting_booked");
     expect(d.parts.at(-1)?.outcome).toBe("meeting_booked");
-    expect(d.routing.name).toBeTruthy();
+    expect(d.line.at(-1)).toBe("meeting_booked");
+  });
+
+  it("the Plan tree shows what ran: the LinkedIn branch has no email finding under it", () => {
+    const outbound = model.campaigns.find((c) => c.id === "campaign-outbound")!;
+    const tree = planTreeOf(model, outbound)!;
+    const walk = (n: TreeNode): TreeNode[] => [n, ...n.branches.flatMap((b) => b.children.flatMap(walk))];
+    const replies = walk(tree).filter((n) => n.outcome === "reply_received").flatMap((n) => n.branches);
+    expect(replies.length).toBeGreaterThanOrEqual(2);
+    const below = (b: TreeBranch): string[] => b.children.flatMap((n) => [n.outcome, ...n.branches.flatMap(below)]);
+    const li = replies.find((b) => b.dynasty === "li_connect");
+    if (li) expect(below(li)).not.toContain("email_found");
+    expect(walk(tree).every((n) => n.branches.filter((b) => b.current).length <= 1)).toBe(true);
+    expect(flowsOf(model, outbound).length).toBeGreaterThan(0);
   });
 });
