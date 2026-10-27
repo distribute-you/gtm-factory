@@ -6,11 +6,13 @@ import type { ApiBrand, ApiNewBrand } from "@gtm-factory/engine";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, TD, TDN, TH, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
+import { useFactory } from "@/lib/api/factory";
 import { formatCents, formatCount, plural } from "@/lib/format";
-import { Field, Read, formatTime } from "./common";
+import { Field, Read, formatTime, useOtherFactory } from "./common";
 
 export function ApiBrandsPage() {
   const read = useApi<ApiBrand[]>("/brands");
+  const rung = useFirstRung();
   return (
     <>
       <TopBar crumbs={[{ label: "Brands" }]} actions={<Link href="/brands/new/" className="k-btn-strong">New brand</Link>} />
@@ -32,6 +34,8 @@ export function ApiBrandsPage() {
                       <th className={TH}>Brand</th>
                       <th className={`${TH} w-full`}>Sells to</th>
                       <th className={`${TH} text-right`}>Lifetime revenue</th>
+                      <th className={`${TH} text-right`}>Spent</th>
+                      <th className={`${TH} text-right`}>{rung?.label ?? "Interested"}</th>
                       <th className={`${TH} text-right`}>Provided leads</th>
                       <th className={TH}>Added</th>
                       <th className={TH} />
@@ -39,31 +43,7 @@ export function ApiBrandsPage() {
                   </thead>
                   <tbody>
                     {brands.map((b) => (
-                      <tr key={b.id} className="k-row k-line-subtle border-b last:border-b-0">
-                        <td className={TD}>
-                          <span className="flex min-w-0 items-center gap-2.5">
-                            <Mark kind="audience" id={b.id} size={28} />
-                            <span className="min-w-0">
-                              <span className="flex items-center gap-1.5 font-medium">
-                                <span className="truncate">{b.name}</span>
-                                {b.test && <span className="k-chip">Staff test</span>}
-                              </span>
-                              <a href={b.website} target="_blank" rel="noreferrer" className="k-fg3 block truncate text-[12px] hover:text-[var(--fg-1)]">
-                                {b.website.replace(/^https?:\/\//, "")}
-                              </a>
-                            </span>
-                          </span>
-                        </td>
-                        <td className={`${TD} k-fg2 min-w-[260px]`}>{b.icp}</td>
-                        <td className={TDN}>{b.lifetimeValueCents == null ? <span className="k-fg4">—</span> : formatCents(b.lifetimeValueCents)}</td>
-                        <td className={TDN}>{b.providedLeads > 0 ? formatCount(b.providedLeads) : <span className="k-fg4">—</span>}</td>
-                        <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(b.createdAt)}</td>
-                        <td className={TD}>
-                          <Link href={`/campaigns/new/?brand=${encodeURIComponent(b.id)}`} className="k-btn whitespace-nowrap">
-                            New campaign
-                          </Link>
-                        </td>
-                      </tr>
+                      <BrandRow key={b.id} b={b} />
                     ))}
                   </tbody>
                 </CardTable>
@@ -73,6 +53,56 @@ export function ApiBrandsPage() {
         </Read>
       </Page>
     </>
+  );
+}
+
+/** The first rung of the catalogue's first lead track (the outcome a client counts its interested leads by). */
+function useFirstRung(): { id: string; label: string } | null {
+  const { data } = useFactory();
+  const c = data?.catalogue;
+  const track = c?.leadTracks[0];
+  const o = track ? c!.outcomes.filter((x) => x.track?.track === track.id && !x.retired).sort((a, b) => a.track!.rank - b.track!.rank)[0] : undefined;
+  return o ? { id: o.id, label: o.plural ?? o.label } : null;
+}
+
+function BrandRow({ b }: { b: ApiBrand }) {
+  const other = useOtherFactory(b.factory);
+  const rung = useFirstRung();
+  return (
+                      <tr className="k-row k-line-subtle border-b last:border-b-0">
+                        <td className={TD}>
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <Mark kind="audience" id={b.id} size={28} />
+                            <span className="min-w-0">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="truncate">{b.name}</span>
+                                {b.test && <span className="k-chip">Staff test</span>}
+                                {other && <span className="k-chip">{other}</span>}
+                              </span>
+                              <a href={b.website} target="_blank" rel="noreferrer" className="k-fg3 block truncate text-[12px] hover:text-[var(--fg-1)]">
+                                {b.website.replace(/^https?:\/\//, "")}
+                              </a>
+                            </span>
+                          </span>
+                        </td>
+                        <td className={`${TD} k-fg2 min-w-[260px]`}>{b.icp}</td>
+                        <td className={TDN}>{b.lifetimeValueCents == null ? <span className="k-fg4">—</span> : formatCents(b.lifetimeValueCents)}</td>
+                        <td className={TDN}>{b.spentTotalCents == null ? <span className="k-fg4">—</span> : formatCents(b.spentTotalCents)}</td>
+                        <td className={TDN}>{rung && b.counts?.[rung.id] ? formatCount(b.counts[rung.id]!) : <span className="k-fg4">—</span>}</td>
+                        <td className={TDN}>{b.providedLeads > 0 ? formatCount(b.providedLeads) : <span className="k-fg4">—</span>}</td>
+                        <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(b.createdAt)}</td>
+                        <td className={TD}>
+                          {other ? (
+                            <Link href={`/campaigns/?brand=${encodeURIComponent(b.id)}`} className="k-btn whitespace-nowrap">
+                              Its campaigns
+                            </Link>
+                          ) : (
+                            <Link href={`/campaigns/new/?brand=${encodeURIComponent(b.id)}`} className="k-btn whitespace-nowrap">
+                              New campaign
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
   );
 }
 
