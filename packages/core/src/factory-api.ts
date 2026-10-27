@@ -12,7 +12,7 @@
  *   GET  /catalogue                     -> CatalogueData
  *   GET  /brands                        -> ApiBrand[]
  *   POST /brands          ApiNewBrand   -> ApiBrand
- *   GET  /brands/:id/funnels            -> ApiRankedFunnel[]
+ *   GET  /brands/:id/plans              -> ApiPlanPreview[]
  *   GET  /campaigns                     -> ApiCampaign[]
  *   POST /campaigns       ApiNewCampaign-> ApiCampaign (always created paused)
  *   GET  /campaigns/:id                 -> ApiCampaignDetail
@@ -24,8 +24,9 @@
  *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another factory)
  *   GET  /objects?outcome=              -> ApiObjectDynasty[]
  *   POST /objects         ApiNewObjectVersion -> ApiObjectDynasty (upgrade, fork or new dynasty)
- *   GET  /scripts?legId=                -> ApiScriptStats[]
+ *   GET  /scripts?outcome=              -> ApiScriptStats[]
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
+ *   POST /scripts/:id/capacity ApiCapacity -> ApiScriptStats (a person types it for a Client's team script)
  *   GET  /research                      -> ApiChoicePoint[]
  *   GET  /choices?campaignId=&leadId=   -> ApiChoice[]
  *   GET  /ledger                        -> ApiLedger
@@ -34,7 +35,6 @@
  */
 
 import type { CatalogueData, OutcomeId } from "./catalogue";
-import type { Condition } from "./tactics";
 import type { LedgerReport } from "./ledger";
 import type { Pin } from "./world";
 
@@ -54,11 +54,11 @@ export interface ApiBrand {
   providedLeads: number;
   createdAt: string;
   /**
-   * The factory that runs this client's campaigns (a catalogue factory id). Absent: this
-   * factory. Another factory's client is read here (its Units, runs and choices come in
-   * through a connector) and gets no campaign from this dashboard.
+   * Who performs this client's campaigns (the "Performed by" tactic). Absent: Ours. A client
+   * another party runs is read here (its Units, runs and choices come in through a
+   * connector) and gets no campaign from this dashboard.
    */
-  factory?: string;
+  performedBy?: string;
   /** Spent on this client, every campaign together, cents. */
   spentTotalCents?: number;
   /** Units reached by this client's leads, per outcome (every campaign together). */
@@ -76,58 +76,69 @@ export interface ApiNewBrand {
   leads?: { email?: string; firstName?: string; lastName?: string; company?: string; title?: string; domain?: string }[];
 }
 
-/** One step of a sales path (a view): from one lead state to the next. */
-export interface ApiFunnelStep {
+/** One milestone of a Routing: from one milestone (or Start) to the next, every Engine it runs through. */
+export interface ApiMilestone {
   from: OutcomeId;
   to: OutcomeId;
-  /** The leg that makes the step's end. */
-  legId: string;
-  /** Every leg the step runs through, in the order they run. */
-  legs: string[];
+  /** Every Engine the subject goes through to get there, in the order they run. */
+  engines: OutcomeId[];
   costPerAttemptCents: number;
   yieldRate: number;
-  /** Attempts this step makes per Target Unit. */
+  /** Attempts made here per Unit of the Target. */
   attemptsPerTarget: number;
-  /** Cost of this step per outcome it makes: its own cost per attempt over its yield. */
-  costOfStepCents: number;
-  /** Cost from Start: what one Unit of the step's end costs, every step before it included (the one the return reads). */
+  /** Cost of this outcome alone: its own cost per attempt over its yield. */
+  costOfOutcomeCents: number;
+  /** Cost from Start: what one Unit of this milestone costs, every milestone before it included (the one the return reads). */
   costFromStartCents: number;
   costPerTargetCents: number;
   label: "expected" | "measured";
 }
 
-/** A sales funnel the factory would run toward a Target today (a view, ranked by value per dollar). */
-export interface ApiRankedFunnel {
+/** A Routing (a view with a short name): the ordered milestones a Plan passes through. */
+export interface ApiRouting {
   id: string;
   name: string;
-  pathName: string;
   line: OutcomeId[];
-  steps: ApiFunnelStep[];
+}
+
+/** What a new campaign toward a Target would run today (a view, ranked by value per dollar). */
+export interface ApiPlanPreview {
+  target: OutcomeId;
+  routing: ApiRouting;
+  milestones: ApiMilestone[];
   costPerTargetCents: number;
   valuePerDollar: number;
   label: "expected" | "measured";
 }
 
-/** A branch of a campaign's production tree: the share of an outcome's Units one leg made, and its cost per Unit. */
-export interface ApiTreeBranch {
-  legId: string;
+/** A branch of an outcome of the Plan: the share of its Units one script made over the last 7 days, and its cost per Unit. */
+export interface ApiPlanBranch {
+  scriptId: string;
   units: number;
   share: number;
   costPerUnitCents: number | null;
 }
 
-/** One outcome of a campaign's production tree (a view of the tree actually used). */
-export interface ApiTreeOutcome {
+/**
+ * A node of a campaign's Plan: an outcome, the script its Engine runs now
+ * (the Rating's best among the scripts the brief keeps), the Plan of each
+ * outcome that script calls, and the branches actually used.
+ */
+export interface ApiPlanNode {
   outcome: OutcomeId;
-  units: number;
-  branches: ApiTreeBranch[];
+  /** The script its Engine runs now; null at a leaf served by its Provider (the start, a brand Unit, the Rating). */
+  scriptId: string | null;
+  /** Scripts (or brand dynasties at a leaf) that compete there. */
+  candidates: number;
+  branches: ApiPlanBranch[];
+  materials: ApiPlanNode[];
 }
 
 /**
  * A new Campaign orders production. It fixes only its Target, its start
  * (Start: proactive, it pulls; any other outcome: reactive, it pushes each
- * landed Unit up), its budget and its strategy. The production tree is
- * rebuilt at every tick from performance.
+ * landed Unit up), its budget and its strategy, a brief in plain words. A
+ * judge reads the brief once per Engine; the Plan is recomputed at every tick.
  */
 export interface ApiNewCampaign {
   brandId: string;
@@ -139,10 +150,8 @@ export interface ApiNewCampaign {
   volume?: { units: number; periodDays: number } | null;
   /** Hard daily cap: no run starts once today's spend would pass it. */
   dailyBudgetCents: number;
-  /** Its strategy: conditions every script it runs meets, wherever the script carries the tactic ("Channel is cold email"). */
-  conditions?: Condition[];
-  /** Strategy id per leg; a leg left out plays its default strategy. */
-  strategies?: Record<string, string>;
+  /** Its strategy, in the client's words ("cold email and LinkedIn, at most 30 a day in email, a 30-day test"). */
+  brief?: string;
 }
 
 export type ApiCampaignStatus = "paused" | "live";
@@ -154,9 +163,8 @@ export interface ApiCampaign {
   id: string;
   brandId: string;
   name: string;
-  /** The sales funnel and sales path its tree runs (views with a short name, never a control), null before its first tick. */
-  salesFunnel: { id: string; name: string } | null;
-  salesPath: { id: string; name: string } | null;
+  /** The Routing its Plan runs (a view with a short name, never a control), null before its first tick. */
+  routing: ApiRouting | null;
   /** START (the market: the campaign pulls), or the outcome whose Units it pushes. */
   start: OutcomeId;
   /** The outcome it orders. */
@@ -168,27 +176,33 @@ export interface ApiCampaign {
   spentTotalCents: number;
   /** Today's spend reached the cap: nothing more runs until tomorrow (UTC). */
   capReached: boolean;
-  conditions: Condition[];
-  strategies: Record<string, string>;
+  /** Its strategy, in the client's words. */
+  brief: string;
+  /** What the judge read in the brief, per Engine: the strategy kept, or "none" (the Plan routes around it). */
+  verdicts: Record<OutcomeId, string>;
+  /** Most Units per day the brief allows at an Engine. */
+  caps: Record<OutcomeId, number>;
+  /** The day a test of a stated length ends, when the brief gave one. */
+  endsAt: string | null;
   counts: ApiOutcomeCounts;
   createdAt: string;
   launchedAt: string | null;
-  /** This factory's last tick on it; for another factory's campaign, the last read of it. */
+  /** This factory's last tick on it; for a campaign another party runs, the last read of it. */
   lastTickAt: string | null;
   /**
-   * The factory that runs it (a catalogue factory id). Absent: this factory. A campaign
-   * another factory runs is shown here as that factory reports it: this factory never
-   * ticks it, and it is never launched, paused or capped from this dashboard.
+   * Who performs it (the "Performed by" tactic). Absent: Ours. A campaign another party
+   * runs is shown here as that party reports it: it is never ticked, launched, paused or
+   * capped from this dashboard.
    */
-  factory?: string;
+  performedBy?: string;
 }
 
 export interface ApiCandidate {
   id: string;
   label: string;
-  /** Mean of the belief about the share of decisions reaching the next lead state. */
+  /** Mean of the belief about the share of decisions reaching the next milestone. */
   rateMean: number;
-  /** Mean of the belief about the dollars from the decision to the next lead state, cents. */
+  /** Mean of the belief about the dollars from the decision to the next milestone, cents. */
   costMeanCents: number;
   /** Value per dollar at the means. */
   meanScore: number;
@@ -199,13 +213,14 @@ export interface ApiCandidate {
 }
 
 export interface ApiChoicePoint {
-  /** `legId|material` (the consuming leg and the Material), or `legId` for the leg's own script. */
+  /** `consumer|material`: the consuming Engine (or "campaign" for the Target) and the outcome it calls. */
   id: string;
-  legId: string;
-  material: OutcomeId | null;
+  /** The consuming Engine's outcome, or "campaign". */
+  consumer: string;
+  material: OutcomeId;
   label: string;
-  /** What competes there: scripts (a producer), Units (a template, an ICP) or legs (the play of a step). */
-  chooses: "script" | "unit" | "leg";
+  /** What competes there: the scripts of the material's Engine, or the brand's Units (a template, an ICP). */
+  chooses: "script" | "unit";
   candidates: ApiCandidate[];
 }
 
@@ -223,7 +238,7 @@ export interface ApiChoice {
   candidates: { id: string; label: string; meanScore: number; sampledScore: number }[];
   /** Why, in plain words. */
   reason: string;
-  /** Reached the next lead state (credited through traceability). */
+  /** Reached the next milestone (credited through traceability). */
   credited: boolean;
 }
 
@@ -232,9 +247,12 @@ export interface ApiRun {
   at: string;
   campaignId: string | null;
   brandId: string | null;
-  legId: string;
+  /** The Engine: the outcome the script makes. */
+  engine: OutcomeId;
   scriptId: string;
   scriptName: string;
+  /** Who performed it (the "Performed by" tactic). */
+  performedBy: string;
   leadId: string | null;
   status: "ok" | "no_outcome" | "failed" | "refused";
   /** What happened, in plain words (the refusal or error included). */
@@ -257,8 +275,8 @@ export interface ApiOverview {
   /** The scheduler: last tick and whether it is running. */
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
   /**
-   * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=),
-   * a leg pin its scripts (GET /scripts?legId=). The factory ships its own (Templates, LLMs).
+   * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=)
+   * or its Engine's scripts (GET /scripts?outcome=). The factory ships its own (Templates, LLMs).
    */
   pins?: Pin[];
 }
@@ -266,10 +284,10 @@ export interface ApiOverview {
 export interface ApiCampaignDetail {
   campaign: ApiCampaign;
   brand: ApiBrand;
-  /** The steps of the sales path its tree runs today. */
-  steps: ApiFunnelStep[];
-  /** The production tree actually used over the last 7 days. */
-  tree: ApiTreeOutcome[];
+  /** The milestones of the Routing its Plan runs today. */
+  milestones: ApiMilestone[];
+  /** Its Plan this tick, with the branches actually used over the last 7 days. */
+  plan: ApiPlanNode | null;
   /** Spend per UTC day, oldest first. */
   spendByDay: { day: string; cents: number }[];
   points: ApiChoicePoint[];
@@ -283,8 +301,8 @@ export interface ApiUnit {
   outcome: OutcomeId;
   at: string;
   runId: string | null;
-  /** Who produced it: a factory id (ours, or another factory such as the client's team). */
-  factory: string;
+  /** Who performed the script that made it (the "Performed by" tactic). */
+  performedBy: string;
   /** Choices on its traceability, its own included. */
   traceability: string[];
   /** What it holds (a written message, a reply, a verdict), shown as is. */
@@ -299,7 +317,7 @@ export interface ApiLead {
   email: string | null;
   company: string | null;
   title: string | null;
-  /** The furthest lead state reached. */
+  /** The furthest milestone reached. */
   state: OutcomeId;
   reached: OutcomeId[];
   updatedAt: string;
@@ -344,18 +362,35 @@ export interface ApiNewObjectVersion {
   brandId?: string | null;
 }
 
+/** Capacity of a script: Units per day at most, and days one Unit takes. */
+export interface ApiCapacity {
+  perDay: number | null;
+  daysPerUnit: number | null;
+}
+
 export interface ApiScriptStats {
   id: string;
   dynasty: string;
   version: number;
-  legId: string;
+  /** Its Engine: the outcome it makes. */
+  outcome: OutcomeId;
   name: string;
   kind: "rules" | "ai" | "human";
   status: "active" | "retired";
   provider: string | null;
+  /** Who performs it (the "Performed by" tactic). */
+  performedBy: string;
   tactics: Record<string, string | number | boolean>;
+  /** Its code: the file of scripts/ it runs. */
+  code: string;
+  /** The outcomes it calls: read from its code by a judge, then what the ledger measured each run consumed. */
+  materials: OutcomeId[];
+  materialsLabel: "judged" | "measured";
+  /** Measured for code and AI scripts; typed by a person for a Client's team script. */
+  capacity: ApiCapacity;
   costCentsPrior: number;
   runs: number;
+  runsToday: number;
   spentCents: number;
   outputs: number;
   points: { point: string; pointLabel: string; picks: number; successes: number; rateMean: number; costMeanCents: number }[];
@@ -364,11 +399,11 @@ export interface ApiScriptStats {
 export interface ApiLedger {
   totalCents: number;
   byDay: { day: string; cents: number }[];
-  byLeg: { legId: string; runs: number; spentCents: number; outputs: number }[];
+  byEngine: { engine: OutcomeId; runs: number; spentCents: number; outputs: number }[];
   byScript: { scriptId: string; name: string; runs: number; spentCents: number }[];
   byVendor: { vendor: string; item: string; quantity: number; cents: number }[];
   byCampaign: { campaignId: string; name: string; spentCents: number }[];
-  /** The every-path report, reconciled to the cent. */
+  /** The report of every run, reconciled to the cent. */
   report: LedgerReport;
   runs: ApiRun[];
 }

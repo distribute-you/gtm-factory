@@ -116,6 +116,9 @@ describe("Engine storage", () => {
       storage: house.forEngine(engine),
       get: (o) => view(o, o === "lead_identified" ? "b:p9" : "b"),
       vendor: { call: (name, args) => answer(name, args ?? {}) },
+      wait: () => {
+        throw new Error("no wait here");
+      },
     });
     // Sourcing: the market draws person 1, 1, 2...; a person picked within the window is skipped.
     let i = 0;

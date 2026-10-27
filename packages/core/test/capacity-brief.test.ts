@@ -8,7 +8,7 @@ beforeAll(() => {
   s.run(45);
 }, 120_000);
 
-const outcomeOf = (scriptId: string | null) => (scriptId ? s.catalogue.script(scriptId)?.outcome : undefined);
+const outcomeOf = (scriptId: string | null | undefined) => (scriptId ? s.catalogue.script(scriptId)?.outcome : undefined);
 
 describe("capacity", () => {
   it("a script out of capacity today leaves today's choices; the order waits for tomorrow, nothing is lost", () => {
