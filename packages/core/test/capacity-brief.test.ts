@@ -76,3 +76,22 @@ describe("the strategy brief", () => {
     for (const u of written) expect(u.day, u.subject).toBeLessThanOrEqual(stopped.get(u.subject)!);
   });
 });
+
+describe("team tasks", () => {
+  it("a person's script opens a task; the answer becomes the Unit, a no stops the order, an unanswered task closes on its due day", () => {
+    const t = new SimulationSession(defaultWorld());
+    t.run(25);
+    const open = t.tasks();
+    expect(open.length).toBeGreaterThan(2);
+    for (const k of open) expect(t.catalogue.script(k.scriptId)?.form?.length).toBeGreaterThan(0);
+    for (const k of open) expect(k.dueDay).toBeGreaterThanOrEqual(t.day - 1);
+    const [yes, no] = open as [(typeof open)[number], (typeof open)[number]];
+    t.answerTask(yes.id, { paid: true, amount: 6000, notes: "Signed the yearly plan" });
+    const landed = t.units.find((u) => u.runId === yes.id.replace(/^task:/, ""))!;
+    expect(landed.content).toMatchObject({ paid: true, notes: "Signed the yearly plan" });
+    t.answerTask(no.id, { paid: false, notes: "Went with a competitor" });
+    expect(t.units.some((u) => u.runId === no.id.replace(/^task:/, ""))).toBe(false);
+    expect(t.tasks().map((x) => x.id)).not.toContain(no.id);
+    expect(() => t.answerTask(no.id, { paid: true })).toThrow(/not open/);
+  }, 120_000);
+});

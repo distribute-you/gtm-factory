@@ -207,6 +207,22 @@ interface PendingLanding {
   unit: Unit;
   final: boolean;
   flight: string;
+  /** A person's run: the outcome did not happen; the order stops when the task is due, unless the person says otherwise first. */
+  fails?: boolean;
+  /** A person's run is a task until it lands. */
+  task?: { id: string; dayOrdered: number };
+}
+
+/** Work the Plan ordered from a person: one run of a script with a form, open until answered or due. */
+export interface TeamTask {
+  id: string;
+  scriptId: string;
+  campaignId: string;
+  brandId: string;
+  subject: string | null;
+  dayOrdered: number;
+  /** The day the hidden truth answers if the person has not. */
+  dueDay: number;
 }
 
 /** Days from a pick to its milestone: the mean, and the part of it that is certain (one tick per Engine). */
@@ -1099,7 +1115,9 @@ export class SimulationSession {
     const kind = this.catalogue.outcome(script.outcome)?.subject;
     const attested = this.attest(o, script, truth, made, final, day);
     if (kind !== "run" && subjectKey) this.storage.forEngine(script.outcome).set("served", subjectKey, { day, ok: attested });
-    if (!attested) return { kind: "fail", reason: `no outcome at ${script.outcome}` };
+    // A person's run is a task: it stays open until the person answers, or its due day, whatever the outcome.
+    const task = (script.form?.length ?? 0) > 0 && (kind === "lead" || kind === "company");
+    if (!attested && !task) return { kind: "fail", reason: `no outcome at ${script.outcome}` };
     const subject = this.subjectOf(o, script, run);
     const u = this.makeUnit(run, script.outcome, subject, o.client.brand.id, o.campaign.id, consumedReal, [...trace].sort((x, y) => x - y));
     if (result?.content) u.content = result.content;
@@ -1108,7 +1126,7 @@ export class SimulationSession {
     const flight = `${script.outcome}${SEP}${kind === "brand" ? o.client.brand.id : subject}`;
     if (kind === "brand" || kind === "company") this.inFlight.add(flight);
     o.pending.add(key);
-    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight });
+    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight, ...(task ? { task: { id: `task:${run.id}`, dayOrdered: day }, ...(attested ? {} : { fails: true }) } : {}) });
     return { kind: "wait" };
   }
 
@@ -1314,16 +1332,55 @@ export class SimulationSession {
     const rest = this.pendings.filter((p) => p.tick > this.tickIndex);
     this.pendings.length = 0;
     this.pendings.push(...rest);
-    for (const p of due) {
+    for (const p of due) this.settle(p, day, null);
+  }
+
+  /** A pending Unit lands, or a person's task closes: answered by the person (`answer`), else by the hidden truth. */
+  private settle(p: PendingLanding, day: number, answer: { happened: boolean; values: Record<string, string | number | boolean> } | null): void {
+    {
+      const fails = answer ? !answer.happened : p.fails === true;
+      if (answer) p.unit.content = { ...(p.unit.content ?? {}), ...answer.values };
+      if (fails) {
+        this.inFlight.delete(p.flight);
+        p.order.pending.delete(p.key);
+        if (p.order.status === "open") {
+          p.order.failReason = `no outcome at ${p.unit.outcome}`;
+          this.finish(p.order, "failed");
+        }
+        return;
+      }
       p.unit.day = day;
       this.inFlight.delete(p.flight);
       this.land(p.unit, day);
       p.order.pending.delete(p.key);
-      if (p.order.status !== "open") continue;
+      if (p.order.status !== "open") return;
       p.order.got.set(p.key, [p.unit.id]);
       if (p.final) p.order.passed.add(p.unit.outcome);
       if (p.final && p.unit.outcome === p.order.campaign.target) this.finish(p.order, "done");
     }
+  }
+
+  /** Every task still open: the work the Plan ordered from a person, oldest first. */
+  tasks(brandId?: string): TeamTask[] {
+    return this.pendings
+      .filter((p) => p.task && p.order.status === "open" && (!brandId || p.order.client.brand.id === brandId))
+      .map((p) => ({ id: p.task!.id, scriptId: p.unit.scriptId ?? "", campaignId: p.order.campaign.id, brandId: p.order.client.brand.id, subject: p.order.person?.id ?? p.order.subject, dayOrdered: p.task!.dayOrdered, dueDay: Math.floor(p.tick / this.ticksPerDay) }))
+      .sort((a, b) => a.dayOrdered - b.dayOrdered || (a.id < b.id ? -1 : 1));
+  }
+
+  /**
+   * A person answers a task: the answer becomes the Unit's content, and its first
+   * yes/no field says whether the outcome happened (no yes/no field: it did).
+   */
+  answerTask(taskId: string, values: Record<string, string | number | boolean>): void {
+    const k = this.pendings.findIndex((p) => p.task?.id === taskId);
+    if (k < 0) throw new Error(`task "${taskId}" is not open`);
+    const p = this.pendings[k]!;
+    const script = p.unit.scriptId ? this.catalogue.script(p.unit.scriptId) : undefined;
+    const flag = script?.form?.find((f) => f.type === "yesno");
+    const happened = flag ? values[flag.key] === true : true;
+    this.pendings.splice(k, 1);
+    this.settle(p, this.dayIndex, { happened, values });
   }
 
   /** A Unit lands in the stock: record it, credit the trace, push reactive campaigns, call the webhooks that report on it. */
