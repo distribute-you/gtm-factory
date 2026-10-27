@@ -95,7 +95,7 @@ function Sidebar() {
         <div className="flex h-9 items-center gap-2 px-2">
           <Mark kind="factory" id="factory" size={22} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">GTM Factory</span>
+            <span className="block truncate text-[13px] font-medium">GTM Factory v5</span>
             <span className="k-fg3 block truncate text-[11px] leading-3">
               {error ? "Factory unreachable" : data?.scheduler.lastTickAt ? `Last tick ${timeAgo(data.scheduler.lastTickAt)}` : "Live factory"}
             </span>
@@ -121,7 +121,7 @@ function Sidebar() {
               key={c.id}
               href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
               label={`${brandName(c.brandId)}: ${c.name}`}
-              icon={<Mark kind="funnel" id={c.funnelId} size={16} />}
+              icon={<Mark kind="outcome" id={c.target} size={16} />}
               active={pathname.startsWith("/campaigns/view") && id === c.id}
               trailing={
                 c.status === "live" ? (

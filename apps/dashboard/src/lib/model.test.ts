@@ -6,8 +6,8 @@ import { WORLD, replay, type LoggedAction } from "./world";
 import { DEFAULT_PINS, pinHref, togglePin } from "./pins";
 import { pinnedPage } from "./pinned";
 import { formatRatePct, formatRoi, formatUsd } from "./format";
-import { campaignLine, linePipes, rankedLine } from "./funnels";
-import { playedPipes } from "./campaigns";
+import { campaignLine, lineLegs, rankedLine } from "./funnels";
+import { playedLegs } from "./campaigns";
 import { proposeFunnels } from "./model";
 
 describe("the world the dashboard plays", () => {
@@ -51,12 +51,12 @@ describe("read models", () => {
   it("lists every choice of a campaign with beliefs and the hidden best", () => {
     const points = pointsOf(model, model.campaigns[0]!);
     expect(points.length).toBeGreaterThan(5);
-    const graded = points.filter((p) => p.options.length > 1 && p.options.some((o) => o.isHiddenBest));
+    const graded = points.filter((p) => p.candidates.length > 1 && p.candidates.some((o) => o.isHiddenBest));
     expect(graded.length).toBeGreaterThan(5);
   });
 
-  it("shows where a provider pipe is plugged and the best script at each Material", () => {
-    const multi = model.catalogue.pipes.map((p) => pluggedAt(model, p.id)).filter((l) => l.length >= 2);
+  it("shows where a provider leg is plugged and the best script at each Material", () => {
+    const multi = model.catalogue.legs.map((p) => pluggedAt(model, p.id)).filter((l) => l.length >= 2);
     expect(multi.length).toBeGreaterThan(0);
   });
 
@@ -76,7 +76,7 @@ describe("pins are configuration", () => {
   const { world, session } = replay(WORLD.seed, [], 6);
   const model = buildModel(world, session);
 
-  it("the world ships two pins, and pinning any other outcome or pipe gives it a page with no new code", () => {
+  it("the world ships two pins, and pinning any other outcome or leg gives it a page with no new code", () => {
     expect(DEFAULT_PINS).toHaveLength(2);
     for (const p of DEFAULT_PINS) expect(pinnedPage(model, p, null).kind).toBe(p.kind);
     // Pin an object outcome nobody pinned: it gets a menu entry and a page listing its dynasties.
@@ -86,10 +86,10 @@ describe("pins are configuration", () => {
     expect(pinHref(pins[2]!)).toContain(encodeURIComponent(`outcome:${other.id}`));
     const page = pinnedPage(model, pins[2]!, null);
     expect(page.kind === "outcome" && page.dynasties.length).toBeGreaterThan(0);
-    // And a pipe: its scripts, where it is plugged, its pipe storage.
-    const pipe = model.catalogue.pipes.find((p) => p.materials.length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
-    const pipePage = pinnedPage(model, { kind: "pipe", id: pipe.id, label: pipe.name }, null);
-    expect(pipePage.kind === "pipe" && pipePage.dynasties.length).toBeGreaterThan(0);
+    // And a leg: its scripts, where it is plugged, its leg storage.
+    const leg = model.catalogue.legs.find((p) => model.catalogue.materialsOf(p).length > 0 && !DEFAULT_PINS.some((x) => x.id === p.id))!;
+    const legPage = pinnedPage(model, { kind: "leg", id: leg.id, label: leg.name }, null);
+    expect(legPage.kind === "leg" && legPage.dynasties.length).toBeGreaterThan(0);
   });
 });
 
@@ -112,7 +112,7 @@ describe("formats", () => {
   });
 });
 
-describe("the dashboard knows no outcome, pipe or script by name", () => {
+describe("the dashboard knows no outcome, leg or script by name", () => {
   it("no source line tests for a template, an LLM or an ICP", () => {
     const root = join(__dirname, "..");
     const files: string[] = [];
@@ -134,28 +134,28 @@ describe("the dashboard knows no outcome, pipe or script by name", () => {
   });
 });
 
-describe("a funnel line and its plays describe the same pipes", () => {
+describe("a funnel line and its plays describe the same legs", () => {
   const { world, session } = replay(WORLD.seed, [], 20);
   const model = buildModel(world, session);
 
-  it("for every campaign, the pipes drawn in its funnel line are exactly the pipes of its plays", () => {
+  it("for every campaign, the legs drawn in its funnel line are exactly the legs of its plays", () => {
     for (const c of model.campaigns) {
       const line = campaignLine(model, c);
-      const drawn = line.legs.flatMap((l) => l.parts.flatMap((p) => [...p.side, p.pipe].map((x) => x.id)));
-      expect(new Set(drawn)).toEqual(new Set(playedPipes(model, c).map((p) => p.id)));
-      // Each leg ends on its lead state, through its play.
-      line.legs.forEach((l, k) => {
-        expect(l.parts.at(-1)?.output).toBe(c.line[k]);
-        expect(l.parts.at(-1)?.pipe.id).toBe(session.playsToday(c)[k]);
+      const drawn = line.steps.flatMap((l) => l.parts.flatMap((p) => [...p.side, p.leg].map((x) => x.id)));
+      expect(new Set(drawn)).toEqual(new Set(playedLegs(model, c).map((p) => p.id)));
+      // Each step ends on its lead state, through its play.
+      line.steps.forEach((l, k) => {
+        expect(l.parts.at(-1)?.output).toBe(session.pathOf(c)[k]);
+        expect(l.parts.at(-1)?.leg.id).toBe(session.playsToday(c)[k]);
       });
-      // Every pipe whose Materials this campaign chose today is drawn.
+      // Every leg whose Materials this campaign chose today is drawn.
       for (const p of session.choicePoints().filter((x) => x.campaignId === c.id)) {
-        const consumer = model.catalogue.pipe(p.point.split("|")[0]!);
+        const consumer = model.catalogue.leg(p.point.split("|")[0]!);
         if (!consumer) continue;
         const picked = [...session.pickSeries(p.point, c.id).values()].some((arr) => arr.slice(-7).some((n) => n > 0));
         const onLine = drawn.includes(consumer.id);
         if (picked && !onLine) {
-          // Only a pipe the leg does not run today (another option at a Material) may be left out.
+          // Only a leg the step does not run today (another candidate at a Material) may be left out.
           const alternatives = session.choicePoints().filter((x) => x.campaignId === c.id && !x.point.startsWith("play:"));
           expect(alternatives.length).toBeGreaterThan(0);
         }
@@ -167,19 +167,19 @@ describe("a funnel line and its plays describe the same pipes", () => {
     const follow = model.campaigns.find((c) => c.start !== "start")!;
     const line = campaignLine(model, follow);
     expect(line.start).toBe("message_sent");
-    expect(line.legs[0]!.parts.map((p) => [p.pipe.id, p.output])).toEqual([
+    expect(line.steps[0]!.parts.map((p) => [p.leg.id, p.output])).toEqual([
       ["follow_up", "follow_up_queued"],
       ["follow_up_replies", "reply_received"],
       ["reply_judging", "lead_interested"],
     ]);
-    expect(linePipes(line).map((p) => p.id)).toEqual(playedPipes(model, follow).map((p) => p.id));
+    expect(lineLegs(line).map((p) => p.id)).toEqual(playedLegs(model, follow).map((p) => p.id));
   });
 
-  it("a proposed funnel draws every pipe its plays list offers, and has a name", () => {
+  it("a proposed funnel draws every leg its plays list offers, and has a name", () => {
     const f = proposeFunnels(model, model.clients[0]!.offer.outcomes, "meeting_booked", 150)[0]!;
     const line = rankedLine(model, f);
     expect(line.funnel?.name).toBeTruthy();
-    expect(line.legs.map((l) => l.parts.at(-1)?.pipe.id)).toEqual(f.legs.map((l) => l.pipeId));
-    expect(linePipes(line).length).toBeGreaterThanOrEqual(f.legs.length);
+    expect(line.steps.map((l) => l.parts.at(-1)?.leg.id)).toEqual(f.steps.map((l) => l.legId));
+    expect(lineLegs(line).length).toBeGreaterThanOrEqual(f.steps.length);
   });
 });

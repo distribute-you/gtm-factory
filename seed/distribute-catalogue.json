@@ -310,13 +310,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sales-cold-email-outreach|lead_found_to_conversation",
-            "name": "Dotterel",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -324,13 +318,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sales-cold-email-outreach|lead_found_to_website_visit",
-            "name": "Killdeer",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -352,13 +340,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "feedback-request-cold-email-outreach|lead_found_to_conversation",
-            "name": "Vireo",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -380,13 +362,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-call-outreach|lead_found_to_conversation",
-            "name": "Grebe",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -408,13 +384,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-sms-outreach|lead_found_to_conversation",
-            "name": "Gull",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -422,13 +392,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-sms-outreach|lead_found_to_website_visit",
-            "name": "Swallow",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -450,13 +414,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-whatsapp-outreach|lead_found_to_conversation",
-            "name": "Petrel",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -464,13 +422,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-whatsapp-outreach|lead_found_to_website_visit",
-            "name": "Nuthatch",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         },
         {
           "legKey": "signup_to_paid_client",
@@ -480,13 +432,7 @@
           "consumes": [
             "signup"
           ],
-          "waitDays": 1.0,
-          "pipe": {
-            "id": "cold-whatsapp-outreach|signup_to_paid_client",
-            "name": "Cuckoo",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": 1.0
         },
         {
           "legKey": "start_to_signup",
@@ -496,13 +442,7 @@
           "consumes": [
             "fact:whatsapp_number_given"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-whatsapp-outreach|start_to_signup",
-            "name": "Turaco",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -524,13 +464,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-linkedin-outreach|lead_found_to_conversation",
-            "name": "Loon",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -538,13 +472,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-linkedin-outreach|lead_found_to_website_visit",
-            "name": "Coot",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -566,13 +494,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-x-outreach|lead_found_to_conversation",
-            "name": "Shearwater",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -580,13 +502,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-x-outreach|lead_found_to_website_visit",
-            "name": "Treecreeper",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -608,13 +524,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-instagram-outreach|lead_found_to_conversation",
-            "name": "Thrush",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -622,13 +532,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-instagram-outreach|lead_found_to_website_visit",
-            "name": "Puffin",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -650,13 +554,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-reddit-outreach|lead_found_to_conversation",
-            "name": "Gannet",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_website_visit",
@@ -664,13 +562,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "cold-reddit-outreach|lead_found_to_website_visit",
-            "name": "Tern",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -692,13 +584,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "google-ads|start_to_website_visit",
-            "name": "Avocet",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -706,13 +592,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "google-ads|start_to_form_submitted",
-            "name": "Bittern",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -734,13 +614,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "meta-ads|start_to_website_visit",
-            "name": "Lapwing",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -748,13 +622,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "meta-ads|start_to_form_submitted",
-            "name": "Turnstone",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_meeting_booked",
@@ -762,13 +630,7 @@
           "to": "meeting_booked",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "meta-ads|start_to_meeting_booked",
-            "name": "Oystercatcher",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -790,13 +652,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "linkedin-ads|start_to_website_visit",
-            "name": "Dunlin",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -804,13 +660,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "linkedin-ads|start_to_form_submitted",
-            "name": "Curlew",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_meeting_booked",
@@ -818,13 +668,7 @@
           "to": "meeting_booked",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "linkedin-ads|start_to_meeting_booked",
-            "name": "Godwit",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -846,13 +690,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "tiktok-ads|start_to_website_visit",
-            "name": "Bullfinch",
-            "icon": "bird",
-            "color": "#9C6B3E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -860,13 +698,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "tiktok-ads|start_to_form_submitted",
-            "name": "Bushtit",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -888,13 +720,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "youtube-ads|start_to_website_visit",
-            "name": "Serin",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -902,13 +728,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "youtube-ads|start_to_form_submitted",
-            "name": "Dipper",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -930,13 +750,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "x-ads|start_to_website_visit",
-            "name": "Hawfinch",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -958,13 +772,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "reddit-ads|start_to_website_visit",
-            "name": "Goldfinch",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -972,13 +780,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "reddit-ads|start_to_form_submitted",
-            "name": "Chickadee",
-            "icon": "bird",
-            "color": "#9C6B3E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1000,13 +802,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "bing-ads|start_to_website_visit",
-            "name": "Stork",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -1014,13 +810,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "bing-ads|start_to_form_submitted",
-            "name": "Ibis",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1042,13 +832,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "quora-ads|start_to_website_visit",
-            "name": "Chaffinch",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_form_submitted",
@@ -1056,13 +840,7 @@
           "to": "form_submitted",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "quora-ads|start_to_form_submitted",
-            "name": "Titmouse",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1084,13 +862,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "newsletter-sponsorships|start_to_website_visit",
-            "name": "Gnatcatcher",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1112,13 +884,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "podcast-sponsorships|start_to_website_visit",
-            "name": "Pipit",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1140,13 +906,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "creator-sponsorships|start_to_website_visit",
-            "name": "Kinglet",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1168,13 +928,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "paid-directory-listings|start_to_website_visit",
-            "name": "Catbird",
-            "icon": "bird",
-            "color": "#9C6B3E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1196,13 +950,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "seo-content|start_to_website_visit",
-            "name": "Greenfinch",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1224,13 +972,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "press-placements|start_to_website_visit",
-            "name": "Dunnock",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1252,13 +994,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "podcast-guesting|start_to_website_visit",
-            "name": "Thrasher",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1280,13 +1016,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "affiliate-programme|start_to_website_visit",
-            "name": "Warbler",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1308,13 +1038,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-linkedin-publishing|start_to_conversation",
-            "name": "Waxwing",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_website_visit",
@@ -1322,13 +1046,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-linkedin-publishing|start_to_website_visit",
-            "name": "Shrike",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1350,13 +1068,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-x-publishing|start_to_conversation",
-            "name": "Kingbird",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_website_visit",
@@ -1364,13 +1076,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-x-publishing|start_to_website_visit",
-            "name": "Starling",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1392,13 +1098,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-reddit-publishing|start_to_conversation",
-            "name": "Phoebe",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_website_visit",
@@ -1406,13 +1106,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-reddit-publishing|start_to_website_visit",
-            "name": "Bluebird",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1434,13 +1128,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-youtube-publishing|start_to_conversation",
-            "name": "Flycatcher",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_website_visit",
@@ -1448,13 +1136,7 @@
           "to": "website_visit",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "organic-youtube-publishing|start_to_website_visit",
-            "name": "Mockingbird",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1478,13 +1160,7 @@
           "consumes": [
             "conversation"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-meeting-booking|conversation_to_meeting_booked",
-            "name": "Auk",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         },
         {
           "legKey": "form_submitted_to_meeting_booked",
@@ -1494,13 +1170,7 @@
           "consumes": [
             "form_submitted"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-meeting-booking|form_submitted_to_meeting_booked",
-            "name": "Quetzal",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1524,13 +1194,7 @@
           "consumes": [
             "conversation"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-meeting-booking|conversation_to_meeting_booked",
-            "name": "Finch",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "website_visit_to_meeting_booked",
@@ -1540,13 +1204,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-meeting-booking|website_visit_to_meeting_booked",
-            "name": "Plover",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1570,13 +1228,7 @@
           "consumes": [
             "conversation"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-meeting-booking|conversation_to_meeting_booked",
-            "name": "Tanager",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         },
         {
           "legKey": "website_visit_to_meeting_booked",
@@ -1586,13 +1238,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-meeting-booking|website_visit_to_meeting_booked",
-            "name": "Grosbeak",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "form_submitted_to_meeting_booked",
@@ -1602,13 +1248,7 @@
           "consumes": [
             "form_submitted"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-meeting-booking|form_submitted_to_meeting_booked",
-            "name": "Trogon",
-            "icon": "bird",
-            "color": "#9C6B3E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1632,13 +1272,7 @@
           "consumes": [
             "meeting_booked"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-meeting-attendance|meeting_booked_to_meeting_attended",
-            "name": "Robin",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1662,13 +1296,7 @@
           "consumes": [
             "meeting_booked"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-meeting-attendance|meeting_booked_to_meeting_attended",
-            "name": "Oriole",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1692,13 +1320,7 @@
           "consumes": [
             "meeting_attended"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-closing-calls|meeting_attended_to_paid_client",
-            "name": "Sparrow",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1722,13 +1344,7 @@
           "consumes": [
             "meeting_attended"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-closing-calls|meeting_attended_to_paid_client",
-            "name": "Bobolink",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_paid_client",
@@ -1736,13 +1352,7 @@
           "to": "paid_client",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-closing-calls|lead_found_to_paid_client",
-            "name": "Motmot",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "industry_update_video_to_paid_client",
@@ -1750,13 +1360,7 @@
           "to": "paid_client",
           "mode": "reactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-closing-calls|industry_update_video_to_paid_client",
-            "name": "Puffbird",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1780,13 +1384,7 @@
           "consumes": [
             "signup"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-signup-conversion|signup_to_paid_client",
-            "name": "Egret",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "form_submitted_to_paid_client",
@@ -1796,13 +1394,7 @@
           "consumes": [
             "form_submitted"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "managed-signup-conversion|form_submitted_to_paid_client",
-            "name": "Sandpiper",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1826,13 +1418,7 @@
           "consumes": [
             "signup"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-signup-conversion|signup_to_paid_client",
-            "name": "Junco",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         },
         {
           "legKey": "form_submitted_to_paid_client",
@@ -1842,13 +1428,7 @@
           "consumes": [
             "form_submitted"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-signup-conversion|form_submitted_to_paid_client",
-            "name": "Bunting",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1872,13 +1452,7 @@
           "consumes": [
             "conversation"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-instant-call|conversation_to_booking_call",
-            "name": "Fulmar",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "form_submitted_to_booking_call",
@@ -1888,13 +1462,7 @@
           "consumes": [
             "form_submitted"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-instant-call|form_submitted_to_booking_call",
-            "name": "Roadrunner",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1918,13 +1486,7 @@
           "consumes": [
             "booking_call"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-booking-calls|booking_call_to_meeting_booked",
-            "name": "Canary",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1948,13 +1510,7 @@
           "consumes": [
             "conversation"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-reply-closing|conversation_to_paid_client",
-            "name": "Cockatoo",
-            "icon": "bird",
-            "color": "#9C6B3E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -1978,13 +1534,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-website|website_visit_to_signup",
-            "name": "Parakeet",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "website_visit_to_form_submitted",
@@ -1994,13 +1544,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-website|website_visit_to_form_submitted",
-            "name": "Lorikeet",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         },
         {
           "legKey": "website_visit_to_purchase",
@@ -2010,13 +1554,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-website|website_visit_to_purchase",
-            "name": "Parrot",
-            "icon": "bird",
-            "color": "#5E9E3A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2040,13 +1578,7 @@
           "consumes": [
             "purchase"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "your-team-order-delivery|purchase_to_paid_client",
-            "name": "Macaw",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2070,13 +1602,7 @@
           "consumes": [
             "fact:follow_up_due"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-follow-up-email|signup_to_paid_client",
-            "name": "Hornbill",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         },
         {
           "legKey": "conversation_to_paid_client",
@@ -2086,13 +1612,7 @@
           "consumes": [
             "fact:github_issue_in_prod"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-follow-up-email|conversation_to_paid_client",
-            "name": "Hoopoe",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         },
         {
           "legKey": "lead_found_to_conversation",
@@ -2100,13 +1620,7 @@
           "to": "conversation",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-follow-up-email|lead_found_to_conversation",
-            "name": "Woodpecker",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         },
         {
           "legKey": "start_to_conversation",
@@ -2116,13 +1630,7 @@
           "consumes": [
             "fact:follow_up_due"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-follow-up-email|start_to_conversation",
-            "name": "Flicker",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         },
         {
           "legKey": "website_visit_to_signup",
@@ -2132,13 +1640,7 @@
           "consumes": [
             "website_visit"
           ],
-          "waitDays": 0.0208,
-          "pipe": {
-            "id": "ai-follow-up-email|website_visit_to_signup",
-            "name": "Sapsucker",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": 0.0208
         },
         {
           "legKey": "start_to_paid_client",
@@ -2148,13 +1650,7 @@
           "consumes": [
             "signup"
           ],
-          "waitDays": 0.0208,
-          "pipe": {
-            "id": "ai-follow-up-email|start_to_paid_client",
-            "name": "Wryneck",
-            "icon": "bird",
-            "color": "#3FA27E"
-          }
+          "waitDays": 0.0208
         }
       ]
     },
@@ -2176,13 +1672,7 @@
           "to": "lead_found",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "lead-sourcing|start_to_lead_found",
-            "name": "Toucan",
-            "icon": "bird",
-            "color": "#C2563A"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2204,13 +1694,7 @@
           "to": "lead_found",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sourcing-apollo-cold-filters|start_to_lead_found",
-            "name": "Siskin",
-            "icon": "bird",
-            "color": "#3D7FD0"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2232,13 +1716,7 @@
           "to": "lead_found",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sourcing-apollo-buying-signals|start_to_lead_found",
-            "name": "Towhee",
-            "icon": "bird",
-            "color": "#8E6CD8"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2260,13 +1738,7 @@
           "to": "lead_found",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sourcing-linkedin-engagement-signals|start_to_lead_found",
-            "name": "Redpoll",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2288,13 +1760,7 @@
           "to": "lead_found",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "sourcing-crm-contacts|start_to_lead_found",
-            "name": "Linnet",
-            "icon": "bird",
-            "color": "#D6A21E"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2316,13 +1782,7 @@
           "to": "industry_update_video",
           "mode": "proactive",
           "consumes": [],
-          "waitDays": null,
-          "pipe": {
-            "id": "social-post|start_to_industry_update_video",
-            "name": "Jacamar",
-            "icon": "bird",
-            "color": "#E0784B"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2346,13 +1806,7 @@
           "consumes": [
             "fact:email_pushed_via_api"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "email-sending|start_to_conversation",
-            "name": "Honeyguide",
-            "icon": "bird",
-            "color": "#2F9DB3"
-          }
+          "waitDays": null
         }
       ]
     },
@@ -2376,13 +1830,7 @@
           "consumes": [
             "fact:hot_lead"
           ],
-          "waitDays": null,
-          "pipe": {
-            "id": "ai-lead-proposal|start_to_paid_client",
-            "name": "Owl",
-            "icon": "bird",
-            "color": "#D9577A"
-          }
+          "waitDays": null
         }
       ]
     }

@@ -8,7 +8,7 @@ import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { companyName, factoryName, leadRows, optionLabel, outcomeLabel, personName, pipeName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
+import { companyName, factoryName, leadRows, candidateLabel, outcomeLabel, personName, legName, pointInfo, timelineOf, type LeadRow, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -189,7 +189,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
                   <ol className="space-y-1.5">
                     {t.states.map((st) => {
                       const day = reached.get(st.outcome);
-                      const producers = [...new Set(timeline.filter((o) => o.outcome === st.outcome && o.pipeId).map((o) => o.pipeId!))];
+                      const producers = [...new Set(timeline.filter((o) => o.outcome === st.outcome && o.legId).map((o) => o.legId!))];
                       const conf = day !== undefined && producers.length > 0 ? confidenceOf(producers, st.outcome, reliability) : null;
                       return (
                         <li key={st.outcome} className="flex items-center gap-2 text-[13px]">
@@ -247,7 +247,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
             )}
           </div>
           <div className="k-card h-fit p-4">
-            <p className="k-label mb-3">Legs tried</p>
+            <p className="k-label mb-3">Steps tried</p>
             <ul className="space-y-1.5">
               {attempts.map((a, i) => (
                 <li key={i} className="flex items-center gap-2 text-[12px]">
@@ -257,7 +257,7 @@ function Lead({ model, id }: { model: Model; id: string }) {
                   <ToneDot tone={a.status === "done" ? "teal" : a.status === "failed" ? "rose" : "accent"}>{a.status === "done" ? "Reached" : a.status === "failed" ? "Stopped" : "Open"}</ToneDot>
                 </li>
               ))}
-              {attempts.length === 0 && <li className="k-fg3 text-[12px]">No leg tried yet.</li>}
+              {attempts.length === 0 && <li className="k-fg3 text-[12px]">No step tried yet.</li>}
             </ul>
           </div>
         </aside>
@@ -280,7 +280,7 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{outcomeLabel(model.catalogue, occ.outcome)}</span>
           <span className="k-fg3 block truncate text-[12px]">
-            {occ.pipeId ? pipeName(model.catalogue, occ.pipeId) : "Setup"}
+            {occ.legId ? legName(model.catalogue, occ.legId) : "Setup"}
             {script ? ` · ${script.name}` : ""}
             {campaign ? ` · ${campaign.name}` : ""}
           </span>
@@ -311,13 +311,13 @@ function TimelineRow({ model, occ }: { model: Model; occ: Unit }) {
           <div>
             <p className="k-label mb-1">Traceability: the choices that led here</p>
             {choices.length === 0 ? (
-              <p className="k-fg3 text-[12px]">No choice: a single option or another factory.</p>
+              <p className="k-fg3 text-[12px]">No choice: a single candidate or another factory.</p>
             ) : (
               <ul className="space-y-1">
                 {choices.map((d) => (
                   <li key={d.id} className="flex items-baseline gap-2 text-[12px]">
                     <span className="k-fg3 min-w-0 flex-1 truncate">{pointInfo(model.catalogue, d.point).title}</span>
-                    <span className="truncate font-medium">{optionLabel(model, d.point, d.option, d.brandId)}</span>
+                    <span className="truncate font-medium">{candidateLabel(model, d.point, d.candidate, d.brandId)}</span>
                     <span className="k-fg3 k-mono">Day {d.day}</span>
                     {d.credited && <span className="k-chip">Credited</span>}
                   </li>
@@ -393,7 +393,7 @@ function Companies({ model, scope }: { model: Model; scope: string | null }) {
     <>
       <PageHeader
         title={<>{plural(rows.length, "company", "companies")}</>}
-        sub="Every lead resolves to one person in one company: identity is a pipe, and every pipe shares its ids. One company research serves every lead of that company."
+        sub="Every lead resolves to one person in one company: identity is a leg, and every leg shares its ids. One company research serves every lead of that company."
       />
       <CardTable
         footer={

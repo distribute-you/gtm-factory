@@ -5,13 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
-import { START, defaultStrategyId, describeCondition, type Campaign, type Pipe } from "@gtm-factory/engine";
-import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
+import { START, defaultStrategyId, describeCondition, type Campaign, type Leg } from "@gtm-factory/engine";
+import { FunnelLine, FunnelName, MaterialsBadge, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
-import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
+import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar, SelectItem } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
-import { campaignLegs, legEndOfPoints, playedPipes } from "@/lib/campaigns";
-import { outcomeLabel, pipeLine, pointsOf, scopedCampaigns, targetOf, type Model, type PointRow } from "@/lib/model";
+import { campaignSteps, stepEndOfPoints, playedLegs } from "@/lib/campaigns";
+import { candidateWord, outcomeLabel, legLine, pointsOf, scopedCampaigns, targetOf, type Model, type PointInfo, type PointRow } from "@/lib/model";
+import { campaignLine, type LinePart } from "@/lib/funnels";
 import { formatCents, formatCount, formatRatePct, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -162,19 +163,22 @@ export function CampaignPage() {
 
 function CampaignView({ model, campaign }: { model: Model; campaign: Campaign }) {
   const e = model.session.economics(campaign.id);
-  const legs = campaignLegs(model, campaign);
+  const steps = campaignSteps(model, campaign);
   const points = pointsOf(model, campaign);
   const brand = model.clients.find((x) => x.brand.id === campaign.brandId)?.brand.name;
   const target = targetOf(campaign);
+  const targetWord = outcomeLabel(model.catalogue, target);
   const proactive = campaign.start === START;
   return (
     <>
       <div className="mb-6 flex flex-wrap items-start gap-3">
-        <Mark kind="funnel" id={campaign.id} size={40} />
+        <Mark kind="outcome" id={target} icon={model.catalogue.outcome(target)?.icon} size={40} />
         <div className="min-w-0 flex-1">
-          <h1 className="text-[24px] font-medium leading-8 tracking-[-0.02em]">{campaign.name}</h1>
+          <h1 className="text-[24px] font-medium leading-8 tracking-[-0.02em]" data-testid="campaign-goal">
+            Goal: {targetWord}
+          </h1>
           <p className="k-fg2 text-[13px]">
-            {brand} · {outcomeLabel(model.catalogue, target)} worth {formatUsd(e.targetValue)}
+            {campaign.name} · {brand} · worth {formatUsd(e.targetValue)} each
             {e.valueLabel === "expected" ? " (fleet median, the client stated none)" : ""}
           </p>
         </div>
@@ -185,16 +189,16 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
       </div>
 
       <div className="k-card mb-6 grid grid-cols-1 divide-y divide-[var(--line-subtle)] sm:grid-cols-3 sm:divide-x sm:divide-y-0" data-testid="campaign-order">
-        <Kpi label="Start outcome">
+        <Kpi label={proactive ? "Proactive" : "Reactive"}>
           <span className="flex flex-col gap-1">
             <OutcomeChip model={model} outcome={campaign.start} size={16} />
-            <span className="k-fg3 text-[12px] font-normal">{proactive ? "Proactive: pulls on its target at each tick" : "Reactive: pushes each Unit that lands into its first pipe"}</span>
+            <span className="k-fg3 text-[12px] font-normal">{proactive ? `Pulls on ${targetWord.toLowerCase()} at each tick, down its tree` : "Pushes each Unit that lands up its tree"}</span>
           </span>
         </Kpi>
-        <Kpi label="Target">
+        <Kpi label="Strategy">
           <span className="flex flex-col gap-1">
-            <OutcomeChip model={model} outcome={target} size={16} />
-            <span className="k-fg3 text-[12px] font-normal">Worth {formatUsd(e.targetValue)} each</span>
+            <span className="text-[14px] leading-5">{(campaign.conditions ?? []).length > 0 ? campaign.conditions!.map((c) => describeCondition(c, model.catalogue)).join(", ") : "Every channel"}</span>
+            <span className="k-fg3 text-[12px] font-normal">The tree is rebuilt at every tick from performance</span>
           </span>
         </Kpi>
         <Kpi label="Daily budget">
@@ -205,12 +209,11 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         </Kpi>
       </div>
 
-      <div className="k-card mb-6 px-4 py-3">
-        <p className="k-label mb-1.5">Sales funnel</p>
-        <p className="mb-1.5">
-          <FunnelName model={model} campaign={campaign} />
-        </p>
-        <FunnelLine model={model} campaign={campaign} size="md" />
+      <div className="k-card mb-6 px-4 py-3" data-testid="campaign-views">
+        <FunnelName model={model} campaign={campaign} />
+        <div className="mt-2.5">
+          <FunnelLine model={model} campaign={campaign} size="md" />
+        </div>
       </div>
 
       <div className="k-card mb-6 grid grid-cols-2 divide-x divide-[var(--line-subtle)] md:grid-cols-4">
@@ -237,25 +240,24 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         </Kpi>
       </div>
       <p className="k-fg3 -mt-4 mb-6 text-[12px]">
-        Both returns use one formula: value of a {outcomeLabel(model.catalogue, target).toLowerCase()} over the cost per {outcomeLabel(model.catalogue, target).toLowerCase()}. Measured reads subjects that entered before day {Math.max(0, e.measured.cutoffDay)} ({plural(e.measured.targets, "outcome", "outcomes")}); expected reads every leg on today&apos;s estimates.
+        Both returns use one formula: value of a {targetWord.toLowerCase()} over its cost from Start. Measured reads subjects that entered before day {Math.max(0, e.measured.cutoffDay)} ({plural(e.measured.targets, "outcome", "outcomes")}); expected reads every step on today&apos;s estimates.
       </p>
 
       <section className="mb-8">
-        <SectionTitle count={legs.length}>Legs</SectionTitle>
+        <SectionTitle count={steps.length}>Steps of the sales path</SectionTitle>
         <CardTable>
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Leg</th>
-              <th className={`${TH} text-right`}>$/outcome</th>
+              <th className={TH}>Step</th>
+              <th className={`${TH} text-right`}>Cost of this step per outcome</th>
+              <th className={`${TH} text-right`}>Cost from Start</th>
               <th className={`${TH} text-right`}>% conversion</th>
               <th className={`${TH} text-right`}># outcomes</th>
-              <th className={`${TH} text-right`}>Attempts</th>
-              <th className={`${TH} text-right`}>$ per attempt</th>
-              <th className={`${TH} text-right`}>Leads needed</th>
+              <th className={`${TH} text-right`}>Attempts per {targetWord}</th>
             </tr>
           </thead>
           <tbody>
-            {legs.map((l) => (
+            {steps.map((l) => (
               <tr key={`${l.from}>${l.to}`} className="k-row k-line-subtle border-b last:border-b-0">
                 <td className={TD}>
                   <span className="inline-flex items-center gap-1.5 text-[12px]">
@@ -265,24 +267,25 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
                     {l.label === "expected" && <span className="k-chip ml-1">Learning</span>}
                   </span>
                 </td>
-                <td className={TDN}>{l.costPerAttempt != null && l.yieldRate ? formatUsd(l.costPerAttempt / l.yieldRate) : <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{l.costOfStep != null ? formatUsd(l.costOfStep) : <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{l.costFromStart != null ? <span className="font-medium">{formatUsd(l.costFromStart)}</span> : <span className="k-fg4">—</span>}</td>
                 <td className={TDN}>{formatRatePct(l.yieldRate)}</td>
                 <td className={TDN}>{formatCount(l.reached)}</td>
-                <td className={TDN}>{formatCount(l.attempts)}</td>
-                <td className={TDN}>{l.costPerAttempt != null ? formatUsd(l.costPerAttempt) : <span className="k-fg4">—</span>}</td>
-                <td className={TDN}>{l.leadsNeeded != null && Number.isFinite(l.leadsNeeded) ? formatCount(l.leadsNeeded) : <span className="k-fg4">—</span>}</td>
+                <td className={TDN}>{l.attemptsPerTarget != null && Number.isFinite(l.attemptsPerTarget) ? formatCount(l.attemptsPerTarget) : <span className="k-fg4">—</span>}</td>
               </tr>
             ))}
           </tbody>
         </CardTable>
-        <p className="k-fg3 mt-2 text-[12px]">Conversion is corrected for outcomes still on their way. Leads needed: attempts this leg makes per {outcomeLabel(model.catalogue, target).toLowerCase()}.</p>
+        <p className="k-fg3 mt-2 text-[12px]">Cost from Start adds every step before it: it is the one the return reads. Conversion is corrected for outcomes still on their way.</p>
       </section>
+
+      <ProductionTree model={model} campaign={campaign} />
 
       <Plays model={model} campaign={campaign} />
 
       <section className="mb-8">
         <SectionTitle count={points.length} right={<span>In the order they are made for each subject</span>}>
-          Choices at each Material
+          Choices
         </SectionTitle>
         {points.length === 0 ? (
           <div className="k-card">
@@ -303,6 +306,49 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         <WhyFeed model={model} campaignIds={new Set([campaign.id])} limit={10} />
       </div>
     </>
+  );
+}
+
+/**
+ * The production tree the campaign actually used over the last 7 days: per outcome it made, each
+ * branch (the leg that made it) with its share of the Units and its cost of this step per Unit.
+ */
+function ProductionTree({ model, campaign }: { model: Model; campaign: Campaign }) {
+  const tree = model.session.productionTree(campaign.id);
+  const order = new Map<string, number>();
+  campaignLine(model, campaign).steps.forEach((s, k) => s.parts.forEach((p, j) => order.set(p.output, k * 100 + j)));
+  const rows = [...tree].filter((t) => model.catalogue.outcome(t.outcome)?.subject === "lead").sort((a, b) => (order.get(a.outcome) ?? 9999) - (order.get(b.outcome) ?? 9999));
+  return (
+    <section className="mb-8">
+      <SectionTitle count={rows.length} right={<span>Last 7 days, every Unit this campaign made</span>}>
+        Production tree
+      </SectionTitle>
+      <div className="k-card divide-y divide-[var(--line-subtle)]" data-testid="production-tree">
+        {rows.length === 0 && <EmptyNote>Nothing made yet. Press play.</EmptyNote>}
+        {rows.map((t) => (
+          <div key={t.outcome} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px]">
+            <span className="w-[200px] shrink-0">
+              <OutcomeChip model={model} outcome={t.outcome} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
+              {t.branches.map((b) => {
+                const leg = model.catalogue.leg(b.legId);
+                return (
+                  <span key={b.legId} className="inline-flex items-center gap-1.5 tabular-nums">
+                    <span className="font-medium">{formatRatePct(b.share)}</span>
+                    <span className="k-fg3">via</span>
+                    <Mark kind="leg" id={b.legId} icon={leg?.icon} size={14} />
+                    <span>{leg?.name ?? b.legId}</span>
+                    <span className="k-fg3">at {b.costPerUnit != null ? formatUsd(b.costPerUnit) : "—"}</span>
+                  </span>
+                );
+              })}
+            </span>
+            <span className="k-fg3 shrink-0 text-[12px] tabular-nums">{plural(t.units, "Unit", "Units")}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -431,37 +477,39 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-/** The pipes a campaign plays and the strategy it chose on each (its default otherwise). */
+/** The legs a campaign's tree runs and the strategy it chose on each (its default otherwise). */
 function Plays({ model, campaign }: { model: Model; campaign: Campaign }) {
-  const pipes = playedPipes(model, campaign);
+  const legs = playedLegs(model, campaign);
+  const parts = new Map(campaignLine(model, campaign).steps.flatMap((s) => s.parts.map((p) => [p.leg.id, p] as const)));
   return (
     <section className="mb-8">
-      <SectionTitle count={pipes.length} right={<span>Every pipe of the funnel line, each with its strategy.</span>}>
+      <SectionTitle count={legs.length} right={<span>Every leg of the tree, each with its strategy.</span>}>
         Plays
       </SectionTitle>
       <div className="grid gap-3 md:grid-cols-2">
-        {pipes.map((p) => (
-          <PlayCard key={p.id} model={model} campaign={campaign} pipe={p} />
+        {legs.map((p) => (
+          <PlayCard key={p.id} model={model} campaign={campaign} leg={p} part={parts.get(p.id) ?? null} />
         ))}
       </div>
     </section>
   );
 }
 
-function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign; pipe: Pipe }) {
+function PlayCard({ model, campaign, leg, part }: { model: Model; campaign: Campaign; leg: Leg; part: LinePart | null }) {
   const { dispatch } = useSim();
-  const strategies = model.catalogue.strategiesOf(pipe.id);
-  const chosen = model.session.strategyOf(campaign, pipe.id);
+  const strategies = model.catalogue.strategiesOf(leg.id);
+  const chosen = model.session.strategyOf(campaign, leg.id);
   const [error, setError] = useState<string | null>(null);
-  const isDefault = !chosen || chosen.id === defaultStrategyId(pipe.id);
+  const isDefault = !chosen || chosen.id === defaultStrategyId(leg.id);
   return (
     <div className="k-card p-4">
       <div className="flex items-start gap-2.5">
-        <Mark kind="pipe" id={pipe.id} icon={pipe.icon} size={32} />
+        <Mark kind="leg" id={leg.id} icon={leg.icon} size={32} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium">{pipe.name}</p>
-          <p className="k-fg3 truncate text-[12px]">{pipeLine(model.catalogue, pipe)}</p>
+          <p className="truncate text-[14px] font-medium">{leg.name}</p>
+          <p className="k-fg3 truncate text-[12px]">{legLine(model.catalogue, leg)}</p>
         </div>
+        {part && part.materials.length > 0 && <MaterialsBadge model={model} part={part} />}
         {!isDefault && <span className="k-chip">Chosen</span>}
       </div>
       <label className="mt-3 flex items-center gap-2">
@@ -469,14 +517,14 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
         <select
           className="k-input min-w-0 flex-1 px-1.5"
           style={{ font: "inherit" }}
-          value={chosen?.id ?? defaultStrategyId(pipe.id)}
-          onChange={(e) => setError(dispatch({ type: "strategy", campaignId: campaign.id, pipeId: pipe.id, strategyId: e.target.value }))}
+          value={chosen?.id ?? defaultStrategyId(leg.id)}
+          onChange={(e) => setError(dispatch({ type: "strategy", campaignId: campaign.id, legId: leg.id, strategyId: e.target.value }))}
         >
           {strategies.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.id === defaultStrategyId(pipe.id) ? "Default: every script" : s.name}
+            <SelectItem key={s.id} value={s.id}>
+              {s.id === defaultStrategyId(leg.id) ? "Default: every script" : s.name}
               {s.proposed ? " (proposed by a split)" : ""}
-            </option>
+            </SelectItem>
           ))}
         </select>
       </label>
@@ -506,29 +554,26 @@ function PlayCard({ model, campaign, pipe }: { model: Model; campaign: Campaign;
   );
 }
 
-/** One choice point: its options, their share of picks, the engine's belief, the hidden best. */
+/** One choice point: its candidates, their share of picks, the engine's belief, the hidden best. */
 function PointCard({ model, campaign, point }: { model: Model; campaign: Campaign; point: PointRow }) {
-  const legEnd = legEndOfPoints(model, campaign).get(point.info.key) ?? targetOf(campaign);
-  const sorted = useMemo(() => [...point.options].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.options]);
+  const stepEnd = stepEndOfPoints(model, campaign).get(point.info.key) ?? targetOf(campaign);
+  const sorted = useMemo(() => [...point.candidates].sort((a, b) => b.share - a.share || b.valuePerDollar - a.valuePerDollar), [point.candidates]);
   return (
     <div className="k-card overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Mark kind="point" id={point.info.key} size={22} />
-          <Link href={`/research/?point=${encodeURIComponent(point.info.key)}`} className="truncate text-[14px] font-medium hover:underline">
-            {point.info.title}
-          </Link>
+          <PointTitle model={model} info={point.info} />
           <span className="k-fg3 truncate text-[12px]">{point.info.sub}</span>
         </div>
         <span className="k-fg3 text-[12px]">
-          {plural(point.picks, "pick", "picks")} · scored on {outcomeLabel(model.catalogue, legEnd).toLowerCase()}, through traceability
+          {plural(point.picks, "pick", "picks")} · scored on {outcomeLabel(model.catalogue, stepEnd).toLowerCase()}, through traceability
         </span>
       </div>
       <div className="k-scroll overflow-x-auto">
         <table className="mt-2 w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Option</th>
+              <th className={TH}>{candidateWord(point.info.kind)}</th>
               <th className={`${TH} text-right`}>Share, 7 days</th>
               <th className={`${TH} text-right`}>Value per $1</th>
               <th className={`${TH} text-right`}>$ from here</th>
@@ -538,7 +583,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
           </thead>
           <tbody>
             {sorted.map((o) => (
-              <tr key={o.option} className="k-row k-line-subtle border-b last:border-b-0">
+              <tr key={o.candidate} className="k-row k-line-subtle border-b last:border-b-0">
                 <td className={TD}>
                   <span className="flex items-center gap-2">
                     <span className="truncate">{o.label}</span>
@@ -580,7 +625,34 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
   );
 }
 
-/** The Units a reactive campaign pushed into its first pipe, newest first. */
+/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one glyph per object type (leg, outcome, script, Material). */
+export function PointTitle({ model, info }: { model: Model; info: PointInfo }) {
+  return (
+    <Link href={`/research/?point=${encodeURIComponent(info.key)}`} className="inline-flex min-w-0 items-center gap-1.5 text-[14px] font-medium hover:underline">
+      {info.leg ? <Mark kind="leg" id={info.leg.id} size={20} /> : <Mark kind="outcome" id={info.material} size={20} />}
+      <span className="truncate">{info.leg ? info.leg.name : `Step to ${outcomeLabel(model.catalogue, info.material)}`}</span>
+      <span className="k-fg4">·</span>
+      {info.kind === "play" ? (
+        <>
+          <Mark kind="leg" id={`legs:${info.material}`} size={16} />
+          <span>its leg</span>
+        </>
+      ) : info.consumer ? (
+        <>
+          <Mark kind="material" id={info.material} size={16} />
+          <span className="truncate">Material {outcomeLabel(model.catalogue, info.material)}</span>
+        </>
+      ) : (
+        <>
+          <Mark kind="script" id={`scripts:${info.key}`} size={16} />
+          <span>its script</span>
+        </>
+      )}
+    </Link>
+  );
+}
+
+/** The Units a reactive campaign pushed into its first step, newest first. */
 function PushFeed({ model, campaign }: { model: Model; campaign: Campaign }) {
   const pushes = model.session.pushes.filter((p) => p.campaignId === campaign.id);
   const recent = pushes.slice(-8).reverse();
@@ -590,7 +662,7 @@ function PushFeed({ model, campaign }: { model: Model; campaign: Campaign }) {
       <SectionTitle count={pushes.length}>Units pushed</SectionTitle>
       <div className="k-card p-4">
         <p className="k-fg2 mb-3 text-[13px]">
-          Each {start} that lands for this brand goes into the campaign&apos;s first pipe, as far as the daily budget allows. The scripts decide when to run: a follow-up waits its days since the last message.
+          Each {start} that lands for this brand goes into the campaign&apos;s first step, as far as the daily budget allows. The scripts decide when to run: a follow-up waits its days since the last message.
         </p>
         {recent.length === 0 ? (
           <p className="k-fg3 text-[13px]">Nothing pushed yet. Press play.</p>

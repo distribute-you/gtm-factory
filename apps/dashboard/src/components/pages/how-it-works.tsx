@@ -16,20 +16,21 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     ],
   },
   {
-    kind: "pipe",
-    title: "Pipes and their Bill of materials",
+    kind: "leg",
+    title: "Legs, and the Bill of materials of each script",
     lines: [
-      "A pipe turns its Bill of materials into one outcome. Each line is a Material: the message writer consumes a verified email, a company researched, a template, a brand context, an LLM completion and a Rating per message.",
-      "Each pipe has two functions. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. Both open Runs: one Run is one script executed, one Unit or none.",
-      "A Specification is what a consumer asks for: the organisation of Paul's company, a brand context younger than 90 days, one of them.",
+      "A leg goes from one outcome to another, performed by competing scripts. Each script declares its own Bill of materials: a writer with a company research, another without.",
+      "Every leg runs the same code. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. It picks a script, serves it each Material from the stock, else pulls that outcome from the best producer, then runs it.",
+      "A Specification names the outcome, never a producer: the brand context of my lead's organisation, younger than 90 days. Whichever leg is picked receives it, like a purchase order names a part, not a machine.",
     ],
   },
   {
     kind: "campaign",
     title: "The Campaign orders production",
     lines: [
-      "A Campaign is a target outcome, a daily budget and a start outcome. From Start it is proactive: at each tick it pulls on its target. From any other outcome it is reactive: it pushes each Unit that lands into its first pipe.",
-      "A pull serves the most advanced Units first. Upstream makes only what downstream asked for. A Unit advances one pipe per tick, since every run takes time.",
+      "A Campaign fixes only its Target, its budget and its strategy (Channel is cold email). Its production tree is rebuilt at every tick from performance.",
+      "From Start it is proactive: it pulls from the Target down, each Material from the stock, else from the best producer. From any other outcome it is reactive: it pushes each Unit that lands up toward the Target.",
+      "The sales path and the sales funnel are views: the tree actually used, with a short name to talk about it. A Unit advances one leg per tick, since every run takes time.",
       "A follow-up campaign starts from Message sent. Its script waits its days since the last message, then writes. Who is never served, such as people who asked to stop, is the strategy's choice.",
     ],
   },
@@ -37,25 +38,25 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     kind: "object",
     title: "The ledger is the common stock",
     lines: [
-      "Every Unit lands in one stock, whoever made it: our pipes, the client's team, the client's CRM, the organic market. Several producers feed one outcome.",
-      "A pipe serves itself from the stock when a Unit fits its Specification. When none does, it orders one from a producer it chooses. A Unit never wears out: several campaigns can consume it.",
-      "A webhook is the script of a pipe another factory calls: the CRM reports an interested lead, the mailbox reports a message sent. Its Units land in the stock and push the reactive campaigns that start from them.",
+      "Every Unit lands in one stock, whoever made it: our legs, the client's team, the client's CRM, the organic market. Several producers feed one outcome.",
+      "A leg serves itself from the stock when a Unit fits its Specification. When none does, it orders one from a producer it chooses. A Unit never wears out: several campaigns can consume it.",
+      "A webhook is the script of a leg another factory calls: the CRM reports an interested lead, the mailbox reports a message sent. Its Units land in the stock and push the reactive campaigns that start from them.",
     ],
   },
   {
     kind: "script:ai",
     title: "Scripts",
     lines: [
-      "A script performs a pipe. Several compete on each pipe. Each belongs to a dynasty with versions: an upgrade keeps the dynasty's stats, a fork starts from its parent's.",
-      "A script owns its business logic in its pipe storage: who to pick, when to run, what to remember. The storage holds notes and references to Units, never copies.",
+      "A script performs a leg. Several compete on each leg. Each belongs to a dynasty with versions: an upgrade keeps the dynasty's stats, a fork starts from its parent's.",
+      "A script owns its business logic in its leg storage: who to pick, when to run, what to remember. The storage holds notes and references to Units, never copies.",
     ],
   },
   {
     kind: "point",
     title: "The Supplier rating",
     lines: [
-      "A pipe cannot judge its options from its own data: a template's replies land later, in another pipe. The Supplier rating pipe reads the ledger and the traceability and makes a Rating each tick.",
-      "The choosing pipe takes the Rating as a Material and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. The Rating's cost goes to the pipes that consume it.",
+      "A leg cannot judge its candidates from its own data: a template's replies land later, in another leg. The Supplier rating leg reads the ledger and the traceability and makes a Rating each tick.",
+      "The choosing leg takes the Rating as a Material and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. The Rating's cost goes to the legs that consume it.",
     ],
   },
   {
@@ -63,7 +64,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "Credit through traceability",
     lines: [
       "Every Unit records the choices that led to it, its own included, and those carried by the Units it consumed.",
-      "When the end of a leg lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
+      "When the next lead state lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
     ],
   },
   {
@@ -71,7 +72,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "Tactics and strategies",
     lines: [
       "A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts, leads and Units.",
-      "A strategy is a set of conditions on tactics, per Material of one pipe: pro models at the writer's LLM completion, a 60 day recontact window at the identity's Lead found. Its conditions enter the Specification.",
+      "A strategy is a set of conditions on tactics, per Material of one leg: pro models at the writer's LLM completion, a 60 day recontact window at the identity's Lead found. Its conditions enter the Specification.",
       "One split mechanism reads typed tactics. Splits on leads propose a finer ICP; splits on scripts propose a strategy.",
     ],
   },
@@ -80,8 +81,8 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     title: "Other factories and reliability",
     lines: [
       "Every Unit names its producer: one of our runs, or another factory at its access cost. Our return counts only what our runs produced.",
-      "Reliability is measured: a producer's agreement with the outcome's reference pipe on the same subjects.",
-      "Decisions read each pipe's own cost and yield. Reports read the every-path cost of each outcome. A Unit keeps the price paid to make it, reuse shows as a gain, and the books reconcile to the cent.",
+      "Reliability is measured: a producer's agreement with the outcome's reference leg on the same subjects.",
+      "Decisions read each leg's own cost and yield. Reports read the every-path cost of each outcome. A Unit keeps the price paid to make it, reuse shows as a gain, and the books reconcile to the cent.",
     ],
   },
 ];
@@ -93,7 +94,7 @@ export function HowItWorksPage() {
       <Page narrow>
         <PageHeader
           title="Revenue made easy, as a factory"
-          sub="Go-to-market as a factory: Campaigns order outcomes, pipes make them from their Bill of materials, scripts compete inside each pipe, and every choice goes where a dollar returns the most."
+          sub="Go-to-market as a factory: Campaigns order a Target, legs make outcomes, scripts compete inside each leg with their own Bill of materials, and every choice goes where a dollar returns the most."
           right={
             <a href={`${REPO_URL}/blob/main/docs/framework.md`} target="_blank" rel="noreferrer" className="k-btn">
               Read the spec

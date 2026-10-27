@@ -7,9 +7,9 @@
  * drawn from a hash of the object's id, inside ranges written below.
  */
 
-import { START, hashString, type Script, type ScriptTruth, type PipeTruth, type SeedUnit, type Tactic, type WorldClient, type WorldData } from "@gtm-factory/engine";
+import { START, hashString, type Condition, type LegTruth, type Script, type ScriptTruth, type SeedUnit, type Tactic, type WorldClient, type WorldData } from "@gtm-factory/engine";
 import type { PublicCatalogue } from "./public-catalogue";
-import { CHANNEL_TACTIC, CLIENT_TEAM, ICP, ICP_CLIENT_PIPE, ICP_FINDER_PIPE, LLM_PIPE, RATING_PIPE, TEMPLATE, TEMPLATE_PIPE, WAIT_TACTIC, translateCatalogue } from "./translate";
+import { CHANNEL_TACTIC, CLIENT_TEAM, ICP, ICP_CLIENT_LEG, ICP_FINDER_LEG, LLM_LEG, RATING_LEG, TEMPLATE, TEMPLATE_LEG, WAIT_TACTIC, translateCatalogue } from "./translate";
 
 /** A number in [lo, hi] drawn from a hash of the parts: the same id gives the same number. */
 function draw(lo: number, hi: number, ...parts: string[]): number {
@@ -42,62 +42,60 @@ const LLMS = [
   { id: "llm_claude_sonnet", name: "Claude Sonnet", tier: "pro", provider: { name: "Anthropic", color: "#d97757" }, cost: 6, end: 1.1 },
 ];
 
-/** Base yield of a pipe by the kind of leg it plays (fictional ranges). */
+/** Base yield of a leg by where it goes from and to (fictional ranges). */
 function baseYield(from: string | undefined, to: string, id: string): number {
   const r = (lo: number, hi: number) => round(draw(lo, hi, "base", id));
   if (to === "lead_found") return 1;
   if (to === "lead_interested") return from === "lead_visited" ? r(0.05, 0.12) : from === "lead_found" ? r(0.01, 0.04) : r(0.005, 0.02);
   if (to === "lead_visited") return from === "lead_found" ? r(0.03, 0.08) : r(0.01, 0.04);
-  if (to === "meeting_booked") return from === "lead_interested" ? r(0.3, 0.6) : r(0.2, 0.5);
+  if (to === "meeting_booked") return from === "lead_interested" ? r(0.3, 0.6) : from === "lead_visited" ? r(0.03, 0.08) : r(0.001, 0.004);
   if (to === "meeting_attended") return r(0.6, 0.85);
-  if (to === "paid_client") return from === "meeting_attended" ? r(0.15, 0.35) : r(0.05, 0.15);
+  if (to === "paid_client") return from === "meeting_attended" ? r(0.15, 0.35) : from === "lead_interested" ? r(0.05, 0.15) : r(0.0005, 0.002);
   return r(0.2, 0.6);
 }
 
-export interface DistributeWorldOptions {
+export interface DistributeWorldParams {
   seed?: number;
 }
 
-export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWorldOptions = {}): WorldData {
+export function buildDistributeWorld(pub: PublicCatalogue, how: DistributeWorldParams = {}): WorldData {
   const isWriter = (c: PublicCatalogue["channels"][number]) => c.managed && c.channelType === "outbound";
   const asksLlm = (c: PublicCatalogue["channels"][number]) => c.managed && c.performedBy === "software" && (c.channelType === "outbound" || c.channelType === "conversion");
   const t = translateCatalogue(pub, { templateChannel: isWriter, llmChannel: asksLlm });
   const cat = t.catalogue;
   const scripts: Script[] = [];
   const truthScripts: Record<string, ScriptTruth> = {};
-  const truthPipes: Record<string, PipeTruth> = {};
-
-  for (const p of cat.pipes) {
-    const from = p.materials.find((i) => cat.outcomes.find((o) => o.id === i)?.subject === "lead");
-    truthPipes[p.id] = { base: baseYield(from, p.output, p.id), delayMeanDays: p.maturity.delayMeanDays, horizonDays: p.maturity.horizonDays };
-  }
+  const truthLegs: Record<string, LegTruth> = {};
+  const fromOf = new Map<string, string | undefined>();
   for (const m of LLMS) {
-    scripts.push({ id: m.id, pipeId: LLM_PIPE, dynasty: m.id, version: 1, name: m.name, kind: "ai", tactics: { tier: m.tier }, costCents: m.cost, status: "active", provider: m.provider });
+    scripts.push({ id: m.id, legId: LLM_LEG, dynasty: m.id, version: 1, name: m.name, kind: "ai", materials: [], tactics: { tier: m.tier }, costCents: m.cost, status: "active", provider: m.provider });
     truthScripts[m.id] = { costCents: m.cost, end: m.end };
   }
-  scripts.push({ id: "tpl_ai", pipeId: TEMPLATE_PIPE, dynasty: "tpl_ai", version: 1, name: "AI template writer", kind: "ai", tactics: {}, costCents: 50, status: "active" });
-  scripts.push({ id: "tpl_copywriter", pipeId: TEMPLATE_PIPE, dynasty: "tpl_copywriter", version: 1, name: "Copywriter", kind: "human", tactics: {}, costCents: 3000, status: "active" });
+  scripts.push({ id: "tpl_ai", legId: TEMPLATE_LEG, dynasty: "tpl_ai", version: 1, name: "AI template writer", kind: "ai", materials: [], tactics: {}, costCents: 50, status: "active" });
+  scripts.push({ id: "tpl_copywriter", legId: TEMPLATE_LEG, dynasty: "tpl_copywriter", version: 1, name: "Copywriter", kind: "human", materials: [], tactics: {}, costCents: 3000, status: "active" });
   truthScripts.tpl_ai = { costCents: 50 };
   truthScripts.tpl_copywriter = { costCents: 3000 };
-  scripts.push({ id: "icp_client_states", pipeId: ICP_CLIENT_PIPE, dynasty: "icp_client_states", version: 1, name: "Client states it", kind: "human", tactics: {}, costCents: 0, status: "active" });
-  scripts.push({ id: "icp_ai", pipeId: ICP_FINDER_PIPE, dynasty: "icp_ai", version: 1, name: "AI ICP finder", kind: "ai", tactics: {}, costCents: 200, status: "active" });
+  scripts.push({ id: "icp_client_states", legId: ICP_CLIENT_LEG, dynasty: "icp_client_states", version: 1, name: "Client states it", kind: "human", materials: [], tactics: {}, costCents: 0, status: "active" });
+  scripts.push({ id: "icp_ai", legId: ICP_FINDER_LEG, dynasty: "icp_ai", version: 1, name: "AI ICP finder", kind: "ai", materials: [], tactics: {}, costCents: 200, status: "active" });
   truthScripts.icp_client_states = { costCents: 0 };
   truthScripts.icp_ai = { costCents: 200 };
-  scripts.push({ id: "rating_pooled", pipeId: RATING_PIPE, dynasty: "rating_pooled", version: 1, name: "Pooled Thompson rating", kind: "rules", tactics: { reads_evidence: true }, costCents: 1, status: "active" });
+  scripts.push({ id: "rating_pooled", legId: RATING_LEG, dynasty: "rating_pooled", version: 1, name: "Pooled Thompson rating", kind: "rules", materials: [], tactics: { reads_evidence: true }, costCents: 1, status: "active" });
   truthScripts.rating_pooled = { costCents: 1 };
 
-  // Scripts: each channel's own, on the pipe its leg runs on, carrying the channel as a tactic.
+  // Scripts: each channel's own, on the leg it runs on, carrying the channel as a tactic and its own Bill of materials.
   for (const c of pub.channels) {
     for (const tr of c.transitions) {
-      const ids = t.pipesOf(c.slug, tr.legKey);
+      const ids = t.legsOf(c.slug, tr.legKey);
       const wait = t.waitOf(c.slug, tr.legKey);
-      for (const pipeId of ids) {
-        const pipe = cat.pipes.find((p) => p.id === pipeId);
-        if (!pipe) continue;
+      for (const legId of ids) {
+        const leg = cat.legs.find((p) => p.id === legId);
+        if (!leg) continue;
+        const materials = t.billOf(c.slug, tr.legKey, legId);
+        if (!fromOf.has(legId)) fromOf.set(legId, materials.map((m) => m.outcome).find((i) => cat.outcomes.find((o) => o.id === i)?.subject === "lead"));
         const channel = { [CHANNEL_TACTIC]: c.name, ...(wait ? { [WAIT_TACTIC]: wait } : {}) };
-        const base = ids.length > 1 ? `${c.slug}|${tr.legKey}|${pipeId}` : `${c.slug}|${tr.legKey}`;
-        if (pipe.factory === CLIENT_TEAM) {
-          scripts.push({ id: `${base}#team`, pipeId: pipe.id, dynasty: `${base}#team`, version: 1, name: c.name, kind: "human", tactics: channel, costCents: 0, status: "active" });
+        const base = ids.length > 1 ? `${c.slug}|${tr.legKey}|${legId}` : `${c.slug}|${tr.legKey}`;
+        if (leg.factory === CLIENT_TEAM) {
+          scripts.push({ id: `${base}#team`, legId: leg.id, dynasty: `${base}#team`, version: 1, name: c.name, kind: "human", materials, tactics: channel, costCents: 0, status: "active" });
           truthScripts[`${base}#team`] = { costCents: 0, step: round(draw(0.7, 1.3, "step", base)) };
           continue;
         }
@@ -117,18 +115,21 @@ export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWo
         for (const v of variants) {
           const id = `${base}#${v.key}`;
           const costCents = Math.round(draw(human ? 300 : sourcing ? 2 : 3, human ? 1500 : sourcing ? 12 : 40, "cost", id));
-          scripts.push({ id, pipeId: pipe.id, dynasty: id, version: 1, name: `${c.name}, ${v.name}`, kind: human ? "human" : sourcing ? "rules" : "ai", tactics: { ...channel, ...v.tactics }, costCents, status: "active" });
+          scripts.push({ id, legId: leg.id, dynasty: id, version: 1, name: `${c.name}, ${v.name}`, kind: human ? "human" : sourcing ? "rules" : "ai", materials, tactics: { ...channel, ...v.tactics }, costCents, status: "active" });
           truthScripts[id] = { costCents, step: round(draw(0.6, 1.4, "step", id)), ...(sourcing ? { coverage: round(draw(0.3, 0.9, "coverage", id)) } : {}) };
         }
       }
     }
   }
   cat.scripts = scripts;
+  for (const p of cat.legs) truthLegs[p.id] = { base: baseYield(fromOf.get(p.id), p.output, p.id), delayMeanDays: p.maturity.delayMeanDays, horizonDays: p.maturity.horizonDays };
   cat.tactics = [...cat.tactics, ...LEAD_TACTICS, ...SCRIPT_TACTICS, ...BRAND_TACTICS];
-  // A play that keeps one channel: the client who wants cold email only says it in its strategy.
-  const coldEmailPipe = t.pipesOf("sales-cold-email-outreach", "lead_found_to_conversation")[0]!;
-  const coldEmailName = t.channelName("sales-cold-email-outreach")!;
-  cat.strategies.push({ id: `${coldEmailPipe}#cold-email-only`, name: "Cold email only", pipeId: coldEmailPipe, rules: [{ conditions: [{ op: "in", tactic: CHANNEL_TACTIC, values: [coldEmailName] }] }] });
+  // A campaign's strategy keeps the channels its client wants: "Channel is one of these".
+  const channelsOf = (...types: string[]) => pub.channels.filter((c) => types.includes(c.channelType ?? "")).map((c) => c.name);
+  const only = (names: string[]): Condition[] => [{ op: "in", tactic: CHANNEL_TACTIC, values: names }];
+  const outreach = only(channelsOf("sourcing", "outbound", "conversion"));
+  const coldEmail = only([t.channelName("sales-cold-email-outreach")!, ...channelsOf("sourcing", "conversion")]);
+  const inbound = only(channelsOf("paid", "earned", "pr", "conversion"));
 
   const seeds = (brand: string, sellsTo: string): SeedUnit[] => [
     { outcome: ICP, scriptId: "icp_client_states", dynasty: "icp-client", version: 1, name: "The client's ICP", text: "Founders and heads of growing companies.", conditions: [{ op: "in", tactic: "seniority", values: ["founder", "head"] }] },
@@ -147,32 +148,32 @@ export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWo
     truthMultiplier: round(draw(0.85, 1.15, "client", String(n))),
     organicPerDay: 0,
   });
-  const camp = (n: number, k: string, name: string, line: string[], budget: number, extra: Partial<WorldClient["campaigns"][number]> = {}): WorldClient["campaigns"][number] => ({
+  const camp = (n: number, k: string, name: string, target: string, budget: number, extra: Partial<WorldClient["campaigns"][number]> = {}): WorldClient["campaigns"][number] => ({
     id: `campaign-${n}${k}`,
     brandId: `brand-${n}`,
     offerId: `offer-${n}`,
     name,
     start: START,
-    line,
+    target,
     dailyBudgetCents: budget,
     status: "running",
     strategies: {},
     ...extra,
   });
   const clients: WorldClient[] = [
-    client(1, "Northwind Analytics", "Mid-market", { lifetimeRevenue: 900 }, [camp(1, "", "Paid clients from cold outreach", ["lead_interested", "meeting_booked", "meeting_attended", "paid_client"], 3000)]),
+    client(1, "Northwind Analytics", "Mid-market", { lifetimeRevenue: 900 }, [camp(1, "", "Paid clients from cold outreach", "paid_client", 3000, { conditions: outreach })]),
     client(2, "Bluepeak Logistics", "Mid-market", { lifetimeRevenue: 400, outcomeValues: { lead_interested: 30 } }, [
-      camp(2, "", "Signups from the website", ["lead_visited", "lead_interested", "paid_client"], 2500),
-      camp(2, "f", "Follow-ups after each website visit", ["lead_interested"], 800, { start: t.outcomeOfStep("website_visit")! }),
+      camp(2, "", "Paid clients from ads and content", "paid_client", 2500, { conditions: inbound }),
+      camp(2, "f", "Follow-ups after each website visit", "lead_interested", 800, { start: t.outcomeOfStep("website_visit")! }),
     ]),
-    client(3, "Lumen Dental Labs", "SMB", { lifetimeRevenue: 1500 }, [camp(3, "", "Replies closed by the team", ["lead_interested", "paid_client"], 2000)]),
-    client(4, "Copperleaf Studio", "SMB", { lifetimeRevenue: 1200, outcomeValues: { meeting_booked: 150 } }, [camp(4, "", "Meetings from cold email", ["lead_interested", "meeting_booked"], 2000, { strategies: { [coldEmailPipe]: `${coldEmailPipe}#cold-email-only` } })]),
+    client(3, "Lumen Dental Labs", "SMB", { lifetimeRevenue: 1500 }, [camp(3, "", "Replies closed by the team", "paid_client", 2000, { conditions: outreach })]),
+    client(4, "Copperleaf Studio", "SMB", { lifetimeRevenue: 1200, outcomeValues: { meeting_booked: 150 } }, [camp(4, "", "Meetings from cold email", "meeting_booked", 2000, { conditions: coldEmail })]),
   ];
 
   return {
     name: "distribute.you catalogue",
     description: "distribute.you's whole public catalogue (every channel, leg and step), four fictional clients, fictional numbers.",
-    seed: options.seed ?? 7,
+    seed: how.seed ?? 7,
     catalogue: cat,
     clients,
     attributes: [
@@ -183,7 +184,7 @@ export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWo
       { tactic: "hiring", level: "company", values: [true, false], weights: [4, 6] },
     ],
     truth: {
-      pipes: truthPipes,
+      legs: truthLegs,
       scripts: truthScripts,
       at: {},
       segments: [
@@ -207,7 +208,7 @@ export function buildDistributeWorld(pub: PublicCatalogue, options: DistributeWo
     },
     pins: [
       { kind: "outcome", id: TEMPLATE, label: "Templates", icon: "note-pencil" },
-      { kind: "pipe", id: LLM_PIPE, label: "LLMs", icon: "sparkle" },
+      { kind: "leg", id: LLM_LEG, label: "LLMs", icon: "sparkle" },
     ],
   };
 }

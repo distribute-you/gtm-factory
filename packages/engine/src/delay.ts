@@ -28,7 +28,7 @@ export function delayFromPmf(pmf: readonly number[]): DelayDistribution {
 /**
  * Geometric delays with a given mean, truncated at `horizonDays` (the rest
  * lands on the last day). `fixedDays` of the mean are certain (a Unit
- * advances one pipe per tick): nothing lands before them.
+ * advances one leg per tick): nothing lands before them.
  */
 export function geometricDelay(meanDays: number, horizonDays: number, fixedDays = 0): DelayDistribution {
   if (meanDays <= 0 || horizonDays <= 0) return { cdf: [1] };

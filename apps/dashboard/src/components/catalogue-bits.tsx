@@ -1,38 +1,41 @@
 "use client";
 
 /**
- * Shared catalogue pieces, all read off data: a script's card and provider logo, a pipe's Bill of
+ * Shared catalogue pieces, all read off data: a script's card and provider logo, a leg's Bill of
  * materials, one renderer per content type of a brand outcome, and the version editor (read, edit =
- * new version, compare two versions). No piece knows an outcome, a pipe or a script by name.
+ * new version, compare two versions). No piece knows an outcome, a leg or a script by name.
  */
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { describeCondition, type Catalogue, type ContentType, type Pipe, type Unit, type Script } from "@gtm-factory/engine";
+import { describeCondition, type Catalogue, type ContentType, type Leg, type Unit, type Script } from "@gtm-factory/engine";
 import { Mark } from "./mark";
+import { SelectItem } from "./ui";
 import { billOfMaterials, diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 
 /**
- * A pipe's Bill of materials: the outcomes it consumes per Unit produced, one line per Material,
- * with the pipes producing each (they share one stock) and the choice made among them.
+ * A script's Bill of materials (the leg's first script when none is named): the outcomes it
+ * consumes per Unit produced, one line per Material, the conditions of its Specification, the
+ * legs producing each (they share one stock) and the choice made among them.
  */
-export function BillOfMaterials({ model, pipe }: { model: Model; pipe: Pipe }) {
-  const rows = billOfMaterials(model, pipe);
+export function BillOfMaterials({ model, leg, script }: { model: Model; leg: Leg; script?: Script }) {
+  const rows = billOfMaterials(model, leg, script);
   if (rows.length === 0)
-    return <p className="k-fg3 text-[13px]">{pipe.webhook ? "No Material: another factory calls its webhook." : "No Material: it draws its subjects from the market."}</p>;
+    return <p className="k-fg3 text-[13px]">{leg.webhook ? "No Material: another factory calls its webhook." : "No Material: it draws its subjects from the market."}</p>;
   return (
     <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]" data-testid="bill-of-materials">
       {rows.map((r) => (
         <div key={r.material} className="flex items-start gap-2.5 px-3 py-2 text-[13px]">
-          <Mark kind="outcome" id={r.material} icon={model.catalogue.outcome(r.material)?.icon} size={20} />
+          <Mark kind="material" id={r.material} icon={model.catalogue.outcome(r.material)?.icon} size={20} />
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5">
               <span className="font-medium">{r.label}</span>
               {r.subject && <span className="k-chip">Subject</span>}
             </p>
             <p className="k-fg3 text-[12px]">{r.how}</p>
-            <p className="k-fg2 truncate text-[12px]">{r.producers.length ? `Made by ${r.producers.map((p) => p.name).join(", ")}` : "Made by no pipe yet"}</p>
+            {r.conditions.length > 0 && <p className="k-fg2 text-[12px]">Specification: {r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}</p>}
+            <p className="k-fg2 truncate text-[12px]">{r.producers.length ? `Made by ${r.producers.map((p) => p.name).join(", ")}` : "Made by no leg yet"}</p>
           </div>
           {r.point ? (
             <Link href={`/research/?point=${encodeURIComponent(r.point)}`} className="shrink-0 text-right hover:underline">
@@ -304,9 +307,9 @@ function VersionPick({ versions, value, onChange }: { versions: Unit[]; value: n
   return (
     <select className="k-input px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="Version">
       {versions.map((v, i) => (
-        <option key={v.id} value={i}>
+        <SelectItem key={v.id} value={i}>
           v{v.version} · day {v.day}
-        </option>
+        </SelectItem>
       ))}
     </select>
   );

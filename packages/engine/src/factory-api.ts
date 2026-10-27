@@ -24,7 +24,7 @@
  *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another factory)
  *   GET  /objects?outcome=              -> ApiObjectDynasty[]
  *   POST /objects         ApiNewObjectVersion -> ApiObjectDynasty (upgrade, fork or new dynasty)
- *   GET  /scripts?pipeId=               -> ApiScriptStats[]
+ *   GET  /scripts?legId=                -> ApiScriptStats[]
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
  *   GET  /research                      -> ApiChoicePoint[]
  *   GET  /choices?campaignId=&leadId=   -> ApiChoice[]
@@ -34,6 +34,7 @@
  */
 
 import type { CatalogueData, OutcomeId } from "./catalogue";
+import type { Condition } from "./tactics";
 import type { LedgerReport } from "./ledger";
 import type { Pin } from "./world";
 
@@ -75,43 +76,72 @@ export interface ApiNewBrand {
   leads?: { email?: string; firstName?: string; lastName?: string; company?: string; title?: string; domain?: string }[];
 }
 
-export interface ApiFunnelLeg {
+/** One step of a sales path (a view): from one lead state to the next. */
+export interface ApiFunnelStep {
   from: OutcomeId;
   to: OutcomeId;
-  pipeId: string;
-  /** Every pipe the leg runs through, in the order they run. */
-  pipes: string[];
+  /** The leg that makes the step's end. */
+  legId: string;
+  /** Every leg the step runs through, in the order they run. */
+  legs: string[];
   costPerAttemptCents: number;
   yieldRate: number;
-  leadsNeeded: number;
+  /** Attempts this step makes per Target Unit. */
+  attemptsPerTarget: number;
+  /** Cost of this step per outcome it makes: its own cost per attempt over its yield. */
+  costOfStepCents: number;
+  /** Cost from Start: what one Unit of the step's end costs, every step before it included (the one the return reads). */
+  costFromStartCents: number;
   costPerTargetCents: number;
   label: "expected" | "measured";
 }
 
+/** A sales funnel the factory would run toward a Target today (a view, ranked by value per dollar). */
 export interface ApiRankedFunnel {
   id: string;
   name: string;
   pathName: string;
   line: OutcomeId[];
-  legs: ApiFunnelLeg[];
+  steps: ApiFunnelStep[];
   costPerTargetCents: number;
   valuePerDollar: number;
   label: "expected" | "measured";
 }
 
+/** A branch of a campaign's production tree: the share of an outcome's Units one leg made, and its cost per Unit. */
+export interface ApiTreeBranch {
+  legId: string;
+  units: number;
+  share: number;
+  costPerUnitCents: number | null;
+}
+
+/** One outcome of a campaign's production tree (a view of the tree actually used). */
+export interface ApiTreeOutcome {
+  outcome: OutcomeId;
+  units: number;
+  branches: ApiTreeBranch[];
+}
+
 /**
- * A new Campaign orders production: its funnel names its start outcome (Start:
- * proactive, it pulls; any other outcome: reactive, it pushes each landed Unit)
- * and its target; it carries a daily budget and an optional volume per period.
+ * A new Campaign orders production. It fixes only its Target, its start
+ * (Start: proactive, it pulls; any other outcome: reactive, it pushes each
+ * landed Unit up), its budget and its strategy. The production tree is
+ * rebuilt at every tick from performance.
  */
 export interface ApiNewCampaign {
   brandId: string;
-  funnelId: string;
+  /** "start" (the market) or the outcome whose Units it pushes. */
+  start: OutcomeId;
+  /** The outcome it orders. */
+  target: OutcomeId;
   /** At most this many new subjects per period. */
   volume?: { units: number; periodDays: number } | null;
   /** Hard daily cap: no run starts once today's spend would pass it. */
   dailyBudgetCents: number;
-  /** Strategy id per pipe; a pipe left out plays its default strategy. */
+  /** Its strategy: conditions every script it runs meets, wherever the script carries the tactic ("Channel is cold email"). */
+  conditions?: Condition[];
+  /** Strategy id per leg; a leg left out plays its default strategy. */
   strategies?: Record<string, string>;
 }
 
@@ -124,8 +154,9 @@ export interface ApiCampaign {
   id: string;
   brandId: string;
   name: string;
-  funnelId: string;
-  funnelName: string;
+  /** The sales funnel and sales path its tree runs (views with a short name, never a control), null before its first tick. */
+  salesFunnel: { id: string; name: string } | null;
+  salesPath: { id: string; name: string } | null;
   /** START (the market: the campaign pulls), or the outcome whose Units it pushes. */
   start: OutcomeId;
   /** The outcome it orders. */
@@ -137,6 +168,7 @@ export interface ApiCampaign {
   spentTotalCents: number;
   /** Today's spend reached the cap: nothing more runs until tomorrow (UTC). */
   capReached: boolean;
+  conditions: Condition[];
   strategies: Record<string, string>;
   counts: ApiOutcomeCounts;
   createdAt: string;
@@ -151,12 +183,12 @@ export interface ApiCampaign {
   factory?: string;
 }
 
-export interface ApiOption {
+export interface ApiCandidate {
   id: string;
   label: string;
-  /** Mean of the belief about the share of decisions reaching the leg's end. */
+  /** Mean of the belief about the share of decisions reaching the next lead state. */
   rateMean: number;
-  /** Mean of the belief about the dollars from the decision to the leg's end, cents. */
+  /** Mean of the belief about the dollars from the decision to the next lead state, cents. */
   costMeanCents: number;
   /** Value per dollar at the means. */
   meanScore: number;
@@ -167,12 +199,14 @@ export interface ApiOption {
 }
 
 export interface ApiChoicePoint {
-  /** `pipeId|material` (the consuming pipe and the Material), or `pipeId` for the pipe's own script. */
+  /** `legId|material` (the consuming leg and the Material), or `legId` for the leg's own script. */
   id: string;
-  pipeId: string;
+  legId: string;
   material: OutcomeId | null;
   label: string;
-  options: ApiOption[];
+  /** What competes there: scripts (a producer), Units (a template, an ICP) or legs (the play of a step). */
+  chooses: "script" | "unit" | "leg";
+  candidates: ApiCandidate[];
 }
 
 export interface ApiChoice {
@@ -185,11 +219,11 @@ export interface ApiChoice {
   pointLabel: string;
   chosen: string;
   chosenLabel: string;
-  /** Each option as scored at the moment of the choice (one Thompson draw). */
-  options: { id: string; label: string; meanScore: number; sampledScore: number }[];
+  /** Each candidate as scored at the moment of the choice (one Thompson draw). */
+  candidates: { id: string; label: string; meanScore: number; sampledScore: number }[];
   /** Why, in plain words. */
   reason: string;
-  /** Reached the end of its leg (credited through traceability). */
+  /** Reached the next lead state (credited through traceability). */
   credited: boolean;
 }
 
@@ -198,7 +232,7 @@ export interface ApiRun {
   at: string;
   campaignId: string | null;
   brandId: string | null;
-  pipeId: string;
+  legId: string;
   scriptId: string;
   scriptName: string;
   leadId: string | null;
@@ -224,7 +258,7 @@ export interface ApiOverview {
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
   /**
    * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=),
-   * a pipe pin its scripts (GET /scripts?pipeId=). The factory ships its own (Templates, LLMs).
+   * a leg pin its scripts (GET /scripts?legId=). The factory ships its own (Templates, LLMs).
    */
   pins?: Pin[];
 }
@@ -232,7 +266,10 @@ export interface ApiOverview {
 export interface ApiCampaignDetail {
   campaign: ApiCampaign;
   brand: ApiBrand;
-  funnel: ApiRankedFunnel | null;
+  /** The steps of the sales path its tree runs today. */
+  steps: ApiFunnelStep[];
+  /** The production tree actually used over the last 7 days. */
+  tree: ApiTreeOutcome[];
   /** Spend per UTC day, oldest first. */
   spendByDay: { day: string; cents: number }[];
   points: ApiChoicePoint[];
@@ -262,7 +299,7 @@ export interface ApiLead {
   email: string | null;
   company: string | null;
   title: string | null;
-  /** The furthest outcome reached, by the order of the campaign's line. */
+  /** The furthest lead state reached. */
   state: OutcomeId;
   reached: OutcomeId[];
   updatedAt: string;
@@ -311,7 +348,7 @@ export interface ApiScriptStats {
   id: string;
   dynasty: string;
   version: number;
-  pipeId: string;
+  legId: string;
   name: string;
   kind: "rules" | "ai" | "human";
   status: "active" | "retired";
@@ -327,7 +364,7 @@ export interface ApiScriptStats {
 export interface ApiLedger {
   totalCents: number;
   byDay: { day: string; cents: number }[];
-  byPipe: { pipeId: string; runs: number; spentCents: number; outputs: number }[];
+  byLeg: { legId: string; runs: number; spentCents: number; outputs: number }[];
   byScript: { scriptId: string; name: string; runs: number; spentCents: number }[];
   byVendor: { vendor: string; item: string; quantity: number; cents: number }[];
   byCampaign: { campaignId: string; name: string; spentCents: number }[];

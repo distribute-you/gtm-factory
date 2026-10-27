@@ -3,9 +3,9 @@
 The dashboard reads one of two data sources, chosen at build time:
 
 - **simulator** (default): the fictional world, computed in the browser. This is the GitHub Pages build.
-- **api**: a running factory. The dashboard reads and writes a factory backend over JSON: brands, campaigns (start outcome, target, launch, pause, daily cap, volume), leads and their Units with their traceability, brand dynasties (templates), scripts (LLMs), the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
+- **api**: a running factory. The dashboard reads and writes a factory backend over JSON: brands, campaigns (start, Target, strategy, launch, pause, daily cap, volume; their steps and production tree), leads and their Units with their traceability, brand dynasties (templates), scripts (LLMs), the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
 
-The contract is [`packages/engine/src/factory-api.ts`](../packages/engine/src/factory-api.ts): every endpoint and every shape, typed. A factory implements it under one base URL. Every figure is computed by the factory; the dashboard divides nothing. Pins (the sidebar's pinned outcomes and pipes) are the factory's data too (`ApiOverview.pins`).
+The contract is [`packages/engine/src/factory-api.ts`](../packages/engine/src/factory-api.ts): every endpoint and every shape, typed. A factory implements it under one base URL. Every figure is computed by the factory; the dashboard divides nothing. Pins (the sidebar's pinned outcomes and legs) are the factory's data too (`ApiOverview.pins`).
 
 ## Build it
 
@@ -31,15 +31,15 @@ Put the factory API on the same origin under `/api` (a reverse proxy routing `/a
 | GET | `/overview` | `ApiOverview`: catalogue, brands, campaigns, totals, recent choices and runs, scheduler, pins |
 | GET | `/catalogue` | `CatalogueData` |
 | GET, POST | `/brands` | `ApiBrand[]`; create from `ApiNewBrand` |
-| GET | `/brands/:id/funnels` | `ApiRankedFunnel[]`, best value per dollar first |
-| GET, POST | `/campaigns` | `ApiCampaign[]`; create from `ApiNewCampaign`, always paused |
-| GET, PATCH | `/campaigns/:id` | `ApiCampaignDetail`; PATCH `{ dailyBudgetCents }` |
+| GET | `/brands/:id/funnels` | `ApiRankedFunnel[]`: the sales funnels a tree can run (views), best value per dollar first |
+| GET, POST | `/campaigns` | `ApiCampaign[]`; create from `ApiNewCampaign` (brand, start, Target, budget, strategy), always paused |
+| GET, PATCH | `/campaigns/:id` | `ApiCampaignDetail` (its steps, production tree, choice points); PATCH `{ dailyBudgetCents }` |
 | POST | `/campaigns/:id/launch`, `/campaigns/:id/pause` | `ApiCampaign` |
 | GET | `/leads?campaignId=&brandId=&state=` | `ApiLead[]` |
 | GET | `/leads/:id` | `ApiLeadDetail` |
 | POST | `/leads/:id/outcomes` | `{ outcome }` reported by another factory |
 | GET, POST | `/objects?outcome=` | `ApiObjectDynasty[]`; POST `ApiNewObjectVersion` (upgrade, fork or new dynasty) |
-| GET | `/scripts?pipeId=` | `ApiScriptStats[]` |
+| GET | `/scripts?legId=` | `ApiScriptStats[]` |
 | POST | `/scripts/:id/retire`, `/scripts/:id/restore` | `ApiScriptStats` |
 | GET | `/research` | `ApiChoicePoint[]` |
 | GET | `/choices?campaignId=&leadId=` | `ApiChoice[]` |

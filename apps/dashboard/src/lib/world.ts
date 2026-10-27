@@ -29,11 +29,11 @@ export type SimAction =
   | { type: "launch"; client: WorldClient }
   | { type: "status"; campaignId: string; status: "running" | "paused" }
   | { type: "budget"; campaignId: string; dailyBudgetCents: number }
-  | { type: "strategy"; campaignId: string; pipeId: string; strategyId: string }
+  | { type: "strategy"; campaignId: string; legId: string; strategyId: string }
   | { type: "retire"; kind: CatalogueKind; id: string }
   | { type: "restore"; kind: CatalogueKind; id: string }
   | { type: "upgradeScript"; dynasty: string; id: string; name: string; costCents?: number }
-  | { type: "forkScript"; parentDynasty: string; script: Omit<Script, "parentDynasty" | "version" | "pipeId" | "status"> }
+  | { type: "forkScript"; parentDynasty: string; script: Omit<Script, "parentDynasty" | "version" | "legId" | "status"> }
   | { type: "objectVersion"; brandId: string; outcome: string; dynasty: string; text: string; name?: string }
   | { type: "objectFork"; brandId: string; outcome: string; parentDynasty: string; dynasty: string; text: string; name?: string };
 
@@ -60,7 +60,7 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
       session.setCampaignBudget(action.campaignId, action.dailyBudgetCents);
       return;
     case "strategy":
-      session.setCampaignStrategy(action.campaignId, action.pipeId, action.strategyId);
+      session.setCampaignStrategy(action.campaignId, action.legId, action.strategyId);
       return;
     case "retire":
       c.retire(action.kind, action.id);

@@ -5,11 +5,11 @@ import { describeCondition, describeTacticType, Catalogue, type CatalogueData } 
 import { Mark } from "@/components/mark";
 import { CardTable, Page, PageHeader, TD, TDN, TH, Tabs, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { factoryTitle, outcomeName, pipeTitle } from "@/lib/api/labels";
+import { factoryTitle, outcomeName, legTitle } from "@/lib/api/labels";
 import { formatCents } from "@/lib/format";
 import { Read } from "./common";
 
-type Tab = "outcomes" | "pipes" | "scripts" | "tactics" | "strategies";
+type Tab = "outcomes" | "legs" | "scripts" | "tactics" | "strategies";
 
 export function ApiCataloguePage() {
   const read = useApi<CatalogueData>("/catalogue", 60_000);
@@ -26,7 +26,7 @@ export function ApiCataloguePage() {
 }
 
 function CatalogueView({ c }: { c: CatalogueData }) {
-  const [tab, setTab] = useState<Tab>("pipes");
+  const [tab, setTab] = useState<Tab>("legs");
   const cat = new Catalogue(c);
   return (
     <>
@@ -36,7 +36,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         onChange={setTab}
         tabs={[
           { id: "outcomes", label: "Outcomes", count: c.outcomes.length },
-          { id: "pipes", label: "Pipes", count: c.pipes.length },
+          { id: "legs", label: "Legs", count: c.legs.length },
           { id: "scripts", label: "Scripts", count: c.scripts.length },
           { id: "tactics", label: "Tactics", count: c.tactics.length },
           { id: "strategies", label: "Strategies", count: c.strategies.length },
@@ -70,11 +70,11 @@ function CatalogueView({ c }: { c: CatalogueData }) {
           </tbody>
         </CardTable>
       )}
-      {tab === "pipes" && (
+      {tab === "legs" && (
         <CardTable>
           <thead>
             <tr className="k-line-subtle border-b">
-              <th className={TH}>Pipe</th>
+              <th className={TH}>Leg</th>
               <th className={`${TH} w-full`}>Bill of materials to output</th>
               <th className={TH}>Factory</th>
               <th className={TH}>Runs on</th>
@@ -82,17 +82,17 @@ function CatalogueView({ c }: { c: CatalogueData }) {
             </tr>
           </thead>
           <tbody>
-            {c.pipes.map((p) => (
+            {c.legs.map((p) => (
               <tr key={p.id} className="k-row k-line-subtle border-b last:border-b-0">
                 <td className={`${TD} whitespace-nowrap`}>
                   <span className="inline-flex items-center gap-2">
-                    <Mark kind="pipe" id={p.id} icon={p.icon} size={20} />
+                    <Mark kind="leg" id={p.id} icon={p.icon} size={20} />
                     {p.name}
                     {p.retired && <ToneDot tone="muted">Retired</ToneDot>}
                   </span>
                 </td>
                 <td className={`${TD} k-fg2`}>
-                  {p.materials.length ? p.materials.map((i) => outcomeName(c, i)).join(" + ") : p.webhook ? "A webhook call" : "The market"} → <span className="k-fg">{outcomeName(c, p.output)}</span>
+                  {cat.subjectMaterial(p) ? outcomeName(c, cat.subjectMaterial(p)!) : p.webhook ? "A webhook call" : "The market"} → <span className="k-fg">{outcomeName(c, p.output)}</span>
                 </td>
                 <td className={`${TD} whitespace-nowrap`}>{factoryTitle(c, p.factory)}</td>
                 <td className={`${TD} k-fg2 whitespace-nowrap`}>{p.webhook ? "A webhook call" : cat.createsSubjects(p) ? "A pull from Start" : "A pull or a push"}</td>
@@ -107,7 +107,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Script</th>
-              <th className={TH}>Pipe</th>
+              <th className={TH}>Leg</th>
               <th className={TH}>Kind</th>
               <th className={`${TH} w-full`}>Tactics</th>
               <th className={`${TH} text-right`}>Expected per run</th>
@@ -124,7 +124,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
                     <span className="k-chip">v{s.version}</span>
                   </span>
                 </td>
-                <td className={`${TD} k-fg2 whitespace-nowrap`}>{pipeTitle(c, s.pipeId)}</td>
+                <td className={`${TD} k-fg2 whitespace-nowrap`}>{legTitle(c, s.legId)}</td>
                 <td className={`${TD} k-fg2`}>{s.kind === "ai" ? "AI" : s.kind === "human" ? "Person" : "Rules"}</td>
                 <td className={TD}>
                   <span className="flex flex-wrap gap-1">
@@ -174,7 +174,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Strategy</th>
-              <th className={TH}>Pipe</th>
+              <th className={TH}>Leg</th>
               <th className={`${TH} w-full`}>Conditions</th>
             </tr>
           </thead>
@@ -187,7 +187,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
                     {s.name}
                   </span>
                 </td>
-                <td className={`${TD} k-fg2 whitespace-nowrap`}>{pipeTitle(c, s.pipeId)}</td>
+                <td className={`${TD} k-fg2 whitespace-nowrap`}>{legTitle(c, s.legId)}</td>
                 <td className={`${TD} k-fg2`}>
                   {[
                     ...s.rules.flatMap((r) => r.conditions.map((cd) => `${r.material ? `At ${outcomeName(c, r.material).toLowerCase()}: ` : ""}${describeCondition(cd, cat)}`)),

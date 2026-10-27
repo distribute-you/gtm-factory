@@ -1,26 +1,26 @@
 /**
  * Read models of the engine pages (Research, Catalogue, Ledger). Figures only: pages divide
- * nothing. Nothing here knows an outcome, a pipe or a script by name.
+ * nothing. Nothing here knows an outcome, a leg or a script by name.
  */
 
 import type { PointConvergence } from "@gtm-factory/engine";
 import { convergenceOf, pluggedAt, pointInfo, type Model, type PluggedInput, type PointInfo } from "./model";
 
 export interface PointGroup {
-  /** The consuming pipe's id, or "leg" for a leg's own choices. */
+  /** The consuming leg's id, or "step" for a step's own choices. */
   key: string;
   title: string;
   points: { info: PointInfo; conv: PointConvergence }[];
 }
 
-/** Choice points grouped by the pipe that consumes the Material (a leg's own choices together). */
+/** Choice points grouped by the leg that consumes the Material (a step's own choices together). */
 export function pointGroups(model: Model): PointGroup[] {
   const groups = new Map<string, PointGroup>();
   for (const conv of convergenceOf(model)) {
     const info = pointInfo(model.catalogue, conv.point);
-    const key = info.consumer?.id ?? "leg";
+    const key = info.consumer?.id ?? "step";
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, title: info.consumer?.name ?? "Plays of each leg", points: [] }));
+    if (!g) groups.set(key, (g = { key, title: info.consumer?.name ?? "Plays of each step", points: [] }));
     g.points.push({ info, conv });
   }
   return [...groups.values()];
@@ -37,12 +37,12 @@ export function recentShare(conv: PointConvergence, days = 7): number | null {
   return p > 0 ? b / p : null;
 }
 
-/** Provider pipes plugged at two Materials or more, with the best script at each. */
-export function multiPlugged(model: Model): { pipeId: string; inputs: PluggedInput[] }[] {
-  const out: { pipeId: string; inputs: PluggedInput[] }[] = [];
-  for (const p of model.catalogue.pipes) {
+/** Provider legs plugged at two Materials or more, with the best script at each. */
+export function multiPlugged(model: Model): { legId: string; inputs: PluggedInput[] }[] {
+  const out: { legId: string; inputs: PluggedInput[] }[] = [];
+  for (const p of model.catalogue.legs) {
     const inputs = pluggedAt(model, p.id).filter((x) => x.info.consumer);
-    if (inputs.length >= 2) out.push({ pipeId: p.id, inputs });
+    if (inputs.length >= 2) out.push({ legId: p.id, inputs });
   }
   return out;
 }
@@ -51,16 +51,16 @@ export interface FactoryFigures {
   id: string;
   name: string;
   ours: boolean;
-  pipes: string[];
+  legs: string[];
   runs: number;
   units: number;
   spendCents: number;
 }
 
-/** What each factory ran: its pipes, runs, Units and what it cost (our spend or an access cost). */
+/** What each factory ran: its legs, runs, Units and what it cost (our spend or an access cost). */
 export function factoryFigures(model: Model): FactoryFigures[] {
   return model.catalogue.factories.map((f) => {
-    const pipes = model.catalogue.pipes.filter((p) => p.factory === f.id).map((p) => p.id);
+    const legs = model.catalogue.legs.filter((p) => p.factory === f.id).map((p) => p.id);
     let runs = 0;
     let spend = 0;
     for (const r of model.session.runs) {
@@ -69,7 +69,7 @@ export function factoryFigures(model: Model): FactoryFigures[] {
       spend += r.spendCents;
     }
     const units = model.session.units.filter((o) => o.factory === f.id).length;
-    return { id: f.id, name: f.name, ours: f.ours, pipes, runs, units, spendCents: spend };
+    return { id: f.id, name: f.name, ours: f.ours, legs, runs, units, spendCents: spend };
   });
 }
 

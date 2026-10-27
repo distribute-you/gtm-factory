@@ -87,11 +87,11 @@ function Today({ o }: { o: ApiOverview }) {
                 <tr key={c.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>
                     <Link href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="flex min-w-0 items-center gap-2.5">
-                      <Mark kind="funnel" id={c.funnelId} size={28} />
+                      <Mark kind="outcome" id={c.target} size={28} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{c.name}</span>
                         <span className="k-fg3 block truncate text-[12px]">
-                          {brandName(c.brandId)} · {c.funnelName}
+                          {brandName(c.brandId)} · {c.salesFunnel?.name ?? "Not run yet"}
                         </span>
                       </span>
                     </Link>

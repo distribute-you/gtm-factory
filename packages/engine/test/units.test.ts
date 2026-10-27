@@ -6,7 +6,7 @@ import {
   candidateCuts,
   chainCostPerTarget,
   costForwardLine,
-  legBreakdown,
+  stepBreakdown,
   meets,
   pickFromMarket,
   scriptAccepts,
@@ -23,17 +23,17 @@ describe("the catalogue", () => {
   it("loads the fictional world's catalogue without an issue", () => {
     const c = new Catalogue(worldData().catalogue);
     expect(c.validate()).toEqual([]);
-    expect(c.strategies.filter((s) => s.id.endsWith("#default"))).toHaveLength(c.pipes.length);
+    expect(c.strategies.filter((s) => s.id.endsWith("#default"))).toHaveLength(c.legs.length);
   });
 
-  it("finds where a pipe's subject comes from by walking its subject Materials", () => {
+  it("finds where a leg's subject comes from by walking its scripts' subject Materials", () => {
     const c = new Catalogue(worldData().catalogue);
-    expect([...c.rootsOf(c.pipe("reply_judging")!)].sort()).toEqual(["start"]);
+    expect([...c.rootsOf(c.leg("reply_judging")!)].sort()).toEqual(["start"]);
     // A campaign starting from Message sent reaches the reply judge through the follow-up.
-    expect([...c.rootsOf(c.pipe("reply_judging")!, new Set(["message_sent"]))].sort()).toEqual(["message_sent", "start"]);
-    expect([...c.rootsOf(c.pipe("ai_booking")!)]).toEqual(["lead_interested"]);
-    expect(c.createsSubjects(c.pipe("sourcing")!)).toBe(true);
-    expect(c.createsSubjects(c.pipe("llm")!)).toBe(false);
+    expect([...c.rootsOf(c.leg("reply_judging")!, new Set(["message_sent"]))].sort()).toEqual(["message_sent", "start"]);
+    expect([...c.rootsOf(c.leg("ai_booking")!)]).toEqual(["lead_interested"]);
+    expect(c.createsSubjects(c.leg("sourcing")!)).toBe(true);
+    expect(c.createsSubjects(c.leg("llm")!)).toBe(false);
   });
 
   it("upgrades a dynasty (same dynasty, next version runs) and forks one (new dynasty, its parent named)", () => {
@@ -91,24 +91,24 @@ describe("typed tactics", () => {
   });
 });
 
-describe("pipe storage", () => {
-  it("hands a script its own pipe's storage and nothing that reaches another one", () => {
+describe("leg storage", () => {
+  it("hands a script its own leg's storage and nothing that reaches another one", () => {
     const house = new StorageHouse();
-    const a = house.forPipe("sourcing");
-    const b = house.forPipe("identity");
+    const a = house.forLeg("sourcing");
+    const b = house.forLeg("identity");
     a.set("picked", "p1", 3);
     expect(b.get("picked", "p1")).toBeUndefined();
-    expect(house.forPipe("sourcing").get("picked", "p1")).toBe(3);
-    // The storage a script holds offers four calls on its own tables: no pipe id, no way out.
+    expect(house.forLeg("sourcing").get("picked", "p1")).toBe(3);
+    // The storage a script holds offers four calls on its own tables: no leg id, no way out.
     expect(Object.keys(a).sort()).toEqual(["count", "delete", "get", "set"]);
     expect(Object.isFrozen(a)).toBe(true);
     const ctx: ScriptContext = { storage: a, day: 0, tactics: {} };
     expect(Object.keys(ctx).sort()).toEqual(["day", "storage", "tactics"]);
   });
 
-  it("keeps a script's own business rules in its pipe storage: recontact window, retry window", () => {
+  it("keeps a script's own business rules in its leg storage: recontact window, retry window", () => {
     const house = new StorageHouse();
-    const ctx = (day: number, tactics: Record<string, number>): ScriptContext => ({ storage: house.forPipe("p"), day, tactics });
+    const ctx = (day: number, tactics: Record<string, number>): ScriptContext => ({ storage: house.forLeg("p"), day, tactics });
     let i = 0;
     const market = { draw: () => [1, 1, 2][i++ % 3]!, inIcp: () => true, keyOf: (x: number) => `b:p${x}` };
     expect(pickFromMarket(ctx(0, { recontact_days: 30 }), market)?.index).toBe(1);
@@ -130,7 +130,7 @@ describe("the two calculations", () => {
   it("costs forward and values backward", () => {
     expect(costForwardLine(meeting).map((x) => Math.round(x * 100) / 100)).toEqual([50, 130, 700]);
     expect(chainCostPerTarget(meeting)).toBeCloseTo(700, 9);
-    expect(legBreakdown(meeting).map((l) => Math.round(l.leadsNeeded * 100) / 100)).toEqual([625, 12.5, 5]);
+    expect(stepBreakdown(meeting).map((l) => Math.round(l.attemptsPerTarget * 100) / 100)).toEqual([625, 12.5, 5]);
     const v = valueBackwardLine(meeting, 2100);
     expect(v.values.map((x) => Math.round(x * 100) / 100)).toEqual([2.24, 162, 410, 2100]);
   });

@@ -1,15 +1,15 @@
 /**
- * Storage: one database schema per pipe. The scripts of a pipe share their
- * pipe's storage; nobody else reads or writes it. Across pipes, data moves
+ * Storage: one database schema per leg. The scripts of a leg share their
+ * leg's storage; nobody else reads or writes it. Across legs, data moves
  * only through consumed outcome Units. A script receives the storage of
- * its own pipe and nothing that could reach another one: there is no lookup by
- * pipe id on the interface it is handed.
+ * its own leg and nothing that could reach another one: there is no lookup by
+ * leg id on the interface it is handed.
  */
 
 export type StoredValue = string | number | boolean | null | StoredValue[] | { [k: string]: StoredValue };
 
-/** The storage a script sees: its pipe's tables, nothing else. */
-export interface PipeStorage {
+/** The storage a script sees: its leg's tables, nothing else. */
+export interface LegStorage {
   get(table: string, key: string): StoredValue | undefined;
   set(table: string, key: string, value: StoredValue): void;
   delete(table: string, key: string): void;
@@ -17,8 +17,8 @@ export interface PipeStorage {
   count(table: string): number;
 }
 
-/** In-memory storage of one pipe (the simulator's implementation). */
-class MemoryPipeStorage implements PipeStorage {
+/** In-memory storage of one leg (the simulator's implementation). */
+class MemoryLegStorage implements LegStorage {
   readonly tables = new Map<string, Map<string, StoredValue>>();
   get(table: string, key: string): StoredValue | undefined {
     return this.tables.get(table)?.get(key);
@@ -36,23 +36,23 @@ class MemoryPipeStorage implements PipeStorage {
   }
 }
 
-/** A read-only view of one pipe's storage, for reports: table name, row count, a few rows. */
+/** A read-only view of one leg's storage, for reports: table name, row count, a few rows. */
 export interface StorageReport {
-  pipeId: string;
+  legId: string;
   tables: { name: string; rows: number; sample: { key: string; value: StoredValue }[] }[];
 }
 
 /**
- * Holds one storage per pipe. Only the engine holds it: a script is handed
- * `forPipe(itsOwnPipe)` and never this object.
+ * Holds one storage per leg. Only the engine holds it: a script is handed
+ * `forLeg(itsOwnPipe)` and never this object.
  */
 export class StorageHouse {
-  private readonly byPipe = new Map<string, MemoryPipeStorage>();
+  private readonly byLeg = new Map<string, MemoryLegStorage>();
 
-  /** The storage of one pipe. The engine calls this with the pipe of the running script only. */
-  forPipe(pipeId: string): PipeStorage {
-    let s = this.byPipe.get(pipeId);
-    if (!s) this.byPipe.set(pipeId, (s = new MemoryPipeStorage()));
+  /** The storage of one leg. The engine calls this with the leg of the running script only. */
+  forLeg(legId: string): LegStorage {
+    let s = this.byLeg.get(legId);
+    if (!s) this.byLeg.set(legId, (s = new MemoryLegStorage()));
     return Object.freeze({
       get: s.get.bind(s),
       set: s.set.bind(s),
@@ -61,8 +61,8 @@ export class StorageHouse {
     });
   }
 
-  report(pipeId: string, sampleSize = 5): StorageReport {
-    const s = this.byPipe.get(pipeId);
+  report(legId: string, sampleSize = 5): StorageReport {
+    const s = this.byLeg.get(legId);
     const tables = s
       ? [...s.tables].map(([name, rows]) => ({
           name,
@@ -70,6 +70,6 @@ export class StorageHouse {
           sample: [...rows].slice(-sampleSize).map(([key, value]) => ({ key, value })),
         }))
       : [];
-    return { pipeId, tables };
+    return { legId, tables };
   }
 }

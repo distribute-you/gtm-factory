@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/engine";
-import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar } from "@/components/ui";
+import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
@@ -37,19 +37,19 @@ export function ApiLeadsPage() {
         <PageHeader title={read.data ? plural(read.data.length, "lead", "leads") : "Leads"} sub="Every person a campaign found, and the furthest outcome each one reached." />
         <div className="mb-4 flex flex-wrap gap-2">
           <select aria-label="Campaign" className="k-input px-1.5" style={{ font: "inherit" }} value={campaign} onChange={(e) => setFilter("campaign", e.target.value)}>
-            <option value="">Every campaign</option>
+            <SelectItem value="">Every campaign</SelectItem>
             {o?.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
+              <SelectItem key={c.id} value={c.id}>
                 {c.name}
-              </option>
+              </SelectItem>
             ))}
           </select>
           <select aria-label="State" className="k-input px-1.5" style={{ font: "inherit" }} value={state} onChange={(e) => setFilter("state", e.target.value)}>
-            <option value="">Every state</option>
+            <SelectItem value="">Every state</SelectItem>
             {leadStates.map((x) => (
-              <option key={x.id} value={x.id}>
+              <SelectItem key={x.id} value={x.id}>
                 {x.label}
-              </option>
+              </SelectItem>
             ))}
           </select>
         </div>

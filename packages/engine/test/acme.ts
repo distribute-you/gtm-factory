@@ -4,7 +4,7 @@ import { worldData } from "./helpers";
 /**
  * The worked pull example of docs/framework.md: one client, Acme, one campaign
  * ordering Meetings booked with a $10 daily budget and 20 new subjects a day,
- * one script per pipe and every yield at 1, so each tick reads like a story.
+ * one script per leg and every yield at 1, so each tick reads like a story.
  */
 export function acmeWorld(): WorldData {
   const w = worldData();
@@ -17,9 +17,9 @@ export function acmeWorld(): WorldData {
   client.organicPerDay = 0;
   client.truthMultiplier = 1;
   client.seeds = client.seeds.filter((s) => s.dynasty === "offer" || s.dynasty === "icp-client" || s.dynasty === "tpl-story");
-  client.campaigns = [{ ...client.campaigns[0]!, name: "Meetings for Acme", line: ["lead_interested", "meeting_booked"], dailyBudgetCents: 1000, volume: { units: 20, periodDays: 1 }, strategies: {} }];
+  client.campaigns = [{ ...client.campaigns[0]!, name: "Meetings for Acme", target: "meeting_booked", dailyBudgetCents: 1000, volume: { units: 20, periodDays: 1 }, strategies: {} }];
   w.clients = [client];
-  for (const p of Object.values(w.truth.pipes)) {
+  for (const p of Object.values(w.truth.legs)) {
     p.base = 1;
     p.delayMeanDays = 0;
     p.horizonDays = 0;

@@ -4,21 +4,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PushPinIcon, PushPinSlashIcon } from "@phosphor-icons/react";
-import { defaultStrategyId, describeCondition, describeTacticType, type Pipe, type Script } from "@gtm-factory/engine";
+import { defaultStrategyId, describeCondition, describeTacticType, type Leg, type Script } from "@gtm-factory/engine";
 import { BillOfMaterials, ProviderLogo, ScriptCard, tacticValueText } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { factoryName, headScript, optionLabel, outcomeLabel, pipeLine, pipeName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
+import { factoryName, headScript, candidateLabel, outcomeLabel, legLine, legName, pluggedAt, scriptFigures, type Model } from "@/lib/model";
 import { factoryFigures } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct } from "@/lib/format";
 import { pinHref, pinKey, togglePin, type Pin } from "@/lib/pins";
 import { campaignsRunning } from "@/lib/funnels";
 import { useSim } from "@/lib/sim";
 
-const TABS = ["outcomes", "pipes", "scripts", "paths", "tactics", "strategies", "factories"] as const;
+const TABS = ["outcomes", "legs", "scripts", "paths", "tactics", "strategies", "factories"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { paths: "Sales paths", outcomes: "Outcomes", pipes: "Pipes", scripts: "Scripts", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
+const TAB_LABEL: Record<Tab, string> = { paths: "Sales paths", outcomes: "Outcomes", legs: "Legs", scripts: "Scripts", tactics: "Tactics", strategies: "Strategies", factories: "Factories" };
 
 export function CataloguePage() {
   const { model } = useSim();
@@ -39,7 +39,7 @@ function Catalogue({ model }: { model: Model }) {
   const c = model.catalogue;
   const counts: Record<Tab, number> = {
     outcomes: c.outcomes.filter((x) => !x.retired).length,
-    pipes: c.pipes.filter((p) => c.isPipeLive(p)).length,
+    legs: c.legs.filter((p) => c.isLegLive(p)).length,
     scripts: new Set(c.scripts.filter((s) => s.status === "active").map((s) => s.dynasty)).size,
     paths: c.salesPaths.length,
     tactics: c.tactics.filter((t) => !t.retired).length,
@@ -51,14 +51,14 @@ function Catalogue({ model }: { model: Model }) {
       <PageHeader
         title={
           <>
-            {counts.pipes} pipes, {counts.scripts} scripts competing
+            {counts.legs} legs, {counts.scripts} scripts competing
           </>
         }
-        sub="Everything is data: outcomes, pipes and scripts, described by tactics and strategies. Add, upgrade, fork or retire while the factory runs."
+        sub="Everything is data: outcomes, legs and scripts, described by tactics and strategies. Add, upgrade, fork or retire while the factory runs."
       />
       <Tabs tabs={TABS.map((t) => ({ id: t, label: TAB_LABEL[t], count: counts[t] }))} value={tab} onChange={setTab} />
       {tab === "outcomes" && <Outcomes model={model} />}
-      {tab === "pipes" && <Pipes model={model} />}
+      {tab === "legs" && <Legs model={model} />}
       {tab === "scripts" && <Scripts model={model} />}
       {tab === "paths" && <SalesPaths model={model} />}
       {tab === "tactics" && <Tactics model={model} />}
@@ -73,7 +73,7 @@ function SalesPaths({ model }: { model: Model }) {
   const c = model.catalogue;
   return (
     <div className="space-y-6">
-      <p className="k-fg2 text-[13px]">A sales path is a straight line of lead states from a start outcome (Start, the market, or any outcome) to a target. A sales funnel is a path with one play per leg. Each gets a name the first time it is seen, and keeps it.</p>
+      <p className="k-fg2 text-[13px]">A sales path is a straight line of lead states from a start outcome (Start, the market, or any outcome) to a target. A sales funnel is a path with one play per step. Each gets a name the first time it is seen, and keeps it.</p>
       {c.salesPaths.length === 0 ? (
         <div className="k-card">
           <EmptyNote>No sales path has been run yet.</EmptyNote>
@@ -125,7 +125,7 @@ function PinButton({ pin }: { pin: Pin }) {
 }
 
 const SUBJECT: Record<string, string> = { lead: "A lead", company: "A company", brand: "The brand", run: "The run that asked" };
-const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", rating: "Beliefs per option", list: "A list", record: "A record", image: "An image" };
+const CONTENT: Record<string, string> = { text_with_variables: "Text with variables", text: "Plain text", audience: "A sentence about who", rating: "Beliefs per candidate", list: "A list", record: "A record", image: "An image" };
 
 function Outcomes({ model }: { model: Model }) {
   const c = model.catalogue;
@@ -169,8 +169,8 @@ function Outcomes({ model }: { model: Model }) {
                 <td className={TD}>{o.contentType ? CONTENT[o.contentType] : <span className="k-fg4">—</span>}</td>
                 <td className={TD}>
                   <span className="k-fg2 block max-w-[280px] truncate text-[12px]">
-                    {providers.map((p) => p.name).join(", ") || "No pipe yet"}
-                    {o.referencePipe ? ` · reference: ${pipeName(c, o.referencePipe)}` : ""}
+                    {providers.map((p) => p.name).join(", ") || "No leg yet"}
+                    {o.referenceLeg ? ` · reference: ${legName(c, o.referenceLeg)}` : ""}
                   </span>
                 </td>
                 <td className={TDN}>{formatCount(produced.get(o.id) ?? 0)}</td>
@@ -183,16 +183,16 @@ function Outcomes({ model }: { model: Model }) {
   );
 }
 
-function Pipes({ model }: { model: Model }) {
+function Legs({ model }: { model: Model }) {
   const c = model.catalogue;
   const [open, setOpen] = useState<string | null>(null);
-  const pipe = open ? c.pipe(open) : undefined;
+  const leg = open ? c.leg(open) : undefined;
   return (
     <>
-      <CardTable footer="A pipe turns its Bill of materials into one outcome. Each pipe pulls what it needs, or is pushed a Unit. Its scripts share its pipe storage: notes and references to Units, never copies.">
+      <CardTable footer="A leg turns its Bill of materials into one outcome. Each leg pulls what it needs, or is pushed a Unit. Its scripts share its leg storage: notes and references to Units, never copies.">
         <thead>
           <tr className="k-line-subtle border-b">
-            <th className={TH}>Pipe</th>
+            <th className={TH}>Leg</th>
             <th className={TH}>Bill of materials → output</th>
             <th className={TH}>Factory</th>
             <th className={TH}>Runs on</th>
@@ -202,19 +202,19 @@ function Pipes({ model }: { model: Model }) {
           </tr>
         </thead>
         <tbody>
-          {c.pipes.map((p) => {
+          {c.legs.map((p) => {
             const rows = model.session.storageReport(p.id).tables.reduce((s, t) => s + t.rows, 0);
             return (
               <tr key={p.id} className={`k-row k-line-subtle cursor-pointer border-b last:border-0 ${p.retired ? "k-fg3" : ""}`} onClick={() => setOpen(p.id)}>
                 <td className={TD}>
                   <span className="flex items-center gap-2">
-                    <Mark kind="pipe" id={p.id} icon={p.icon} size={22} />
+                    <Mark kind="leg" id={p.id} icon={p.icon} size={22} />
                     <span className="font-medium">{p.name}</span>
                     {p.retired && <span className="k-chip">Retired</span>}
                   </span>
                 </td>
                 <td className={TD}>
-                  <span className="k-fg2 block max-w-[380px] truncate text-[12px]">{pipeLine(c, p)}</span>
+                  <span className="k-fg2 block max-w-[380px] truncate text-[12px]">{legLine(c, p)}</span>
                 </td>
                 <td className={TD}>{c.isOurs(p) ? "Ours" : factoryName(c, p.factory)}</td>
                 <td className={TD}>{p.webhook ? "A webhook call" : c.createsSubjects(p) ? "A pull from Start" : "A pull or a push"}</td>
@@ -226,49 +226,49 @@ function Pipes({ model }: { model: Model }) {
           })}
         </tbody>
       </CardTable>
-      {pipe && <PipeDrawer model={model} pipe={pipe} onClose={() => setOpen(null)} />}
+      {leg && <LegDrawer model={model} leg={leg} onClose={() => setOpen(null)} />}
     </>
   );
 }
 
-function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClose: () => void }) {
+function LegDrawer({ model, leg, onClose }: { model: Model; leg: Leg; onClose: () => void }) {
   const { dispatch } = useSim();
   const c = model.catalogue;
-  const plugged = pluggedAt(model, pipe.id);
-  const storage = model.session.storageReport(pipe.id);
+  const plugged = pluggedAt(model, leg.id);
+  const storage = model.session.storageReport(leg.id);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Drawer title="Pipe" onClose={onClose} width={520}>
+    <Drawer title="Leg" onClose={onClose} width={520}>
       <div className="flex items-start gap-3">
-        <Mark kind="pipe" id={pipe.id} icon={pipe.icon} size={40} />
+        <Mark kind="leg" id={leg.id} icon={leg.icon} size={40} />
         <div className="min-w-0 flex-1">
-          <h2 className="text-[18px] font-medium">{pipe.name}</h2>
-          <p className="k-fg2 text-[13px]">{pipeLine(c, pipe)}</p>
-          {pipe.description && <p className="k-fg3 mt-1 text-[12px]">{pipe.description}</p>}
+          <h2 className="text-[18px] font-medium">{leg.name}</h2>
+          <p className="k-fg2 text-[13px]">{legLine(c, leg)}</p>
+          {leg.description && <p className="k-fg3 mt-1 text-[12px]">{leg.description}</p>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <PinButton pin={{ kind: "pipe", id: pipe.id, label: pipe.name, ...(pipe.icon ? { icon: pipe.icon } : {}) }} />
+        <PinButton pin={{ kind: "leg", id: leg.id, label: leg.name, ...(leg.icon ? { icon: leg.icon } : {}) }} />
         <button
           type="button"
           className="k-btn"
-          onClick={() => setError(dispatch({ type: pipe.retired ? "restore" : "retire", kind: "pipes", id: pipe.id }))}
+          onClick={() => setError(dispatch({ type: leg.retired ? "restore" : "retire", kind: "legs", id: leg.id }))}
         >
-          {pipe.retired ? "Restore" : "Retire"}
+          {leg.retired ? "Restore" : "Retire"}
         </button>
         {error && <span className="text-[12px] text-[var(--data-rose)]">{error}</span>}
       </div>
       <dl className="mt-4 grid grid-cols-[120px_minmax(0,1fr)] gap-y-2 text-[13px]">
         <dt className="k-label pt-0.5">Factory</dt>
-        <dd>{c.isOurs(pipe) ? "Ours" : `${factoryName(c, pipe.factory)} (another factory)`}</dd>
+        <dd>{c.isOurs(leg) ? "Ours" : `${factoryName(c, leg.factory)} (another factory)`}</dd>
         <dt className="k-label pt-0.5">Output</dt>
-        <dd>{outcomeLabel(c, pipe.output)}</dd>
+        <dd>{outcomeLabel(c, leg.output)}</dd>
         <dt className="k-label pt-0.5">Delay</dt>
-        <dd>{pipe.maturity.delayMeanDays ? `${pipe.maturity.delayMeanDays} days on average, up to ${pipe.maturity.horizonDays}` : "The next tick"}</dd>
+        <dd>{leg.maturity.delayMeanDays ? `${leg.maturity.delayMeanDays} days on average, up to ${leg.maturity.horizonDays}` : "The next tick"}</dd>
       </dl>
 
       <p className="k-label mb-1.5 mt-5">Bill of materials</p>
-      <BillOfMaterials model={model} pipe={pipe} />
+      <BillOfMaterials model={model} leg={leg} />
 
       <p className="k-label mb-1.5 mt-5">Where it is plugged</p>
       {plugged.length === 0 ? (
@@ -279,7 +279,7 @@ function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClos
             <Link key={p.point} href={`/research/?point=${encodeURIComponent(p.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
               <span className="min-w-0 flex-1 truncate">{p.info.title}</span>
               <span className="k-fg3 text-[12px]">best</span>
-              <span className="font-medium">{p.bestScript ? optionLabel(model, p.point, p.bestScript) : "—"}</span>
+              <span className="font-medium">{p.bestScript ? candidateLabel(model, p.point, p.bestScript) : "—"}</span>
             </Link>
           ))}
         </div>
@@ -287,13 +287,13 @@ function PipeDrawer({ model, pipe, onClose }: { model: Model; pipe: Pipe; onClos
 
       <p className="k-label mb-1.5 mt-5">Scripts</p>
       <div className="space-y-1.5">
-        {c.dynastiesOf(pipe.id).map((s) => (
+        {c.dynastiesOf(leg.id).map((s) => (
           <ScriptLine key={s.dynasty} model={model} script={s} />
         ))}
       </div>
 
-      <p className="k-label mb-1.5 mt-5">Pipe storage</p>
-      <p className="k-fg3 mb-2 text-[12px]">Private to this pipe's scripts. Other pipes get its data only through the Units it produces.</p>
+      <p className="k-label mb-1.5 mt-5">Leg storage</p>
+      <p className="k-fg3 mb-2 text-[12px]">Private to this leg's scripts. Other legs get its data only through the Units it produces.</p>
       {storage.tables.length === 0 ? (
         <EmptyNote>Nothing stored yet.</EmptyNote>
       ) : (
@@ -333,16 +333,16 @@ function ScriptLine({ model, script }: { model: Model; script: Script }) {
 function Scripts({ model }: { model: Model }) {
   const c = model.catalogue;
   const [open, setOpen] = useState<string | null>(null);
-  const groups = c.pipes
-    .map((p) => ({ pipe: p, dynasties: [...new Set(c.scripts.filter((s) => s.pipeId === p.id).map((s) => s.dynasty))] }))
+  const groups = c.legs
+    .map((p) => ({ leg: p, dynasties: [...new Set(c.scripts.filter((s) => s.legId === p.id).map((s) => s.dynasty))] }))
     .filter((g) => g.dynasties.length > 0);
   return (
     <>
       <div className="space-y-8">
         {groups.map((g) => (
-          <section key={g.pipe.id}>
-            <SectionTitle count={g.dynasties.length} right={<span>{pipeLine(c, g.pipe)}</span>}>
-              {g.pipe.name}
+          <section key={g.leg.id}>
+            <SectionTitle count={g.dynasties.length} right={<span>{legLine(c, g.leg)}</span>}>
+              {g.leg.name}
             </SectionTitle>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {g.dynasties.map((d) => (
@@ -367,7 +367,7 @@ function ScriptDrawer({ model, dynasty, onClose }: { model: Model; dynasty: stri
   const upgrade = () => setError(dispatch({ type: "upgradeScript", dynasty, id: `${dynasty}-v${next}-d${model.day}`, name: `${head.name} v${next}` }));
   const fork = () => {
     const id = `${dynasty}-fork-d${model.day}`;
-    setError(dispatch({ type: "forkScript", parentDynasty: dynasty, script: { id, dynasty: id, name: `${head.name}, fork`, kind: head.kind, tactics: { ...head.tactics }, costCents: head.costCents } }));
+    setError(dispatch({ type: "forkScript", parentDynasty: dynasty, script: { id, dynasty: id, name: `${head.name}, fork`, kind: head.kind, materials: head.materials, tactics: { ...head.tactics }, costCents: head.costCents } }));
   };
   return (
     <Drawer title="Script" onClose={onClose} width={480}>
@@ -397,7 +397,7 @@ function ScriptDrawer({ model, dynasty, onClose }: { model: Model; dynasty: stri
       <p className="k-fg3 mt-3 text-[12px]">Stats pool across the versions of a dynasty. A fork starts from its parent's belief.</p>
       <p className="k-label mb-1.5 mt-5">Where it is offered</p>
       <div className="k-inset divide-y divide-[var(--line-subtle)] rounded-[8px]">
-        {pluggedAt(model, head.pipeId).map((p) => (
+        {pluggedAt(model, head.legId).map((p) => (
           <Link key={p.point} href={`/research/?point=${encodeURIComponent(p.point)}`} className="k-hover flex items-center gap-2 px-3 py-2 text-[13px]">
             <span className="min-w-0 flex-1 truncate">{p.info.title}</span>
             {p.bestScript === dynasty && <span className="k-chip text-[var(--run)]">Best here</span>}
@@ -461,18 +461,18 @@ function Tactics({ model }: { model: Model }) {
 function Strategies({ model }: { model: Model }) {
   const c = model.catalogue;
   const users = (id: string) => model.campaigns.filter((x) => Object.values(x.strategies).includes(id));
-  const byPipe = c.pipes
-    .map((p) => ({ pipe: p, strategies: c.strategiesOf(p.id) }))
-    .filter((g) => g.strategies.some((s) => s.id !== defaultStrategyId(g.pipe.id)));
+  const byLeg = c.legs
+    .map((p) => ({ leg: p, strategies: c.strategiesOf(p.id) }))
+    .filter((g) => g.strategies.some((s) => s.id !== defaultStrategyId(g.leg.id)));
   return (
     <div className="space-y-6">
-      <p className="k-fg2 text-[13px]">A strategy is a set of conditions on tactics, for one pipe. Its rules attach to the Materials of the pipe. A campaign chooses one per pipe; a pipe it leaves out plays its default.</p>
-      {byPipe.map(({ pipe, strategies }) => (
-        <section key={pipe.id}>
-          <SectionTitle count={strategies.length}>{pipe.name}</SectionTitle>
+      <p className="k-fg2 text-[13px]">A strategy is a set of conditions on tactics, for one leg. Its rules attach to the Materials of the leg. A campaign chooses one per leg; a leg it leaves out plays its default.</p>
+      {byLeg.map(({ leg, strategies }) => (
+        <section key={leg.id}>
+          <SectionTitle count={strategies.length}>{leg.name}</SectionTitle>
           <div className="k-card divide-y divide-[var(--line-subtle)]">
             {strategies.map((s) => {
-              const isDefault = s.id === defaultStrategyId(pipe.id);
+              const isDefault = s.id === defaultStrategyId(leg.id);
               const used = users(s.id);
               return (
                 <div key={s.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
@@ -526,7 +526,7 @@ function Factories({ model }: { model: Model }) {
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>Factory</th>
-          <th className={TH}>Pipes</th>
+          <th className={TH}>Legs</th>
           <th className={`${TH} text-right`}>Runs</th>
           <th className={`${TH} text-right`}>Units</th>
           <th className={`${TH} text-right`}>Spent</th>
@@ -543,7 +543,7 @@ function Factories({ model }: { model: Model }) {
               </span>
             </td>
             <td className={TD}>
-              <span className="k-fg2 block max-w-[420px] truncate text-[12px]">{f.pipes.map((p) => pipeName(model.catalogue, p)).join(", ") || "—"}</span>
+              <span className="k-fg2 block max-w-[420px] truncate text-[12px]">{f.legs.map((p) => legName(model.catalogue, p)).join(", ") || "—"}</span>
             </td>
             <td className={TDN}>{formatCount(f.runs)}</td>
             <td className={TDN}>{formatCount(f.units)}</td>

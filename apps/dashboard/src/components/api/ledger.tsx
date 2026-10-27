@@ -4,7 +4,7 @@ import type { ApiLedger, CatalogueData } from "@gtm-factory/engine";
 import { BarSpark, CardTable, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
-import { outcomeName, pipeTitle } from "@/lib/api/labels";
+import { outcomeName, legTitle } from "@/lib/api/labels";
 import { formatCents, formatCentsExact, formatCount, formatUsd } from "@/lib/format";
 import { Read, RunsTable } from "./common";
 
@@ -87,20 +87,20 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
           </CardTable>
         </section>
         <section>
-          <SectionTitle count={l.byPipe.length}>By pipe</SectionTitle>
+          <SectionTitle count={l.byLeg.length}>By leg</SectionTitle>
           <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`}>Pipe</th>
+                <th className={`${TH} w-full`}>Leg</th>
                 <th className={`${TH} text-right`}>Runs</th>
                 <th className={`${TH} text-right`}>Outputs</th>
                 <th className={`${TH} text-right`}>Spent</th>
               </tr>
             </thead>
             <tbody>
-              {l.byPipe.map((p) => (
-                <tr key={p.pipeId} className="k-row k-line-subtle border-b last:border-b-0">
-                  <td className={TD}>{pipeTitle(catalogue, p.pipeId)}</td>
+              {l.byLeg.map((p) => (
+                <tr key={p.legId} className="k-row k-line-subtle border-b last:border-b-0">
+                  <td className={TD}>{legTitle(catalogue, p.legId)}</td>
                   <td className={TDN}>{formatCount(p.runs)}</td>
                   <td className={TDN}>{formatCount(p.outputs)}</td>
                   <td className={TDN}>{formatCentsExact(p.spentCents)}</td>

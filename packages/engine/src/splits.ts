@@ -33,7 +33,7 @@ export interface SplitRecord {
 
 export type Verdict = "conclusion" | "signal" | "noise";
 
-export interface SplitOptions {
+export interface SplitLimits {
   alpha?: number;
   minOutcomesPerSide?: number;
   minLeaderOutcomes?: number;
@@ -105,8 +105,8 @@ export function candidateCuts(tactic: Tactic, records: readonly SplitRecord[]): 
 }
 
 /** Apply the verdict rule to one cut. */
-export function verdictOf(crude: Table2x2, strata: readonly Table2x2[], tests: number, options: SplitOptions = {}) {
-  const o = { ...DEFAULTS, ...options };
+export function verdictOf(crude: Table2x2, strata: readonly Table2x2[], tests: number, candidates: SplitLimits = {}) {
+  const o = { ...DEFAULTS, ...candidates };
   const insideCounts = { successes: crude.a, trials: crude.a + crude.b };
   const outsideCounts = { successes: crude.c, trials: crude.c + crude.d };
   const rIn = insideCounts.trials > 0 ? insideCounts.successes / insideCounts.trials : 0;
@@ -123,8 +123,8 @@ export function verdictOf(crude: Table2x2, strata: readonly Table2x2[], tests: n
 }
 
 /** Every cut of every tactic with enough outcomes on both sides, with its verdict. */
-export function evaluateSplits(records: readonly SplitRecord[], tactics: readonly Tactic[], options: SplitOptions = {}): Split[] {
-  const o = { ...DEFAULTS, ...options };
+export function evaluateSplits(records: readonly SplitRecord[], tactics: readonly Tactic[], candidates: SplitLimits = {}): Split[] {
+  const o = { ...DEFAULTS, ...candidates };
   const tried: { tactic: string; inside: Condition; outside: Condition; crude: Table2x2 }[] = [];
   for (const t of tactics) {
     for (const [inside, outside] of candidateCuts(t, records)) {
@@ -164,8 +164,8 @@ export interface SplitStudy {
  * Grow the tree: at each node take the conclusion with the strongest
  * like-for-like evidence, keep its better side, and look again inside it.
  */
-export function studySplits(records: readonly SplitRecord[], tactics: readonly Tactic[], options: SplitOptions = {}): SplitStudy {
-  const o = { ...DEFAULTS, ...options };
+export function studySplits(records: readonly SplitRecord[], tactics: readonly Tactic[], candidates: SplitLimits = {}): SplitStudy {
+  const o = { ...DEFAULTS, ...candidates };
   const root = evaluateSplits(records, tactics, o);
   const conditions: Condition[] = [];
   const path: Split[] = [];

@@ -6,7 +6,7 @@ import { DayChart, Legend } from "@/components/charts";
 import { FunnelLine } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
 import { BarSpark, EmptyNote, Figure, Page, PageHeader, RoiLabel, SectionTitle, Shimmer, SparkLine, StatTile, TickGauge, TopBar } from "@/components/ui";
-import { costPerOutcomeSeries, cumulative, explainChoice, optionLabel, outcomeLabel, pointInfo, recentChoices, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
+import { costPerOutcomeSeries, cumulative, explainChoice, candidateLabel, outcomeLabel, pointInfo, recentChoices, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
 import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -232,7 +232,7 @@ export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campa
               <Mark kind="point" id={c.point} size={28} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px]">
-                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{optionLabel(model, c.point, c.chosenId, campaign?.brandId)}</span>
+                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{candidateLabel(model, c.point, c.chosenId, campaign?.brandId)}</span>
                 </p>
                 <p className="k-fg3 truncate text-[12px]">
                   {campaign?.name} · {explainChoice(model, c)}

@@ -11,7 +11,7 @@ import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/co
 import { Mark } from "@/components/mark";
 import { apiSend, type ApiRead } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
-import { factoryTitle, outcomeName, pipeTitle } from "@/lib/api/labels";
+import { factoryTitle, outcomeName, legTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi } from "@/lib/format";
 
 /** "3m ago", "2h ago", "4d ago". */
@@ -263,7 +263,7 @@ export function RunsTable({ runs, catalogue, empty = "No run yet." }: { runs: Ap
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
           <th className={TH}>Script</th>
-          <th className={TH}>Pipe</th>
+          <th className={TH}>Leg</th>
           <th className={TH}>Status</th>
           <th className={`${TH} w-full`}>What happened</th>
           <th className={`${TH} text-right`}>Cost</th>
@@ -284,7 +284,7 @@ function RunRow({ run, catalogue, open, onToggle }: { run: ApiRun; catalogue: Ca
       <tr className="k-row k-line-subtle cursor-pointer border-b last:border-b-0" onClick={onToggle}>
         <td className={`${TD} k-mono k-fg2 whitespace-nowrap text-[12px]`}>{formatTime(run.at)}</td>
         <td className={`${TD} whitespace-nowrap`}>{run.scriptName}</td>
-        <td className={`${TD} k-fg2 whitespace-nowrap`}>{pipeTitle(catalogue, run.pipeId)}</td>
+        <td className={`${TD} k-fg2 whitespace-nowrap`}>{legTitle(catalogue, run.legId)}</td>
         <td className={TD}>
           <RunStatus status={run.status} />
         </td>
@@ -368,17 +368,17 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
       {open && (
         <tr className="k-line-subtle border-b">
           <td colSpan={5} className="bg-[var(--bg-inset)] px-4 py-3">
-            <p className="k-label mb-1.5">Options at this draw</p>
+            <p className="k-label mb-1.5">Scored at this draw</p>
             <table className="text-[12px]">
               <thead>
                 <tr className="k-fg3">
-                  <td className="pb-1 pr-6">Option</td>
+                  <td className="pb-1 pr-6">Picked among</td>
                   <td className="pb-1 pr-6 text-right">Value per $ (mean)</td>
                   <td className="pb-1 text-right">Value per $ (this draw)</td>
                 </tr>
               </thead>
               <tbody>
-                {choice.options.map((o) => (
+                {choice.candidates.map((o) => (
                   <tr key={o.id} className={o.id === choice.chosen ? "font-medium" : "k-fg2"}>
                     <td className="py-0.5 pr-6">{o.label}</td>
                     <td className="py-0.5 pr-6 text-right tabular-nums">{formatRoi(o.meanScore)}</td>
@@ -394,34 +394,33 @@ function ChoiceRow({ choice, open, onToggle }: { choice: ApiChoice; open: boolea
   );
 }
 
-/** Each choice point and its options' beliefs. Rows keep the served order. */
-export function PointsList({ points, empty = "No choice point yet." }: { points: ApiChoicePoint[]; empty?: string }) {
+/** Each choice point and its candidates' beliefs, under a uniform title. Rows keep the served order. */
+export function PointsList({ points, catalogue, empty = "No choice point yet." }: { points: ApiChoicePoint[]; catalogue?: CatalogueData | null; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
+        const word = p.chooses === "unit" ? "Unit" : p.chooses === "leg" ? "Leg" : "Script";
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.options.length)} options at this Material`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} ${p.chooses === "unit" ? "Units" : p.chooses === "leg" ? "legs" : "scripts"} compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`}>
-                  <span className="inline-flex items-center gap-2 normal-case">
-                    <Mark kind="point" id={p.id} size={16} />
-                    <span className="k-fg text-[13px] font-medium tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
-                      {p.label}
-                    </span>
-                  </span>
+                <th className={`${TH} w-full`} colSpan={7}>
+                  <ApiPointTitle point={p} catalogue={catalogue} />
                 </th>
+              </tr>
+              <tr className="k-line-subtle border-b">
+                <th className={`${TH} w-full`}>{word}</th>
                 <th className={`${TH} text-right`}>Value per $</th>
                 <th className={`${TH} text-right`}>Rate</th>
-                <th className={`${TH} text-right`}>Cost to leg end</th>
+                <th className={`${TH} text-right`}>Cost to step end</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
               </tr>
             </thead>
             <tbody>
-              {p.options.map((o) => (
+              {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={TD}>{o.label}</td>
                   <td className={TDN}>{formatRoi(o.meanScore)}</td>
@@ -437,6 +436,38 @@ export function PointsList({ points, empty = "No choice point yet." }: { points:
         );
       })}
     </div>
+  );
+}
+
+/** A choice card's uniform title: "<Leg> · its script" or "<Leg> · Material <outcome>", one glyph per object type (leg, outcome, script, Material). */
+export function ApiPointTitle({ point, catalogue }: { point: ApiChoicePoint; catalogue?: CatalogueData | null }) {
+  const leg = catalogue?.legs.find((l) => l.id === point.legId);
+  return (
+    <span className="inline-flex items-center gap-1.5 normal-case">
+      <Mark kind="leg" id={point.legId} size={18} />
+      <span className="k-fg text-[13px] font-medium tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
+        {leg?.name ?? legTitle(catalogue, point.legId)}
+      </span>
+      <span className="k-fg4">·</span>
+      {point.chooses === "leg" ? (
+        <>
+          <Mark kind="leg" id={`legs:${point.id}`} size={14} />
+          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>its leg</span>
+        </>
+      ) : point.material ? (
+        <>
+          <Mark kind="material" id={point.material} size={14} />
+          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>
+            Material {outcomeName(catalogue, point.material)}
+          </span>
+        </>
+      ) : (
+        <>
+          <Mark kind="script" id={`scripts:${point.id}`} size={14} />
+          <span className="k-fg2 text-[13px] tracking-normal" style={{ fontFamily: "var(--font-geist-sans)" }}>its script</span>
+        </>
+      )}
+    </span>
   );
 }
 

@@ -3,11 +3,13 @@
 import type { ApiChoicePoint } from "@gtm-factory/engine";
 import { Page, PageHeader, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
+import { useFactory } from "@/lib/api/factory";
 import { plural } from "@/lib/format";
 import { PointsList, Read } from "./common";
 
 export function ApiResearchPage() {
   const read = useApi<ApiChoicePoint[]>("/research");
+  const { data: o } = useFactory();
   return (
     <>
       <TopBar crumbs={[{ label: "Research" }]} />
@@ -17,9 +19,9 @@ export function ApiResearchPage() {
             <>
               <PageHeader
                 title={plural(points.length, "choice point", "choice points")}
-                sub="At every Material where several options compete, the belief the Supplier rating holds about each one. The choosing pipe picks by value per dollar, with one Thompson draw."
+                sub="At every Material where several candidates compete, the belief the Supplier rating holds about each one. The choosing script picks by value per dollar, with one Thompson draw."
               />
-              <PointsList points={points} />
+              <PointsList points={points} catalogue={o?.catalogue} />
             </>
           )}
         </Read>
