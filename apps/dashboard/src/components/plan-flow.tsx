@@ -11,7 +11,7 @@ export interface FlowBranch {
   costPerUnit: number | null;
 }
 
-/** What the script of a step calls besides the subject: a template, an LLM completion, the Rating. */
+/** What the script of a node calls besides the subject: a template, an LLM completion, the Rating. */
 export interface FlowSide {
   outcome: string;
   label: string;
@@ -21,7 +21,7 @@ export interface FlowSide {
 }
 
 /** One Engine on the chain that carries the subject. */
-export interface FlowStep {
+export interface FlowNode {
   outcome: string;
   label: string;
   icon?: string;
@@ -38,15 +38,15 @@ export interface FlowStep {
  * Engine runs now and what actually made the outcome this week; what the script calls hangs
  * off the card's side.
  */
-export function PlanFlow({ start, startLabel, steps, target }: { start: string; startLabel: string; steps: FlowStep[]; target: string }) {
+export function PlanFlow({ start, startLabel, nodes, target }: { start: string; startLabel: string; nodes: FlowNode[]; target: string }) {
   return (
     <div className="k-card overflow-x-auto px-6 py-6" data-testid="campaign-plan">
       <div className="mx-auto flex w-fit min-w-[min(100%,760px)] flex-col items-start">
         <StartNode start={start} label={startLabel} />
-        {steps.map((s) => (
+        {nodes.map((s) => (
           <div key={s.outcome} className="flex flex-col items-start">
             <Connector />
-            <StepNode step={s} isTarget={s.outcome === target} />
+            <EngineNode node={s} isTarget={s.outcome === target} />
           </div>
         ))}
       </div>
@@ -80,33 +80,33 @@ function Connector() {
   );
 }
 
-function StepNode({ step, isTarget }: { step: FlowStep; isTarget: boolean }) {
+function EngineNode({ node, isTarget }: { node: FlowNode; isTarget: boolean }) {
   return (
-    <div className="flex items-start" data-plan-node={step.outcome}>
+    <div className="flex items-start" data-plan-node={node.outcome}>
       <div className={`k-card shrink-0 p-3.5 ${isTarget ? "ring-2 ring-inset ring-[var(--accent)]" : ""}`} style={{ width: CARD_W }}>
         <div className="flex items-center gap-2.5">
-          <Mark kind="engine" id={step.outcome} icon={step.icon} size={28} />
+          <Mark kind="engine" id={node.outcome} icon={node.icon} size={28} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-medium leading-5">{step.label}</p>
+            <p className="truncate text-[14px] font-medium leading-5">{node.label}</p>
             <p className="k-fg3 truncate text-[12px] leading-4">{isTarget ? "The Target" : "Engine"}</p>
           </div>
-          {step.candidates > 1 && <span className="k-chip shrink-0">best of {step.candidates}</span>}
+          {node.candidates > 1 && <span className="k-chip shrink-0">best of {node.candidates}</span>}
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-[8px] bg-[var(--bg-inset)] px-2.5 py-2 text-[13px]">
-          {step.script ? (
+          {node.script ? (
             <>
-              <Mark kind={`script:${step.script.kind}` as MarkKind} id={step.script.dynasty} size={18} />
+              <Mark kind={`script:${node.script.kind}` as MarkKind} id={node.script.dynasty} size={18} />
               <span className="k-fg3 shrink-0">Runs</span>
-              <span className="min-w-0 flex-1 truncate font-medium">{step.script.name}</span>
+              <span className="min-w-0 flex-1 truncate font-medium">{node.script.name}</span>
             </>
           ) : (
             <span className="k-fg3">No script can run here today</span>
           )}
         </div>
-        {step.branches.length > 0 && (
+        {node.branches.length > 0 && (
           <div className="mt-2.5 space-y-1">
             <p className="k-fg3 text-[11px]">Made this week by</p>
-            {step.branches.slice(0, 3).map((b) => (
+            {node.branches.slice(0, 3).map((b) => (
               <div key={b.name} className="flex items-center gap-2 text-[12px] tabular-nums">
                 <span className="inline-block h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-[var(--data-track)]">
                   <span className="block h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.round(b.share * 100)}%` }} />
@@ -119,14 +119,14 @@ function StepNode({ step, isTarget }: { step: FlowStep; isTarget: boolean }) {
           </div>
         )}
       </div>
-      {step.sides.length > 0 && (
+      {node.sides.length > 0 && (
         <div className="flex items-start pt-5">
           <svg width="28" height="12" viewBox="0 0 28 12" className="mt-1.5 shrink-0 text-[var(--fg-4)]" aria-hidden="true">
             <path d="M0 6h28" stroke="currentColor" strokeWidth="1.2" strokeDasharray="3 3" />
           </svg>
           <div className="space-y-1.5">
-            {step.sides.map((m) => (
-              <div key={m.outcome} className="flex w-[260px] items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12px] ring-1 ring-inset ring-[var(--line)]" data-material={`${step.outcome}|${m.outcome}`}>
+            {node.sides.map((m) => (
+              <div key={m.outcome} className="flex w-[260px] items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12px] ring-1 ring-inset ring-[var(--line)]" data-material={`${node.outcome}|${m.outcome}`}>
                 <Mark kind="material" id={m.outcome} icon={m.icon} size={16} />
                 <span className="min-w-0 flex-1 truncate">{m.label}</span>
                 <span className="k-fg3 max-w-[120px] shrink-0 truncate">{m.from}</span>

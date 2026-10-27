@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { PlanFlow, type FlowStep } from "@/components/plan-flow";
+import { PlanFlow, type FlowNode } from "@/components/plan-flow";
 import { START, type ApiCampaign, type ApiCampaignDetail, type ApiPlanNode, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
@@ -264,7 +264,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       <section className="mt-8">
         <SectionTitle right={<span>Recomputed at every tick; shares and costs over the last 7 days</span>}>Plan</SectionTitle>
         {chain.length > 0 ? (
-          <PlanFlow start={c.start} startLabel={outcomeName(catalogue, c.start)} target={c.target} steps={chain.map((n) => flowStep(catalogue, n))} />
+          <PlanFlow start={c.start} startLabel={outcomeName(catalogue, c.start)} target={c.target} nodes={chain.map((n) => flowNode(catalogue, n))} />
         ) : (
           <div className="k-card">
             <EmptyNote>No Plan yet: the first tick computes it.</EmptyNote>
@@ -301,7 +301,7 @@ function strategyName(catalogue: CatalogueData | undefined, id: string): string 
 }
 
 /** One Engine of the Plan as a workflow card: its script now, what made it this week, what its script calls. */
-function flowStep(catalogue: CatalogueData | undefined, node: ApiPlanNode): FlowStep {
+function flowNode(catalogue: CatalogueData | undefined, node: ApiPlanNode): FlowNode {
   const script = node.scriptId ? catalogue?.scripts.find((s) => s.id === node.scriptId) : undefined;
   const subjects = new Set((catalogue?.outcomes ?? []).filter((o) => o.subject === "lead" || o.subject === "company").map((o) => o.id));
   return {

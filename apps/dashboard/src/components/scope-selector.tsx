@@ -64,7 +64,7 @@ function ScopeMenu({ orgs, value, anchor, onClose, onChange }: { orgs: ScopeOrg[
   const col = "min-w-0 flex-1 p-1";
   const item = (on: boolean) => `flex h-8 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] hover:bg-[var(--bg-hover)] ${on ? "k-selected" : ""}`;
   return createPortal(
-    <div className="v2-root fixed inset-0 z-50" onClick={onClose}>
+    <div className="v2-root fixed inset-0 z-50" style={{ background: "transparent" }} onClick={onClose}>
       <div className="k-popover fixed flex w-[min(620px,calc(100vw-16px))] divide-x divide-[var(--line-subtle)]" style={{ top: r.bottom + 4, left: Math.max(8, r.left) }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Pick what to show">
         <div className={col}>
           <p className="k-label px-2 pb-1 pt-1.5">Organization</p>

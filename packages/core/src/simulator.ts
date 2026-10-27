@@ -207,8 +207,6 @@ interface PendingLanding {
   unit: Unit;
   final: boolean;
   flight: string;
-  /** A person's run: the outcome did not happen; the order stops when the task is due, unless the person says otherwise first. */
-  fails?: boolean;
   /** A person's run is a task until it lands. */
   task?: { id: string; dayOrdered: number };
 }
@@ -1115,9 +1113,9 @@ export class SimulationSession {
     const kind = this.catalogue.outcome(script.outcome)?.subject;
     const attested = this.attest(o, script, truth, made, final, day);
     if (kind !== "run" && subjectKey) this.storage.forEngine(script.outcome).set("served", subjectKey, { day, ok: attested });
-    // A person's run is a task: it stays open until the person answers, or its due day, whatever the outcome.
+    // A person's run is a task. In the simulator the hidden truth answers it: a no at once, a yes when its delay ends, unless the visitor answers first.
     const task = (script.form?.length ?? 0) > 0 && (kind === "lead" || kind === "company");
-    if (!attested && !task) return { kind: "fail", reason: `no outcome at ${script.outcome}` };
+    if (!attested) return { kind: "fail", reason: `no outcome at ${script.outcome}` };
     const subject = this.subjectOf(o, script, run);
     const u = this.makeUnit(run, script.outcome, subject, o.client.brand.id, o.campaign.id, consumedReal, [...trace].sort((x, y) => x - y));
     if (result?.content) u.content = result.content;
@@ -1126,7 +1124,7 @@ export class SimulationSession {
     const flight = `${script.outcome}${SEP}${kind === "brand" ? o.client.brand.id : subject}`;
     if (kind === "brand" || kind === "company") this.inFlight.add(flight);
     o.pending.add(key);
-    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight, ...(task ? { task: { id: `task:${run.id}`, dayOrdered: day }, ...(attested ? {} : { fails: true }) } : {}) });
+    this.pendings.push({ tick: this.tickIndex + delay, order: o, key, unit: u, final, flight, ...(task ? { task: { id: `task:${run.id}`, dayOrdered: day } } : {}) });
     return { kind: "wait" };
   }
 
@@ -1338,7 +1336,7 @@ export class SimulationSession {
   /** A pending Unit lands, or a person's task closes: answered by the person (`answer`), else by the hidden truth. */
   private settle(p: PendingLanding, day: number, answer: { happened: boolean; values: Record<string, string | number | boolean> } | null): void {
     {
-      const fails = answer ? !answer.happened : p.fails === true;
+      const fails = answer ? !answer.happened : false;
       if (answer) p.unit.content = { ...(p.unit.content ?? {}), ...answer.values };
       if (fails) {
         this.inFlight.delete(p.flight);

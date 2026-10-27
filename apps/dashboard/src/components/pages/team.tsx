@@ -189,7 +189,7 @@ function ScriptRow({ model, script, brandId }: { model: Model; script: Script; b
         <td className={`${TD} text-right`} colSpan={3}>
           {held ? (
             <Link href={pinHref({ kind: "outcome", id: script.outcome })} className="inline-flex items-center gap-1.5 text-[var(--run)] hover:underline">
-              Done: see the {outcomeLabel(model.catalogue, script.outcome).toLowerCase()}
+              Done: see the {outcomeLabel(model.catalogue, script.outcome)}
             </Link>
           ) : (
             <span className="k-fg3">Done once, when the client tells us</span>

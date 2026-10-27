@@ -1,6 +1,8 @@
-# GTM Factory v6: the framework
+# GTM Factory v7: the framework
 
 Revenue made easy. This document describes the open framework behind it: how to model a go-to-market operation as an industrial plant, with the plant's own words and its own cost accounting. Everything here is implemented in [`packages/core`](../packages/core), the scripts are code in [`scripts/`](../scripts), and every number in the worked examples is checked by a test ([`docs.test.ts`](../packages/core/test/docs.test.ts)).
+
+**Open source and hosted.** This repository is the framework and one fictional world to adapt to your own use case. A hosted GTM Factory keeps its catalogue in its database: the outcomes, the Engines, every script and every version of its code, the Providers. It keeps every run's result there too. Its estimates sharpen over time, because what one client learns is pooled with the others. Code kept as text in a database runs through `compileScript`; the host provides isolation.
 
 ## 1. The plant
 
@@ -52,10 +54,10 @@ flowchart LR
 
 **The market is Start.** A market has a finite size. A script that sources leads draws people its source covers; when its reserve empties, its yield falls and budget moves elsewhere by itself.
 
-## 3. The six decisions of v6
+## 3. The six decisions
 
-1. **One Engine per outcome.** An Engine makes one outcome; competing scripts in dynasties perform it. A script makes one outcome and may consume any outcomes. The only choice left is the script, inside the Engine of an outcome: the best value per dollar among the scripts the strategy keeps.
-2. **No written manifest.** A script is code: it calls its Providers at run time. The outcomes it needs (its **materials**, for the Plan, costs, return and capacity) are first read from its code by a judge, once per version, then replaced by what the ledger measured each run consumed. An unexpected call joins the list.
+1. **One Engine per outcome.** An Engine makes one outcome; competing scripts in dynasties perform it. A script makes one outcome and may consume any outcomes. The only pick left is the script, inside the Engine of an outcome: the best value per dollar among the scripts the strategy keeps.
+2. **No written manifest.** A script is code: it calls its Providers at run time. The outcomes it needs (its **materials**, for the Plan, costs and return) are read from its code: each `ctx.get("...")` names one, always a literal, and a test enforces it. Then the ledger measures what each run consumed, and an unexpected call joins the list. No judge is needed.
 3. **Provider and Engine.** A Provider offers one function, `get()`, with no argument: it returns the most recent Unit of its outcome this caller has not received yet, for the caller's context (the run's subject, its company, its brand, or the run itself), from the stock, else by ordering one from the Engine. "Already received" is the ledger's record of consumption. An Engine offers `pull()` and `push(unit)`, and always makes a new piece. `pull()` makes one piece for a context, down from the Target. `push(unit)` makes the next outcome from a Unit that landed, up toward the Target.
 4. **Freshness is the script's job.** A script unhappy with what it got calls `get()` again, and a new piece is made, as long as the run's budget lasts.
 5. **The names.** Engine, Provider, Plan, Routing, Track.
@@ -139,7 +141,9 @@ The judge kept the strategy "Only people who have not answered nor asked to stop
 
 A **strategy** is a set of conditions on tactics: equals, in a list, within a range. It filters the scripts of its Engine ("Channel is Cold email") and may also state who the Engine serves ("never write to people who asked to stop"). The subject is checked at every run, since a person may ask to stop while an order is open. Each Engine has a default strategy with no condition.
 
-**Capacity.** Each script has a capacity: most Units per day, and days one Unit takes. It is measured for code and AI scripts. A person types it for a script of the client's team, on the "Done by your team" page. A script out of capacity today leaves today's choices and the order waits for tomorrow; the Plan ignores today's limits, so it still names the script.
+**Capacity.** Only work a person does has a capacity: most Units per day, and days one takes. A person types it on the "Done by your team" page. Code and AI scripts have none: an email queue that releases messages little by little is a delay, not a capacity. A script out of capacity today leaves today's picks and the order waits for tomorrow; the Plan ignores today's limits, so it still names the script.
+
+**Tasks.** A script a person performs declares a short answer form. Each run of it is a task: in production the person is notified by email and answers on the "Done by your team" page. The answer becomes the Unit's content. Its first yes or no field says whether the outcome happened, and the Unit then credits the picks that brought the person. In the simulator the hidden truth answers: a no at once, a yes when its delay ends, unless the visitor answers first. Work done once, like the offer or the ICP the client states, shows as done.
 
 ## 7. The ledger is the common stock
 
@@ -149,15 +153,15 @@ Every Unit, from whoever performed it, lands in one stock. Several scripts feed 
 
 ### Dynasties
 
-Anything a choice can pick (a script, or a Unit of the brand) belongs to a dynasty of versions. The choice picks a dynasty and serves its head version. Stats pool across the versions of a dynasty. An **upgrade** is a new version of the same dynasty: it starts from the dynasty's belief. A **fork** is a new dynasty: it starts from its parent's belief. LLM models, templates and ICPs are examples of this one rule; the code holds no line about any of them.
+Anything a pick can pick (a script, or a Unit of the brand) belongs to a dynasty of versions. The pick picks a dynasty and serves its head version. Stats pool across the versions of a dynasty. An **upgrade** is a new version of the same dynasty: it starts from the dynasty's belief. A **fork** is a new dynasty: it starts from its parent's belief. LLM models, templates and ICPs are examples of this one rule; the code holds no line about any of them.
 
-## 8. The choice and the Supplier rating
+## 8. The pick and the Supplier rating
 
-A **choice point** is a pair (consuming Engine, outcome it calls): the same LLM Engine called by the writer and by the reply judge makes two choice points, and each can settle on a different model.
+A **candidate place** is a pair (consuming Engine, outcome it calls): the same LLM Engine called by the writer and by the reply judge makes two candidate places, and each can settle on a different model.
 
-The **Supplier rating** is an Engine like any other. At each tick it reads the ledger and produces a **Rating** Unit for each brand: per candidate at each choice point, its beliefs about value per dollar. Every choosing script calls the Rating's Provider.
+The **Supplier rating** is an Engine like any other. At each tick it reads the ledger and produces a **Rating** Unit for each brand: per candidate at each candidate place, its beliefs about value per dollar. Every picking script calls the Rating's Provider.
 
-The rule is one for every choice: **Thompson sampling on value per dollar**.
+The rule is one for every pick: **Thompson sampling on value per dollar**.
 
 1. Each candidate carries a belief about the share of its decisions that reach the next milestone, and a belief about its measured cost from the decision to that milestone.
 2. Draw one rate and one cost from each belief.
@@ -168,15 +172,15 @@ A candidate with little data has wide beliefs: sometimes it draws high and gets 
 
 ### Credit through traceability
 
-Every Unit carries its **traceability**: the choices that led to it, its own included, and those carried by the Units it consumed. When the next milestone lands, every choice on its traceability is credited. A template is scored on the replies of the messages it served, never on whether the writer wrote. Reply received is a milestone of the Conversation track, so the choices of a cold email are credited at the reply, days before an interested lead.
+Every Unit carries its **traceability**: the picks that led to it, its own included, and those carried by the Units it consumed. When the next milestone lands, every pick on its traceability is credited. A template is scored on the replies of the messages it served, never on whether the writer wrote. Reply received is a milestone of the Conversation track, so the picks of a cold email are credited at the reply, days before an interested lead.
 
-### A branch is rated with its own choices at their best
+### A branch is rated with its own picks at their best
 
-A candidate's measured rate mixes every choice still being learned under it. A cold email branch tried while its email finder, writer and template are still explored looks worse than it is. So the Rating multiplies a candidate's value by its **uplift**: over each choice point under it, the best candidate's value per dollar over the value per dollar of the mix picked there this last week. The Plan reads the tree the same way.
+A candidate's measured rate mixes every pick still being learned under it. A cold email branch tried while its email finder, writer and template are still explored looks worse than it is. So the Rating multiplies a candidate's value by its **uplift**: over each candidate place under it, the best candidate's value per dollar over the value per dollar of the mix picked there this last week. The Plan reads the tree the same way.
 
 ### Pooling, delays, time
 
-A belief is pooled across levels (the candidate everywhere it is offered, this choice point across clients, clients sharing tactics, the client), each pulled toward the one above with a strength fitted from the data. Local data wins as it grows.
+A belief is pooled across levels (the candidate everywhere it is offered, this candidate place across clients, clients sharing tactics, the client), each pulled toward the one above with a strength fitted from the data. Local data wins as it grows.
 
 Worked example, with a fleet rate of 2% counted as 200 trials of prior experience, for a client whose true rate is 3%:
 
@@ -193,7 +197,7 @@ Each day's decisions are read like for like, against the other candidates' resul
 
 ### Regret
 
-The simulator knows the hidden truth, so it can grade the Rating. **Regret** is, per day, the share of each dollar's value the picks lost against always picking the hidden best (1 minus its value per dollar over the best's), weighted by picks, over every choice point of every campaign, each day graded against that day's truth. On five seeds of the fictional world, regret falls between days 0 to 10 and days 50 to 60 on each seed, and its mean over days 50 to 60 stays under **0.05**.
+The simulator knows the hidden truth, so it can grade the Rating. **Regret** is, per day, the share of each dollar's value the picks lost against always picking the hidden best (1 minus its value per dollar over the best's), weighted by picks, over every candidate place of every campaign, each day graded against that day's truth. On five seeds of the fictional world, regret falls between days 0 to 10 and days 50 to 60 on each seed, and its mean over days 50 to 60 stays under **0.05**.
 
 ## 9. Splits and proposals
 
@@ -237,7 +241,7 @@ A budget is funded in order of value per dollar until it runs out. With $500 to 
 
 ## 11. Others who perform, and reliability
 
-Every Unit names who performed it. Everything is counted; our return values only what our runs brought in. A report from another party about a fact one of our runs made (the CRM import of an interested lead our reply judge missed) is that run's campaign's value, and credits no choice: a judge that missed a fact missed it.
+Every Unit names who performed it. Everything is counted; our return values only what our runs brought in. A report from another party about a fact one of our runs made (the CRM import of an interested lead our reply judge missed) is that run's campaign's value, and credits no pick: a judge that missed a fact missed it.
 
 Whoever attests an outcome is a script: a reply judge, a CRM import, a website tracker. **Reliability** is its agreement with the outcome's reference script on the same subjects.
 

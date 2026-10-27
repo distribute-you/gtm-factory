@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type OutcomeId, type PlanNode } from "@gtm-factory/core";
 import { MaterialsBadge, OutcomeChip, PlanLineView, RoutingName } from "@/components/plan-line";
-import { PlanFlow, type FlowStep } from "@/components/plan-flow";
+import { PlanFlow, type FlowNode } from "@/components/plan-flow";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
@@ -320,7 +320,7 @@ function PlanTree({ model, campaign }: { model: Model; campaign: Campaign }) {
   const line = campaignPlanLine(model, campaign);
   const branches = planBranches(model, campaign);
   const c = model.catalogue;
-  const steps: FlowStep[] = line.parts.map((p) => {
+  const nodes: FlowNode[] = line.parts.map((p) => {
     const script = p.scriptId ? c.script(p.scriptId) : undefined;
     const subject = script ? c.subjectOf(script) : null;
     return {
@@ -336,12 +336,12 @@ function PlanTree({ model, campaign }: { model: Model; campaign: Campaign }) {
   return (
     <section className="mb-8">
       <SectionTitle right={<span>Recomputed at every tick; shares over the last 7 days</span>}>Plan</SectionTitle>
-      {steps.length === 0 ? (
+      {nodes.length === 0 ? (
         <div className="k-card">
           <EmptyNote>No Plan yet. Press Run.</EmptyNote>
         </div>
       ) : (
-        <PlanFlow start={campaign.start} startLabel={outcomeLabel(c, campaign.start)} steps={steps} target={campaign.target} />
+        <PlanFlow start={campaign.start} startLabel={outcomeLabel(c, campaign.start)} nodes={nodes} target={campaign.target} />
       )}
     </section>
   );
@@ -453,7 +453,7 @@ function FixedMenu({ anchor, onClose, children }: { anchor: HTMLElement | null; 
   if (!host || !anchor) return null;
   const r = anchor.getBoundingClientRect();
   return createPortal(
-    <div className="v2-root fixed inset-0 z-50" onClick={onClose}>
+    <div className="v2-root fixed inset-0 z-50" style={{ background: "transparent" }} onClick={onClose}>
       <div className="k-popover fixed w-[180px] p-1" style={{ top: r.bottom + 4, left: Math.max(8, r.right - 180) }} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>

@@ -17,7 +17,7 @@ const pct = (x: number, digits: number) => `${(x * 100).toFixed(digits)}%`;
 
 describe("the words", () => {
   it("no dash, none of the retired words, and the product name is the only factory", () => {
-    const retired = [/\bpipes?\b/i, /\blegs?\b/i, /\bsteps?\b/i, /\bplays?\b/i, /\bspecifications?\b/i, /\boptions?\b/i, /\bsales funnels?\b/i, /\bsales paths?\b/i, /(?<!GTM |-)\bfactor(y|ies)\b(?!-)/i];
+    const retired = [/\bchoices?\b/i, /\bchosen\b/i, /\bpipes?\b/i, /\blegs?\b/i, /\bsteps?\b/i, /\bplays?\b/i, /\bspecifications?\b/i, /\boptions?\b/i, /\bsales funnels?\b/i, /\bsales paths?\b/i, /(?<!GTM |-)\bfactor(y|ies)\b(?!-)/i];
     for (const [name, text] of [["framework.md", doc], ["api.md", api], ["README.md", readme]] as const) {
       expect(text, name).not.toMatch(/[–—]/);
       for (const w of retired) expect(text, `${name} ${w}`).not.toMatch(w);
@@ -26,7 +26,7 @@ describe("the words", () => {
 
   it("defines every object of the model and states the six decisions", () => {
     for (const o of ["Outcome", "Unit", "Engine", "Script", "Provider", "Run", "Campaign", "Plan", "Routing", "Track"]) expect(doc).toContain(`| **${o}** |`);
-    expect(doc).toContain("# GTM Factory v6");
+    expect(doc).toContain("# GTM Factory v7");
     expect(doc).toContain("1. **One Engine per outcome.**");
     expect(doc).toContain("2. **No written manifest.**");
     expect(doc).toContain("`get()`, with no argument");
