@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { outcomeLabel, legName, type Model } from "@/lib/model";
-import { factoryFigures, mostReused } from "@/lib/engine-pages";
+import { engineName, outcomeLabel, type Model } from "@/lib/model";
+import { mostReused, performerFigures } from "@/lib/engine-pages";
 import { formatCents, formatCentsExact, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -21,10 +21,10 @@ export function LedgerPage() {
 
 function Ledger({ model }: { model: Model }) {
   const l = model.session.ledger();
-  const factories = useMemo(() => factoryFigures(model), [model]);
+  const performers = useMemo(() => performerFigures(model), [model]);
   const reused = useMemo(() => mostReused(model), [model]);
-  const ours = factories.filter((f) => f.ours).reduce((s, f) => s + f.spendCents, 0);
-  const other = factories.filter((f) => !f.ours).reduce((s, f) => s + f.spendCents, 0);
+  const ours = performers.filter((f) => f.ours).reduce((s, f) => s + f.spendCents, 0);
+  const other = performers.filter((f) => !f.ours).reduce((s, f) => s + f.spendCents, 0);
   const c = model.catalogue;
   return (
     <>
@@ -55,7 +55,7 @@ function Ledger({ model }: { model: Model }) {
         <StatTile label="Our runs" note="our spend">
           <Figure value={formatCents(ours)} />
         </StatTile>
-        <StatTile label="Other factories" note="access cost">
+        <StatTile label="Performed by others" note="access cost">
           <Figure value={formatCents(other)} />
         </StatTile>
         <StatTile label="Normal loss" note="runs with no outcome">
@@ -68,11 +68,11 @@ function Ledger({ model }: { model: Model }) {
 
       <div className="mt-8 grid gap-6 xl:grid-cols-2">
         <section>
-          <SectionTitle right={<span>What choices read</span>}>Decide: each leg's own cost</SectionTitle>
-          <CardTable footer="Materials bought from other legs are not in a leg's price: the funnel adds them, never twice.">
+          <SectionTitle right={<span>What choices read</span>}>Decide: each Engine's own cost</SectionTitle>
+          <CardTable footer="Materials made by other Engines are not in an Engine's price: the Plan adds them, never twice.">
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={TH}>Leg</th>
+                <th className={TH}>Engine</th>
                 <th className={`${TH} text-right`}>Units consumed</th>
                 <th className={`${TH} text-right`}>$ per Unit consumed</th>
                 <th className={`${TH} text-right`}>Yield</th>
@@ -83,11 +83,11 @@ function Ledger({ model }: { model: Model }) {
               {[...l.decide]
                 .sort((a, b) => b.spendCents - a.spendCents)
                 .map((d) => (
-                  <tr key={d.legId} className="k-row k-line-subtle border-b last:border-0">
+                  <tr key={d.engine} className="k-row k-line-subtle border-b last:border-0">
                     <td className={TD}>
                       <span className="flex items-center gap-2">
-                        <Mark kind="leg" id={d.legId} icon={c.leg(d.legId)?.icon} size={20} />
-                        <span className="truncate">{legName(c, d.legId)}</span>
+                        <Mark kind="engine" id={d.engine} icon={c.outcome(d.engine)?.icon} size={20} />
+                        <span className="truncate">{engineName(c, d.engine)}</span>
                       </span>
                     </td>
                     <td className={TDN}>{formatCount(d.inputs)}</td>
@@ -163,7 +163,7 @@ function Ledger({ model }: { model: Model }) {
                         </span>
                       </span>
                     </td>
-                    <td className={TD}>{occ?.legId ? legName(c, occ.legId) : "—"}</td>
+                    <td className={TD}>{occ?.scriptId ? c.script(occ.scriptId)?.name ?? occ.scriptId : "—"}</td>
                     <td className={TDN}>{formatCount(r.consumptions)}</td>
                     <td className={TDN}>{formatCentsExact(r.standardCents)}</td>
                     <td className={TDN}>{formatCentsExact(r.standardCents * (r.consumptions - 1))}</td>

@@ -3,23 +3,23 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
-import { START, defaultStrategyId, describeCondition, type Campaign, type RankedFunnel, type WorldClient } from "@gtm-factory/engine";
-import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
-import { lineLegs, rankedLine } from "@/lib/funnels";
+import { START, type Campaign, type WorldClient } from "@gtm-factory/core";
+import { PlanLineView, RoutingName } from "@/components/plan-line";
+import { draftPlanLine } from "@/lib/plan";
 import { Mark } from "@/components/mark";
-import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar, SelectItem } from "@/components/ui";
+import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { campaignHref } from "./campaigns";
 import { freshCampaignId, newClient } from "@/lib/campaigns";
-import { outcomeLabel, outcomePlural, proposeFunnels, type Model } from "@/lib/model";
-import { formatCount, formatRatePct, formatRoi, formatUsd, roiIsGood } from "@/lib/format";
+import { outcomeLabel, outcomePlural, type Model } from "@/lib/model";
+import { formatRoi, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
-type Step = "client" | "goal" | "funnels";
-const STEPS: { id: Step; label: string }[] = [
+type Stage = "client" | "goal" | "plan";
+const STAGES: { id: Stage; label: string }[] = [
   { id: "client", label: "Client" },
   { id: "goal", label: "What you want" },
-  { id: "funnels", label: "Plays and budget" },
+  { id: "plan", label: "Brief and budget" },
 ];
 
 interface Draft {
@@ -33,7 +33,8 @@ interface Draft {
   value: string;
   perDay: string;
   campaignName: string;
-  strategies: Record<string, string>;
+  /** Its strategy in plain words: read once per Engine. */
+  brief: string;
 }
 
 export function NewCampaignPage() {
@@ -46,7 +47,7 @@ export function NewCampaignPage() {
   );
 }
 
-/** Lead states with a track, the highest rank of its track first. */
+/** Milestones, the highest rank of each track first. */
 function trackedOutcomes(model: Model): string[] {
   return model.tracks.flatMap((t) => [...t.states].reverse().map((s) => s.outcome));
 }
@@ -76,7 +77,7 @@ function defaultDraft(model: Model, existing: boolean): Draft {
     value: value ? String(value) : "1000",
     perDay: "30",
     campaignName: "",
-    strategies: {},
+    brief: "Cold email and LinkedIn. Never write again to someone who asked to stop.",
   };
 }
 
@@ -84,31 +85,28 @@ function Flow({ model }: { model: Model }) {
   const search = useSearchParams();
   const router = useRouter();
   const { dispatch } = useSim();
-  const opensOnFunnels = search.get("step") === "funnels";
-  const [step, setStep] = useState<Step>(opensOnFunnels ? "funnels" : "client");
-  const [d, setD] = useState<Draft>(() => defaultDraft(model, opensOnFunnels));
+  const opensOnPlan = search.get("stage") === "plan";
+  const [stage, setStage] = useState<Stage>(opensOnPlan ? "plan" : "client");
+  const [d, setD] = useState<Draft>(() => defaultDraft(model, opensOnPlan));
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
 
   const client = d.brandId ? model.clients.find((c) => c.brand.id === d.brandId) ?? null : null;
   const offerOutcomes = client ? client.offer.outcomes : trackedOutcomes(model);
   const targets = trackedOutcomes(model).filter((o) => offerOutcomes.includes(o));
-  // Start, or any lead outcome a leg consumes as the Unit it works on: a reactive campaign pushes each one that lands.
-  const consumed = [...new Set(model.catalogue.legs.filter((p) => !p.webhook && model.catalogue.isLegLive(p)).map((p) => model.catalogue.subjectMaterial(p)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
-  const starts = [{ id: START, label: "The market (Start): pulls each tick" }, ...consumed.map((o) => ({ id: o, label: `${outcomeLabel(model.catalogue, o)}: pushes each one` }))];
+  // Start, or any outcome a script works on that is not a milestone: a reactive campaign pushes each one that lands.
+  const worked = [...new Set(model.catalogue.scripts.filter((s) => s.status === "active" && !s.webhook).map((s) => model.catalogue.subjectOf(s)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
+  const starts = [{ id: START, label: "The market (Start): pulls each tick" }, ...worked.map((o) => ({ id: o, label: `${outcomeLabel(model.catalogue, o)}: pushes each one` }))];
   const start = starts.find((e) => e.id === d.start) ?? starts[0]!;
   const value = Number(d.value) || 0;
-  const funnels = useMemo(() => (step === "funnels" && d.target ? proposeFunnels(model, offerOutcomes, d.target, value, start.id) : []), [model, step, offerOutcomes, d.target, value, start.id]);
-  const best: RankedFunnel | undefined = funnels[0];
-  // The plays: every leg the tree can run toward the Target today, each with the strategy the campaign picks.
-  const playable = useMemo(() => {
-    const out: ReturnType<typeof lineLegs> = [];
-    for (const f of funnels) for (const l of lineLegs(rankedLine(model, f))) if (!out.some((x) => x.id === l.id)) out.push(l);
-    return out;
-  }, [model, funnels]);
+  const brandForPlan = client?.brand.id ?? model.clients[0]?.brand.id ?? "";
+  const draft = useMemo(() => (stage === "plan" && d.target && brandForPlan ? draftPlanLine(model, brandForPlan, start.id, d.target) : null), [model, stage, d.target, brandForPlan, start.id]);
+  // A campaign of the same brand already running the same Routing: its expected return, on the same formula.
+  const sibling = draft ? model.campaigns.find((c) => c.brandId === brandForPlan && model.session.routingOf(c).id === draft.routing.id) : undefined;
+  const expected = sibling ? model.session.economics(sibling.id).expected.value : null;
 
   const launch = () => {
-    if (!best) return;
+    if (!draft?.plan) return;
     const brandId = client?.brand.id ?? null;
     const base: WorldClient = client
       ? { ...client, campaigns: [], seeds: [] }
@@ -123,7 +121,7 @@ function Flow({ model }: { model: Model }) {
       target: d.target,
       dailyBudgetCents: Math.round((Number(d.perDay) || 0) * 100),
       status: "running",
-      strategies: Object.fromEntries(Object.entries(d.strategies).filter(([leg, s]) => s !== defaultStrategyId(leg))),
+      brief: d.brief.trim(),
     };
     const err = dispatch({ type: "launch", client: { ...base, campaigns: [campaign] } });
     setError(err);
@@ -132,23 +130,23 @@ function Flow({ model }: { model: Model }) {
 
   return (
     <>
-      <PageHeader title="New campaign" sub="Say who it is for, the Target you want and your budget. The production tree is rebuilt at every tick from performance." />
-      <ol className="mb-6 flex flex-wrap gap-2" aria-label="Steps">
-        {STEPS.map((s, i) => {
-          const at = STEPS.findIndex((x) => x.id === step);
+      <PageHeader title="New campaign" sub="Say who it is for, the Target you want, your brief and your budget. The Plan is recomputed at every tick." />
+      <ol className="mb-6 flex flex-wrap gap-2" aria-label="Progress">
+        {STAGES.map((s, i) => {
+          const at = STAGES.findIndex((x) => x.id === stage);
           return (
-            <li key={s.id} className={`flex items-center gap-2 text-[13px] ${i === at ? "" : "k-fg3"}`} aria-current={i === at ? "step" : undefined}>
+            <li key={s.id} className={`flex items-center gap-2 text-[13px] ${i === at ? "" : "k-fg3"}`} aria-current={i === at ? "true" : undefined}>
               <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] tabular-nums ${i < at ? "bg-[var(--run)] text-white" : i === at ? "bg-[var(--fg-1)] text-[var(--bg-surface)]" : "ring-1 ring-inset ring-[var(--line)]"}`}>
                 {i < at ? <CheckIcon size={11} weight="bold" /> : i + 1}
               </span>
               {s.label}
-              {i < STEPS.length - 1 && <span className="k-fg4">·</span>}
+              {i < STAGES.length - 1 && <span className="k-fg4">·</span>}
             </li>
           );
         })}
       </ol>
 
-      {step === "client" && (
+      {stage === "client" && (
         <div className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">
             {model.clients.map((c) => (
@@ -177,14 +175,14 @@ function Flow({ model }: { model: Model }) {
             </div>
           )}
           <div className="flex justify-end">
-            <button type="button" className="k-btn-strong" onClick={() => setStep("goal")}>
+            <button type="button" className="k-btn-strong" onClick={() => setStage("goal")}>
               Continue
             </button>
           </div>
         </div>
       )}
 
-      {step === "goal" && (
+      {stage === "goal" && (
         <div className="space-y-4">
           <div className="k-card space-y-4 p-4">
             <Field label="What you want">
@@ -221,79 +219,47 @@ function Flow({ model }: { model: Model }) {
             </Field>
           </div>
           <div className="flex justify-between">
-            <button type="button" className="k-btn-ghost" onClick={() => setStep("client")}>
+            <button type="button" className="k-btn-ghost" onClick={() => setStage("client")}>
               Back
             </button>
-            <button type="button" className="k-btn-strong" disabled={!d.target} onClick={() => setStep("funnels")}>
+            <button type="button" className="k-btn-strong" disabled={!d.target} onClick={() => setStage("plan")}>
               Continue
             </button>
           </div>
         </div>
       )}
 
-      {step === "funnels" && (
+      {stage === "plan" && (
         <div className="space-y-6">
           <section>
-            <SectionTitle count={funnels.length} right={<span>Views of the tree, priced on every client&apos;s measured steps</span>}>
-              Sales funnels the tree can run to {outcomeLabel(model.catalogue, d.target).toLowerCase()} today
-            </SectionTitle>
-            {funnels.length === 0 ? (
+            <SectionTitle right={<span>Recomputed at every tick once it runs</span>}>The Plan it would run today</SectionTitle>
+            {!draft?.plan || draft.parts.length === 0 ? (
               <div className="k-card">
-                <EmptyNote>No sales funnel reaches this outcome from this start. Pick another start or outcome.</EmptyNote>
+                <EmptyNote>No Plan reaches this outcome from this start. Pick another start or outcome.</EmptyNote>
               </div>
             ) : (
-              <div className="space-y-2">
-                {funnels.map((f) => (
-                  <FunnelCard key={f.steps.map((l) => l.legId).join(">")} model={model} funnel={f} />
-                ))}
+              <div className="k-card space-y-2.5 p-4" data-testid="draft-plan">
+                <RoutingName model={model} line={draft} />
+                <PlanLineView model={model} line={draft} size="md" />
+                <p className="k-fg3 text-[12px]">
+                  {expected != null ? (
+                    <>
+                      <RoiLabel>Expected</RoiLabel>: <span className={roiIsGood(expected) ? "text-[var(--run)]" : ""}>{formatRoi(expected)}</span> per $1, from {sibling!.name}.
+                    </>
+                  ) : (
+                    "No campaign of this client runs it yet: the return is learned from its first days."
+                  )}
+                </p>
               </div>
             )}
           </section>
 
-          {best && (
-            <section>
-              <SectionTitle count={playable.length} right={<span>A strategy states conditions per Material. The default lets every script compete.</span>}>
-                Plays
-              </SectionTitle>
-              <div className="k-card divide-y divide-[var(--line-subtle)]">
-                {playable.map((p) => {
-                  const candidates = model.catalogue.strategiesOf(p.id);
-                  const value = d.strategies[p.id] ?? defaultStrategyId(p.id);
-                  const s = model.catalogue.strategy(value);
-                  return (
-                    <div key={p.id} className="grid items-center gap-2 px-4 py-3 md:grid-cols-[220px_minmax(0,1fr)]">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <Mark kind="leg" id={p.id} icon={p.icon} size={22} />
-                        <span className="truncate text-[13px] font-medium">{p.name}</span>
-                      </span>
-                      <span className="min-w-0">
-                        <select className="k-input w-full px-1.5" style={{ font: "inherit" }} value={value} onChange={(e) => set({ strategies: { ...d.strategies, [p.id]: e.target.value } })}>
-                          {candidates.map((o) => (
-                            <SelectItem key={o.id} value={o.id}>
-                              {o.id === defaultStrategyId(p.id) ? "Default: every script" : o.name}
-                              {o.proposed ? " (proposed by a split)" : ""}
-                            </SelectItem>
-                          ))}
-                        </select>
-                        {s && s.rules.length + (s.subject?.length ?? 0) > 0 && (
-                          <span className="k-fg3 mt-1 block text-[12px]">
-                            {[
-                              ...s.rules.map((r) => `${r.material ? `At ${outcomeLabel(model.catalogue, r.material).toLowerCase()}: ` : ""}${r.conditions.map((c) => describeCondition(c, model.catalogue)).join(", ")}`),
-                              ...(s.subject ?? []).map((c) => describeCondition(c, model.catalogue)),
-                            ].join(" · ")}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
-                {playable.length === 0 && <EmptyNote>Every leg plays its default.</EmptyNote>}
-              </div>
-            </section>
-          )}
-
-          {best && (
+          {draft?.plan && draft.parts.length > 0 && (
             <div className="k-card space-y-3 p-4">
+              <Field label="Brief">
+                <textarea className="k-input w-full resize-y px-2 py-1.5 leading-6" style={{ font: "inherit", height: "auto" }} rows={3} value={d.brief} onChange={(e) => set({ brief: e.target.value })} />
+              </Field>
+              <p className="k-fg3 text-[12px]">The brief is read once per Engine: the scripts it keeps, daily caps, a test length. See and change what each Engine keeps on the campaign page.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Campaign name">
                   <input className="k-input w-full px-2" style={{ font: "inherit" }} placeholder="Named after its Target" value={d.campaignName} onChange={(e) => set({ campaignName: e.target.value })} />
@@ -306,14 +272,14 @@ function Flow({ model }: { model: Model }) {
                   </span>
                 </Field>
               </div>
-              <button type="button" className="k-cta w-full justify-center" onClick={launch}>
+              <button type="button" className="k-btn-accent k-cta w-full justify-center" onClick={launch}>
                 <RocketLaunchIcon size={16} weight="fill" />
-                Launch and earn up to {formatRoi(best.valuePerDollar)} per $1 expected
+                {expected != null ? `Launch and earn up to ${formatRoi(expected)} per $1 expected` : "Launch and start learning"}
               </button>
               {error && <p className="text-[12px] text-[var(--data-rose)]">{error}</p>}
             </div>
           )}
-          <button type="button" className="k-btn-ghost" onClick={() => setStep("goal")}>
+          <button type="button" className="k-btn-ghost" onClick={() => setStage("goal")}>
             Back
           </button>
         </div>
@@ -328,43 +294,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="k-label block">{label}</span>
       {children}
     </label>
-  );
-}
-
-/** One sales funnel the tree can run (a view): its line, value per dollar, cost per Target Unit, and each step's attempts per Target Unit. */
-function FunnelCard({ model, funnel }: { model: Model; funnel: RankedFunnel }) {
-  const target = outcomeLabel(model.catalogue, funnel.line[funnel.line.length - 1] ?? "").toLowerCase();
-  return (
-    <div className="k-card block w-full p-4 text-left">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <span className="min-w-0 flex-1 space-y-1.5">
-          <FunnelName model={model} funnel={funnel} />
-          <span className="block">
-            <FunnelLine model={model} funnel={funnel} />
-          </span>
-        </span>
-        <span className="text-right">
-          <span className={`block text-[18px] font-medium tabular-nums ${roiIsGood(funnel.valuePerDollar) ? "text-[var(--run)]" : ""}`}>{formatRoi(funnel.valuePerDollar)}</span>
-          <span className="k-fg3 block text-[11px]">
-            <RoiLabel>per $1</RoiLabel> · {funnel.label === "measured" ? "measured" : "expected"}
-          </span>
-        </span>
-      </div>
-      <div className="k-inset mt-3 grid rounded-[8px] text-[12px]" style={{ gridTemplateColumns: `repeat(${funnel.steps.length + 1}, minmax(0, 1fr))` }}>
-        <div className="px-3 py-2">
-          <p className="k-label">Cost from Start</p>
-          <p className="text-[14px] font-medium tabular-nums">{formatUsd(funnel.costPerTarget)}</p>
-        </div>
-        {funnel.steps.map((l) => (
-          <div key={`${l.from}>${l.to}`} className="min-w-0 border-l border-[var(--line-subtle)] px-3 py-2">
-            <p className="k-label truncate">{outcomeLabel(model.catalogue, l.to)}</p>
-            <p className="tabular-nums">
-              {formatRatePct(l.estimate.yieldRate)} · {formatUsd(l.estimate.costPerAttempt)} each
-            </p>
-            <p className="k-fg3 tabular-nums">{Number.isFinite(l.attemptsPerTarget) ? `${formatCount(l.attemptsPerTarget)} attempts per ${target}` : "—"}</p>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

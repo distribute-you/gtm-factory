@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { createElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@phosphor-icons/react";
 import { formatRoi, roiIsGood } from "@/lib/format";
@@ -427,12 +427,4 @@ export const TDN = "px-3 py-2 first:pl-4 last:pr-4 align-middle text-right tabul
 /** A small "Learning" tag beside a figure the data has not settled yet. */
 export function LearningTag() {
   return <span className="k-chip">Learning</span>;
-}
-
-/** The HTML element of one entry of a native `<select>`, spelled in parts: the framework's vocabulary never says it. */
-const SELECT_ITEM_TAG = ["opt", "ion"].join("");
-
-/** One entry of a native `<select>`. */
-export function SelectItem(props: React.OptionHTMLAttributes<HTMLOptionElement>) {
-  return createElement(SELECT_ITEM_TAG, props);
 }

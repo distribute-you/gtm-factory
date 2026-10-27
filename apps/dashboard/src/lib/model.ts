@@ -1,34 +1,32 @@
 /**
  * Read models over the running world: every figure a page shows is computed here from the
  * engine's own outputs (runs, Units, choices, beliefs). Pages divide nothing
- * themselves. Nothing here knows an outcome, a leg or a script by name: everything is read
- * off the catalogue.
+ * themselves. Nothing here knows an outcome or a script by name: everything is read off
+ * the catalogue.
  */
 
 import {
+  OURS,
   START,
   convergence,
   hiddenBest,
-  stepConsumer,
-  playPoint,
-  rankFunnels,
   type Campaign,
   type Catalogue,
   type ChoiceRecord,
-  type Condition,
   type HiddenCandidate,
   type Unit,
   type OutcomeId,
   type Person,
-  type Leg,
+  type PlanNode,
   type PointConvergence,
   type Script,
   type SimulationSession,
   type WorldClient,
   type WorldSpec,
-} from "@gtm-factory/engine";
+} from "@gtm-factory/core";
 import { humanize } from "./format";
 
+/** A milestone: an outcome of a Track, at its rank. */
 export interface LeadStateDef {
   outcome: OutcomeId;
   label: string;
@@ -38,7 +36,7 @@ export interface LeadStateDef {
 
 export interface TrackDef {
   id: string;
-  /** The owner's word: "CRM lifecycle track". */
+  /** "CRM lifecycle track". */
   label: string;
   description: string | undefined;
   states: LeadStateDef[];
@@ -80,9 +78,9 @@ function memo<T>(model: Model, key: string, f: () => T): T {
 // Vocabulary read off the catalogue
 // ---------------------------------------------------------------------------
 
-/** Every lead track with its states in rank order. A track is never added to another. */
+/** Every Track with its milestones in rank order. A track is never added to another. */
 export function leadTracks(catalogue: Catalogue): TrackDef[] {
-  return catalogue.leadTracks
+  return catalogue.tracks
     .filter((t) => !t.retired)
     .map((t) => ({
       id: t.id,
@@ -106,73 +104,81 @@ export function outcomePlural(catalogue: Catalogue, id: OutcomeId): string {
   return o?.plural ?? `${outcomeLabel(catalogue, id)}s`;
 }
 
-export function legName(catalogue: Catalogue, id: string): string {
-  return catalogue.leg(id)?.name ?? humanize(id);
+/** An Engine is named by the outcome it makes. */
+export function engineName(catalogue: Catalogue, outcome: OutcomeId): string {
+  return outcomeLabel(catalogue, outcome);
 }
 
-export function factoryName(catalogue: Catalogue, id: string): string {
-  return catalogue.factory(id)?.name ?? humanize(id);
+/** The Engines whose scripts call an outcome (its Provider's callers). */
+export function callersOf(catalogue: Catalogue, outcome: OutcomeId): OutcomeId[] {
+  return [...new Set(catalogue.scripts.filter((s) => s.status === "active" && s.materials.includes(outcome)).map((s) => s.outcome))];
 }
 
-/** A leg in one line: where it goes from, then what it makes. */
-export function legLine(catalogue: Catalogue, leg: Leg): string {
-  const from = catalogue.subjectMaterial(leg);
-  const ins = from ? outcomeLabel(catalogue, from) : leg.webhook ? "A webhook call" : catalogue.createsSubjects(leg) || catalogue.outcome(leg.output)?.subject === "lead" ? "The market" : "An order";
-  return `${ins} → ${outcomeLabel(catalogue, leg.output)}`;
+/**
+ * An Engine in one line: where its subject comes from, then what it makes. An
+ * Engine that makes no subject of its own (a completion, a template) says who calls it.
+ */
+export function engineLine(catalogue: Catalogue, outcome: OutcomeId): string {
+  const scripts = catalogue.scriptsOf(outcome);
+  const kind = catalogue.outcome(outcome)?.subject;
+  if (kind === "lead" || kind === "company") {
+    const froms = [...new Set(scripts.map((s) => (catalogue.subjectOf(s) ? outcomeLabel(catalogue, catalogue.subjectOf(s)!) : s.webhook ? "a report from another party" : "The market")))];
+    const said = froms.length > 1 ? `${froms.slice(0, -1).join(", ")} or ${froms[froms.length - 1]}` : froms[0] ?? "The market";
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)} → ${outcomeLabel(catalogue, outcome)}`;
+  }
+  const callers = callersOf(catalogue, outcome);
+  return callers.length > 0 ? `Called by ${callers.map((c) => outcomeLabel(catalogue, c)).join(", ")}` : `Made for the brand`;
 }
 
-/** One line of a script's Bill of materials: the outcome it consumes per Unit produced, who makes it, and the choice made there. */
+/** One outcome a script calls: its Provider, and the choice made there. */
 export interface MaterialRow {
   material: OutcomeId;
   label: string;
-  /** The subject Material: the Unit the leg works on. */
+  /** The subject Material: the Unit the script works on. */
   subject: boolean;
-  /** Legs producing it (several share one stock). */
-  producers: Leg[];
-  /** How the leg gets it: served from the stock or ordered (a choice among producer scripts), the Unit it is pushed. */
+  /** How the Provider serves it. */
   how: string;
-  /** The conditions the script's Specification states at this Material ("younger than 90 days"). */
-  conditions: Condition[];
-  /** The choice point (this leg, this Material), when one was made. */
+  /** The choice point (this Engine, this Material), when one was made. */
   point: string | null;
   /** The candidate picked most over the last 7 days, every campaign. */
   choice: string | null;
   picks: number;
 }
 
-/** A script's Bill of materials, line by line (each line a Material); the leg's first script when none is named. */
-export function billOfMaterials(model: Model, leg: Leg, script?: Script): MaterialRow[] {
+/** The outcomes a script calls (read from its code, then measured), each with its Provider. */
+export function materialsOfScript(model: Model, script: Script): { rows: MaterialRow[]; label: "judged" | "measured" } {
   const c = model.catalogue;
-  const runs = script ?? c.dynastiesOf(leg.id)[0] ?? c.scripts.find((s) => s.legId === leg.id);
-  if (!runs) return [];
-  const subject = c.subjectOf(runs);
-  return runs.materials.map(({ outcome: m, conditions }) => {
+  const subject = c.subjectOf(script);
+  const list = model.session.materialsOf(script);
+  const measured = list.join() !== [...script.materials].join() || model.session.runs.some((r) => r.scriptId === script.id && r.consumed.length > 0);
+  const rows = list.map((m) => {
     const o = c.outcome(m);
-    const point = `${leg.id}|${m}`;
+    const point = `${script.outcome}|${m}`;
     const series = model.session.pickSeries(point);
     let choice: string | null = null;
     let best = 0;
     let picks = 0;
-    for (const [opt, arr] of series) {
+    for (const [cand, arr] of series) {
       const recent = arr.slice(-7).reduce((x, y) => x + y, 0);
       picks += arr.reduce((x, y) => x + y, 0);
       if (recent > best) {
         best = recent;
-        choice = opt;
+        choice = cand;
       }
     }
     const how =
       o?.contentType === "rating"
-        ? "Today's Rating, from the stock"
+        ? "Today's Rating"
         : o?.subject === "run"
-          ? "Ordered for each run"
+          ? "A new one for each run"
           : o?.subject === "brand"
-            ? "From the stock when a Unit conforms, else ordered"
+            ? "The brand's latest, else made"
             : m === subject
               ? "The Unit it works on: pulled or pushed"
-              : "From the stock for this subject, else ordered";
-    return { material: m, label: outcomeLabel(c, m), subject: m === subject, producers: c.providersOf(m), how, conditions: conditions ?? [], point: series.size > 0 && choice ? point : null, choice: choice ? candidateLabel(model, point, choice) : null, picks };
+              : "From the stock for this subject, else made";
+    return { material: m, label: outcomeLabel(c, m), subject: m === subject, how, point: series.size > 0 && choice ? point : null, choice: choice ? candidateLabel(model, point, choice) : null, picks };
   });
+  return { rows, label: measured ? "measured" : "judged" };
 }
 
 /** The script a dynasty runs today. */
@@ -180,62 +186,47 @@ export function headScript(catalogue: Catalogue, dynasty: string): Script | unde
   return catalogue.headOf(dynasty) ?? catalogue.versionsOf(dynasty).pop();
 }
 
-export type PointKind = "play" | "script" | "unit";
+export type PointKind = "script" | "unit";
 
 export interface PointInfo {
   key: string;
   kind: PointKind;
-  /** The consuming leg, or null for a step's own choice. */
-  consumer: Leg | null;
-  /** The leg the card is titled with: the consuming leg, or the leg performing the step. */
-  leg: Leg | null;
-  /** The Material the choice is made at (null for a leg's own script). */
+  /** The consuming Engine's outcome, or "campaign" (the Target itself). */
+  consumer: string;
+  /** The outcome called: its Engine's scripts (or the brand's Units) compete. */
   material: OutcomeId;
-  /** Uniform: "<Leg> · its script", "<Leg> · Material <outcome>", or "Step to <outcome> · its leg". */
+  /** Uniform: "<Engine> · its script" or "<Engine> · Material <outcome>". */
   title: string;
-  /** What competes: scripts of the producer legs, Units of an outcome, or legs. */
+  /** Who asks for it. */
   sub: string;
 }
 
-/** What a choice point is, in words, from its key. */
+/** What a choice point is, in words, from its key `consumer|material`. */
 export function pointInfo(catalogue: Catalogue, key: string): PointInfo {
-  if (key.startsWith("play:")) {
-    const [, to] = key.slice(5).split(">") as [string, string];
-    return { key, kind: "play", consumer: null, leg: null, material: to, title: `Step to ${outcomeLabel(catalogue, to)} · its leg`, sub: "Which leg makes it" };
-  }
   const [consumer, material] = key.split("|") as [string, string];
   const out = catalogue.outcome(material);
-  if (consumer.startsWith("step:")) {
-    const [from, to] = consumer.slice(5).split(">") as [string, string];
-    const leg = catalogue.providersOf(to).find((p) => !p.webhook && catalogue.rootsOf(p, new Set([from])).has(from)) ?? catalogue.providersOf(to)[0] ?? null;
-    return { key, kind: "script", consumer: null, leg, material, title: `${leg?.name ?? outcomeLabel(catalogue, to)} · its script`, sub: "Which script performs it" };
-  }
-  const leg = catalogue.leg(consumer) ?? null;
-  // A brand Material is chosen among the Units in the stock (templates, ICPs); the others among producer scripts.
-  const scripted = catalogue.providersOf(material).some((p) => catalogue.dynastiesOf(p.id).some((s) => s.dynasty !== "" && out?.subject !== "brand"));
-  const kind: PointKind = out?.subject === "brand" && !scripted ? "unit" : "script";
+  // A brand outcome (a template, an ICP) is chosen among the brand's Units; every other among its Engine's scripts.
+  const kind: PointKind = out?.subject === "brand" ? "unit" : "script";
+  const asker = consumer === "campaign" ? "the campaign" : engineName(catalogue, consumer);
   return {
     key,
     kind,
-    consumer: leg,
-    leg,
+    consumer,
     material,
-    title: `${leg?.name ?? humanize(consumer)} · Material ${outcomeLabel(catalogue, material)}`,
-    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material)} Unit to serve from the stock` : `Which script produces it`,
+    title: kind === "unit" ? `${consumer === "campaign" ? "Campaign" : engineName(catalogue, consumer)} · Material ${outcomeLabel(catalogue, material)}` : `${engineName(catalogue, material)} · its script`,
+    sub: kind === "unit" ? `Which ${outcomeLabel(catalogue, material)} to serve` : `Which script makes it, for ${asker}`,
   };
 }
 
 /** The word a choice card's first column says: what competes there. */
 export function candidateWord(kind: PointKind): string {
-  return kind === "unit" ? "Unit" : kind === "play" ? "Leg" : "Script";
+  return kind === "unit" ? "Unit" : "Script";
 }
 
-/** A candidate of a choice point in words: a script dynasty, an object dynasty, or a leg. */
+/** A candidate of a choice point in words: a script dynasty or a brand Unit dynasty. */
 export function candidateLabel(model: Model, point: string, candidate: string, brandId?: string): string {
   const s = headScript(model.catalogue, candidate);
   if (s) return s.name;
-  const leg = model.catalogue.leg(candidate);
-  if (leg) return leg.name;
   const info = pointInfo(model.catalogue, point);
   const brands = brandId ? [brandId] : model.clients.map((c) => c.brand.id);
   for (const b of brands) {
@@ -258,46 +249,23 @@ export function scopedCampaigns(model: Model, brandId: string | null): Campaign[
   return model.campaigns.filter((c) => !brandId || c.brandId === brandId);
 }
 
-/** Where a campaign's funnel starts: Start (it pulls), or the outcome whose Units it pushes. */
+/** Where a campaign starts: Start (it pulls), or the outcome whose Units it pushes. */
 export function startOf(_model: Model, campaign: Campaign): OutcomeId {
   return campaign.start;
-}
-
-/** The line of a campaign's sales path (a view of its tree): its start outcome, then each lead state. */
-export function lineOf(model: Model, campaign: Campaign): OutcomeId[] {
-  return [startOf(model, campaign), ...model.session.pathOf(campaign)];
 }
 
 export function targetOf(campaign: Campaign): OutcomeId {
   return campaign.target;
 }
 
-export function campaignName(model: Model, campaign: Campaign): string {
+export function campaignName(_model: Model, campaign: Campaign): string {
   return campaign.name;
-}
-
-/** The leg each step plays most today (its current choice), by step. */
-export function stepPlays(model: Model, campaign: Campaign): { from: OutcomeId; to: OutcomeId; legId: string | null; candidates: string[] }[] {
-  return model.session.stepsOf(campaign).map(({ from, to }) => {
-    const candidates = model.session.playsFor(campaign, from, to).map((p) => p.id);
-    const series = model.session.pickSeries(playPoint(from, to), campaign.id);
-    let best: string | null = candidates[0] ?? null;
-    let bestN = -1;
-    for (const [o, arr] of series) {
-      const n = arr.slice(-7).reduce((x, y) => x + y, 0);
-      if (n > bestN) {
-        bestN = n;
-        best = o;
-      }
-    }
-    return { from, to, legId: best, candidates };
-  });
 }
 
 export interface ScopeFigures {
   spendCents: number;
   dailySpendCents: number[];
-  /** Access cost paid to other factories, per day. */
+  /** Access cost paid to other parties, per day. */
   dailyOtherCents: number[];
   /** New lead states per outcome, per day. */
   dailyOutcomes: Record<string, number[]>;
@@ -338,9 +306,8 @@ export function scopeFigures(model: Model, campaigns: readonly Campaign[]): Scop
   for (const r of model.session.runs) if (r.support && r.campaignId && ids.has(r.campaignId)) f.spendCents += r.spendCents;
   // Auxiliary cost centers (the Supplier rating) of the brands in scope: our runs for no campaign, their cost reaching the campaigns through the Units consumed.
   const brands = new Set(campaigns.map((c) => c.brandId));
-  const ours = new Set(model.catalogue.factories.filter((x) => x.ours).map((x) => x.id));
   const runBrand = memo(model, "runBrand", () => new Map(model.session.units.map((u) => [u.runId, u.brandId])));
-  for (const r of model.session.runs) if (!r.campaignId && !r.support && ours.has(r.factory) && brands.has(runBrand.get(r.id) ?? "")) f.spendCents += r.spendCents;
+  for (const r of model.session.runs) if (!r.campaignId && !r.support && r.performedBy === OURS && brands.has(runBrand.get(r.id) ?? "")) f.spendCents += r.spendCents;
   f.valueOurs = f.dailyValueOurs.reduce((s, x) => s + x, 0);
   f.valueOther = f.dailyValueOther.reduce((s, x) => s + x, 0);
   f.attempts = f.dailyAttempts.reduce((s, x) => s + x, 0);
@@ -399,7 +366,7 @@ export interface CandidateRow {
   valuePerDollar: number;
   decisions: number;
   successes: number;
-  /** Hidden: true share reaching the step's end, true cost, true value per dollar. */
+  /** Hidden: true share reaching the next milestone, true cost, true value per dollar. */
   truth: HiddenCandidate | null;
   isHiddenBest: boolean;
   isBelievedBest: boolean;
@@ -491,7 +458,7 @@ export function explainChoice(model: Model, c: ChoiceRecord): string {
 }
 
 // ---------------------------------------------------------------------------
-// Legs, scripts and where they are plugged
+// Engines, scripts and who calls them
 // ---------------------------------------------------------------------------
 
 export interface PluggedInput {
@@ -502,11 +469,11 @@ export interface PluggedInput {
   picks: number;
 }
 
-/** Every Material a leg's scripts are offered at, and the best script at each. */
-export function pluggedAt(model: Model, legId: string): PluggedInput[] {
-  return memo(model, `plugged:${legId}`, () => {
-    const dynasties = new Set(model.catalogue.scripts.filter((s) => s.legId === legId).map((s) => s.dynasty));
-    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => model.session.candidatesAt(p).some((o) => dynasties.has(o)));
+/** Every caller of an Engine (a point `consumer|outcome`), and the best script at each. */
+export function pluggedAt(model: Model, outcome: OutcomeId): PluggedInput[] {
+  return memo(model, `plugged:${outcome}`, () => {
+    const dynasties = new Set(model.catalogue.scripts.filter((s) => s.outcome === outcome).map((s) => s.dynasty));
+    const points = [...new Set(model.session.choicePoints().map((p) => p.point))].filter((p) => p.endsWith(`|${outcome}`) && model.session.candidatesAt(p).some((o) => dynasties.has(o)));
     return points.map((point) => {
       const score = new Map<string, number>();
       let picks = 0;
@@ -649,15 +616,15 @@ export function variablesOf(text: string): string[] {
 
 export interface LeadRow {
   person: Person;
-  /** Highest state reached per track. */
+  /** Highest milestone reached per track. */
   states: Record<string, LeadStateDef | null>;
-  /** The factory that brought the lead in. */
+  /** Who brought the person in (the "Performed by" of the script that found them). */
   root: string;
   firstDay: number;
   campaignIds: string[];
 }
 
-/** Every person the factory served, with the furthest state per track. */
+/** Every person served, with the furthest milestone per track. */
 export function leadRows(model: Model, brandId: string | null): LeadRow[] {
   return memo(model, `leads:${brandId ?? "all"}`, () => {
     const rows: LeadRow[] = [];
@@ -722,20 +689,18 @@ export function initials(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// New campaign: funnels proposed by value per dollar
+// A new campaign: the Plan it would run today
 // ---------------------------------------------------------------------------
 
-/** The best funnels from an entry to a target for an offer, priced on the fleet's measured steps. */
-export function proposeFunnels(model: Model, offerOutcomes: OutcomeId[], target: OutcomeId, value: number, entry: OutcomeId = START) {
-  return rankFunnels(
-    model.catalogue,
-    offerOutcomes,
-    target,
-    (edge) => model.session.fleetStepEstimate(edge.from, edge.to) ?? { costPerAttempt: 1, yieldRate: 0.1, label: "expected" },
-    value,
-    6,
-    entry,
-  );
+/** The Plan a new campaign of a brand would run this tick, from a start to a Target, and the Routing it passes through. */
+export function previewPlan(model: Model, brandId: string, start: OutcomeId, target: OutcomeId): { plan: PlanNode | null; line: OutcomeId[] } {
+  const draft: Campaign = { id: `draft:${brandId}:${start}:${target}:${model.day}`, brandId, offerId: "", name: "", start, target, dailyBudgetCents: 0, status: "paused", brief: "" };
+  const plan = model.session.planOf(draft);
+  const line: OutcomeId[] = [];
+  let node: PlanNode | undefined = plan ?? undefined;
+  while (node && node.outcome !== start) {
+    if (model.catalogue.isMilestone(node.outcome) || node.outcome === target) line.unshift(node.outcome);
+    node = node.materials.find((m) => model.catalogue.outcome(m.outcome)?.subject === "lead");
+  }
+  return { plan, line };
 }
-
-export { stepConsumer, playPoint };

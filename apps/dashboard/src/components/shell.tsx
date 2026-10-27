@@ -19,17 +19,16 @@ import {
   SkipForwardIcon,
   SquaresFourIcon,
   StackIcon,
+  UserListIcon,
   UsersIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import { NavContext } from "./nav-context";
 import { Mark } from "./mark";
-import { SelectItem } from "./ui";
 import { useSim, SPEEDS, type Speed } from "@/lib/sim";
 import { leadRows } from "@/lib/model";
 import { formatCount } from "@/lib/format";
 import { pinHref, pinKey } from "@/lib/pins";
-import { SCENARIOS, SCENARIO_IDS, type ScenarioId } from "@/lib/world";
 
 export const REPO_URL = "https://github.com/distribute-you/gtm-factory";
 
@@ -126,7 +125,7 @@ function Sidebar() {
                       key={c.id}
                       href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
                       label={scope ? c.name : `${brand}: ${c.name}`}
-                      icon={<Mark kind="funnel" id={c.id} size={16} />}
+                      icon={<Mark kind="campaign" id={c.id} size={16} />}
                       active={active}
                       trailing={
                         c.status === "running" ? (
@@ -151,14 +150,15 @@ function Sidebar() {
                     key={pinKey(p)}
                     href={pinHref(p)}
                     label={p.label}
-                    icon={<Mark kind={p.kind === "outcome" ? "object" : p.kind} id={p.id} icon={p.icon} size={16} />}
+                    icon={<Mark kind="object" id={p.id} icon={p.icon} size={16} />}
                     active={pathname.startsWith("/pinned") && pinned === pinKey(p)}
                   />
                 ))}
               </Group>
             )}
-            <Group title="Engine">
+            <Group title="Production">
               <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
+              <NavItem href="/team/" label="Done by your team" icon={<UserListIcon size={15} />} active={at("/team")} />
               <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
               <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
             </Group>
@@ -186,7 +186,7 @@ function Sidebar() {
 
 /** Which client the pages show: one brand, or every client. */
 function ScopeSwitcher() {
-  const { model, scope, setScope, scenario } = useSim();
+  const { model, scope, setScope } = useSim();
   const [open, setOpen] = useState(false);
   const current = model?.clients.find((c) => c.brand.id === scope);
   const brands = model ? model.clients.map((c) => c.brand) : [];
@@ -196,7 +196,7 @@ function ScopeSwitcher() {
         <Mark kind="audience" id={current?.brand.id ?? "all"} size={22} quiet={!current} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium">{current?.brand.name ?? "All clients"}</span>
-          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory v5 · {scenario === "fictional" ? "fictional data" : `${SCENARIOS[scenario].label}, fictional clients`}</span>
+          <span className="k-fg3 block truncate text-[11px] leading-3">GTM Factory v6 · fictional data</span>
         </span>
         <CaretDownIcon size={12} className="k-fg3" />
       </button>
@@ -222,13 +222,13 @@ function ScopeSwitcher() {
   );
 }
 
-/** The simulator, always in reach above every page: the day, play / pause / one day / speed, the scenario, reset on a seed. */
+/** The simulator, always in reach above every page: the day, run / pause / one day / speed, reset on a seed. */
 function SimBar() {
   return <SimulatorBar />;
 }
 
 function SimulatorBar() {
-  const { model, playing, play, pause, stepDay, speed, setSpeed, reset, seed, scenario, setScenario } = useSim();
+  const { model, playing, run, pause, stepDay, speed, setSpeed, reset, seed } = useSim();
   const [seedText, setSeedText] = useState(String(seed));
   useEffect(() => setSeedText(String(seed)), [seed]);
   const nextSpeed = (): Speed => SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!;
@@ -241,11 +241,11 @@ function SimulatorBar() {
           Day {model ? model.day : "—"}
         </span>
       </span>
-      <button type="button" onClick={playing ? pause : play} className="k-btn-strong shrink-0" aria-label={playing ? "Pause" : "Play"}>
+      <button type="button" onClick={playing ? pause : run} className="k-btn-strong shrink-0" aria-label={playing ? "Pause" : "Run"}>
         {playing ? <PauseIcon size={13} weight="fill" /> : <PlayIcon size={13} weight="fill" />}
-        {playing ? "Pause" : "Play"}
+        {playing ? "Pause" : "Run"}
       </button>
-      <button type="button" onClick={stepDay} className="k-btn shrink-0" title="Play one more day">
+      <button type="button" onClick={stepDay} className="k-btn shrink-0" title="Run one more day">
         <SkipForwardIcon size={13} />
         One day
       </button>
@@ -253,13 +253,6 @@ function SimulatorBar() {
         {speed} days/s
       </button>
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" aria-hidden="true" />
-      <select aria-label="Scenario" className="k-input shrink-0 px-1.5" style={{ font: "inherit" }} value={scenario} onChange={(e) => setScenario(e.target.value as ScenarioId)}>
-        {SCENARIO_IDS.map((id) => (
-          <SelectItem key={id} value={id}>
-            {SCENARIOS[id].label}
-          </SelectItem>
-        ))}
-      </select>
       <span className="k-input flex w-[104px] shrink-0 items-center gap-1 px-2">
         <span className="k-fg3 text-[12px]">Seed</span>
         <input

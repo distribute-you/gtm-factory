@@ -29,7 +29,7 @@ import {
   FacebookLogoIcon,
   FileTextIcon,
   FlowArrowIcon,
-  FunnelIcon,
+  GearSixIcon,
   FunnelSimpleIcon,
   GoogleLogoIcon,
   HandshakeIcon,
@@ -72,7 +72,7 @@ import {
 
 /**
  * Every catalogue object wears a mark: an icon in a soft tile of its own colour. The icon is the
- * object's served icon name when the catalogue has one (steps, channels), else its kind's glyph.
+ * object's served icon name when the catalogue has one (outcomes, channels), else its kind's glyph.
  * The colour is drawn from the object's id, so the same object wears the same mark on every page.
  */
 const ICONS: Record<string, Icon> = {
@@ -136,26 +136,24 @@ const ICONS: Record<string, Icon> = {
 
 /**
  * The glyph of each kind of object that has no icon of its own. The four objects a choice card
- * names wear one glyph each: a leg, an outcome, a script (distribute.you dashboard v2's workflow
- * glyph) and a Material.
+ * names wear one glyph each: an Engine, an outcome, a script (distribute.you dashboard v2's
+ * workflow glyph) and a Material.
  */
 export const KIND_ICON = {
   outcome: TargetIcon,
-  leadTrack: PathIcon,
+  track: PathIcon,
   campaign: LightningIcon,
-  leg: PathIcon,
+  engine: GearSixIcon,
   script: FlowArrowIcon,
   material: PackageIcon,
-  funnel: FunnelIcon,
-  path: MapTrifoldIcon,
-  play: PlayIcon,
+  routing: MapTrifoldIcon,
   tactic: TagIcon,
   strategy: StrategyIcon,
   "script:rules": FlowArrowIcon,
   "script:ai": RobotIcon,
   "script:human": UserIcon,
   object: FileTextIcon,
-  factory: FactoryIcon,
+  performer: FactoryIcon,
   audience: UsersThreeIcon,
   start: PlayIcon,
   point: BrainIcon,

@@ -1,7 +1,7 @@
 {
   "name": "gtm-factory",
   "private": true,
-  "description": "An open framework for running go-to-market as an agentic factory.",
+  "description": "An open framework for running go-to-market like a production line: Engines, scripts as code, a Plan per tick.",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "engines": {

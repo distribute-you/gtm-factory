@@ -1,15 +1,15 @@
 "use client";
 
-import type { ApiChoicePoint } from "@gtm-factory/engine";
+import type { ApiChoicePoint } from "@gtm-factory/core";
 import { Page, PageHeader, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
+import { useOverview } from "@/lib/api/overview";
 import { plural } from "@/lib/format";
 import { PointsList, Read } from "./common";
 
 export function ApiResearchPage() {
   const read = useApi<ApiChoicePoint[]>("/research");
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   return (
     <>
       <TopBar crumbs={[{ label: "Research" }]} />

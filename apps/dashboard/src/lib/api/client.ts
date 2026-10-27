@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * The api data source's client: JSON over HTTP against the factory API. A failed call throws
- * the factory's own words (`{ error }`); nothing is defaulted. Reads poll and keep their last
+ * The api data source's client: JSON over HTTP against the GTM Factory API. A failed call throws
+ * the server's own words (`{ error }`); nothing is defaulted. Reads poll and keep their last
  * answer while they refetch, so a page never blinks; every write refetches every read.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FACTORY_API_URL } from "@/lib/data-source";
 
-const REFRESH_EVENT = "factory:refresh";
+const REFRESH_EVENT = "gtm-factory:refresh";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${FACTORY_API_URL}${path}`, {

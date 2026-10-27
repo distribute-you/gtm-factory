@@ -10,79 +10,69 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     kind: "outcome",
     title: "Outcomes and Units",
     lines: [
-      "An outcome is a part reference: Lead interested, Message sent, Template. A Unit is one physical piece of it: Marie, interested on day 24.",
-      "Every API call output is an outcome. A cold email is Message written, then Message queued by our send call, then Message sent and Reply received, reported by the mailbox.",
-      "Lead states sit on a lead track: lead interested, then meeting booked, then meeting attended, then paid client. Tracks are never added together.",
+      "An outcome is a part reference: Reply received, Message sent, Template. A Unit is one physical piece of it: Marie's reply on day 24.",
+      "Every call a script makes to the outside world lands as an outcome. A cold email is Message written, then Message queued, then Message sent and Reply received, reported by the mailbox.",
+      "Milestones sit on a Track: Lead interested, then Meeting booked, then Meeting attended, then Paid client. Tracks are never added together.",
     ],
   },
   {
-    kind: "leg",
-    title: "Legs, and the Bill of materials of each script",
+    kind: "engine",
+    title: "One Engine per outcome",
     lines: [
-      "A leg goes from one outcome to another, performed by competing scripts. Each script declares its own Bill of materials: a writer with a company research, another without.",
-      "Every leg runs the same code. Pull asks for Units that fit a Specification: the subject, conditions, a quantity. Push hands it one Unit to advance. It picks a script, serves it each Material from the stock, else pulls that outcome from the best producer, then runs it.",
-      "A Specification names the outcome, never a producer: the brand context of my lead's organisation, younger than 90 days. Whichever leg is picked receives it, like a purchase order names a part, not a machine.",
-    ],
-  },
-  {
-    kind: "campaign",
-    title: "The Campaign orders production",
-    lines: [
-      "A Campaign fixes only its Target, its budget and its strategy (Channel is cold email). Its production tree is rebuilt at every tick from performance.",
-      "From Start it is proactive: it pulls from the Target down, each Material from the stock, else from the best producer. From any other outcome it is reactive: it pushes each Unit that lands up toward the Target.",
-      "The sales path and the sales funnel are views: the tree actually used, with a short name to talk about it. A Unit advances one leg per tick, since every run takes time.",
-      "A follow-up campaign starts from Message sent. Its script waits its days since the last message, then writes. Who is never served, such as people who asked to stop, is the strategy's choice.",
-    ],
-  },
-  {
-    kind: "object",
-    title: "The ledger is the common stock",
-    lines: [
-      "Every Unit lands in one stock, whoever made it: our legs, the client's team, the client's CRM, the organic market. Several producers feed one outcome.",
-      "A leg serves itself from the stock when a Unit fits its Specification. When none does, it orders one from a producer it chooses. A Unit never wears out: several campaigns can consume it.",
-      "A webhook is the script of a leg another factory calls: the CRM reports an interested lead, the mailbox reports a message sent. Its Units land in the stock and push the reactive campaigns that start from them.",
+      "An Engine makes one outcome. Competing scripts perform it: cold email and LinkedIn are two scripts of the Reply received Engine. The only choice is the script, by return on each dollar.",
+      "An Engine has two calls. Pull makes one new piece for a subject. Push takes a Unit that just landed and makes the next outcome from it.",
     ],
   },
   {
     kind: "script:ai",
-    title: "Scripts",
+    title: "Scripts are code",
     lines: [
-      "A script performs a leg. Several compete on each leg. Each belongs to a dynasty with versions: an upgrade keeps the dynasty's stats, a fork starts from its parent's.",
-      "A script owns its business logic in its leg storage: who to pick, when to run, what to remember. The storage holds notes and references to Units, never copies.",
+      "A script is a file of plain code a person or an AI reads and edits. A change is a new version of its dynasty; a fork starts a new dynasty from its parent's results.",
+      "Its code calls the Providers of the outcomes it needs, at run time. A judge reads the code to list them, then the ledger measures what each run really consumed.",
+      "Freshness is the script's call: unhappy with what it got, it asks again and a new piece is made, as long as the run's budget lasts.",
+    ],
+  },
+  {
+    kind: "material",
+    title: "Providers",
+    lines: [
+      "One Provider per outcome, never in competition. Its one call returns the most recent Unit this caller has not received yet, for the run's subject, from the stock, else ordered from the Engine.",
+      "Every Unit lands in one stock, whoever made it: our scripts, the client's team, the client's CRM, the organic market. A Unit never wears out: several campaigns can consume it.",
+    ],
+  },
+  {
+    kind: "campaign",
+    title: "The Campaign and its Plan",
+    lines: [
+      "A Campaign fixes only its Target, its start, its budget and a brief in plain words. A judge reads the brief once per Engine: the strategy it keeps, or none, daily caps and a test length.",
+      "Its Plan is recomputed at every tick: from the Target down, each Engine with its best script now, its total cost and its return. From Start it pulls; from any other outcome it pushes each Unit that lands up toward the Target.",
+      "The Routing is a view: the milestones the Plan passes through, with a short name to talk about it.",
+    ],
+  },
+  {
+    kind: "performer",
+    title: "Performed by",
+    lines: [
+      "Every script carries who performs it: Ours, Client's team, Mailbox, CRM, Organic market. Budget and return count only what we perform.",
+      "A Client's team script costs us nothing; its limit is its capacity, typed by a person on the Done by your team page. Out of capacity today, the Plan routes around it until tomorrow.",
     ],
   },
   {
     kind: "point",
     title: "The Supplier rating",
     lines: [
-      "A leg cannot judge its candidates from its own data: a template's replies land later, in another leg. The Supplier rating leg reads the ledger and the traceability and makes a Rating each tick.",
-      "The choosing leg takes the Rating as a Material and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. The Rating's cost goes to the legs that consume it.",
-    ],
-  },
-  {
-    kind: "play",
-    title: "Credit through traceability",
-    lines: [
-      "Every Unit records the choices that led to it, its own included, and those carried by the Units it consumed.",
-      "When the next lead state lands, every choice on that record is credited. A template is judged on the reply it brings, never on how easily it gets written.",
+      "A script cannot judge its candidates from its own data: a template's replies land later. The Supplier rating reads the ledger and the traceability and makes a Rating each day.",
+      "Every choice takes the Rating and picks: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client. A branch is rated as it will be once the choices under it sit at their best.",
+      "Every Unit records the choices that led to it. When the next milestone lands, every choice on that record is credited.",
     ],
   },
   {
     kind: "strategy",
     title: "Tactics and strategies",
     lines: [
-      "A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts, leads and Units.",
-      "A strategy is a set of conditions on tactics, per Material of one leg: pro models at the writer's LLM completion, a 60 day recontact window at the identity's Lead found. Its conditions enter the Specification.",
-      "One split mechanism reads typed tactics. Splits on leads propose a finer ICP; splits on scripts propose a strategy.",
-    ],
-  },
-  {
-    kind: "factory",
-    title: "Other factories and reliability",
-    lines: [
-      "Every Unit names its producer: one of our runs, or another factory at its access cost. Our return counts only what our runs produced.",
-      "Reliability is measured: a producer's agreement with the outcome's reference leg on the same subjects.",
-      "Decisions read each leg's own cost and yield. Reports read the every-path cost of each outcome. A Unit keeps the price paid to make it, reuse shows as a gain, and the books reconcile to the cent.",
+      "A tactic is a typed property: yes or no, a value from a list, or a number. The same tactics describe scripts, people and Units.",
+      "A strategy is a set of conditions on tactics, per Engine: pro models for LLM completions, a 60 day recontact window for Lead found, nobody who asked to stop for Message written.",
+      "One split mechanism reads typed tactics. Splits on people propose a finer ICP; splits on scripts propose a strategy.",
     ],
   },
 ];
@@ -93,8 +83,8 @@ export function HowItWorksPage() {
       <TopBar crumbs={[{ label: "How it works" }]} />
       <Page narrow>
         <PageHeader
-          title="Revenue made easy, as a factory"
-          sub="Go-to-market as a factory: Campaigns order a Target, legs make outcomes, scripts compete inside each leg with their own Bill of materials, and every choice goes where a dollar returns the most."
+          title="Revenue made easy, built like a production line"
+          sub="Campaigns order a Target, one Engine makes each outcome, scripts compete inside each Engine, and every choice goes where a dollar returns the most."
           right={
             <a href={`${REPO_URL}/blob/main/docs/framework.md`} target="_blank" rel="noreferrer" className="k-btn">
               Read the spec

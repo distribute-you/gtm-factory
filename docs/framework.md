@@ -1,168 +1,182 @@
-# GTM Factory v5: the framework
+# GTM Factory v6: the framework
 
-Revenue made easy. This document describes the open framework behind it: how to model a go-to-market operation as an industrial plant, with the plant's own words and its own cost accounting. Everything here is implemented in [`packages/engine`](../packages/engine), and every number in the worked examples is checked by a test ([`docs.test.ts`](../packages/engine/test/docs.test.ts)).
+Revenue made easy. This document describes the open framework behind it: how to model a go-to-market operation as an industrial plant, with the plant's own words and its own cost accounting. Everything here is implemented in [`packages/core`](../packages/core), the scripts are code in [`scripts/`](../scripts), and every number in the worked examples is checked by a test ([`docs.test.ts`](../packages/core/test/docs.test.ts)).
 
-## 1. The factory
+## 1. The plant
 
-Think of a car plant. An order comes in for a car. The plant explodes the car's bill of materials: an engine, a body, four wheels; each part has its own bill of materials, down to raw steel. Each part comes from the stock when one is there, else it is ordered from the best supplier for it. The full production cost of the car is rolled up along that tree. The plant manager does not ask "which station is cheapest?" but "which tree makes a car for the least money, and is a car worth more than that?"
+Think of a car plant. An order comes in for a car. The plant explodes the car's bill of materials: an engine, a body, four wheels; each part has its own bill of materials, down to raw steel. Each part comes from the stock when one is there, else it is ordered from the shop that makes it. The full production cost of the car is rolled up along that tree. The plant manager does not ask "which machine is cheapest?" but "which tree makes a car for the least money, and is a car worth more than that?"
 
-Go-to-market works the same way. The raw material is a market, which always has a finite size. The finished product is a paying client. In between, legs turn one outcome into the next: a market becomes found leads, a found lead becomes an identified person, a person with a verified email and a researched company gets a written message, the message is queued by our send call, the mailbox reports it sent and reads the reply, a reply becomes an interested lead, an interested lead books a meeting. Some legs are performed by rules, some by AI, some by people. Some run in our factory, some in another one: the client's team, the client's CRM, the mailbox, the organic market.
+Go-to-market works the same way. The raw material is a market, which always has a finite size. The finished product is a paying client. In between, shops turn outcomes into new outcomes: a market becomes found leads, a found lead becomes an identified person, a person with a verified email gets a written message, the message is queued, the mailbox reports it sent and reads the reply, a reply becomes an interested lead, an interested lead books a meeting. Some of this work is done by rules, some by AI, some by people. Some of it is ours; some is performed by the client's team, the client's CRM, the mailbox or the organic market.
 
-The framework names these legs, measures them, and picks, at every place where several candidates compete, the one with the best value per dollar. It does so with one algorithm, everywhere, and it never stops learning.
+The framework names this work, measures it, and picks, at every place where several candidates compete, the one with the best value per dollar. It does so with one algorithm, everywhere, and it never stops learning.
 
 ```mermaid
 flowchart LR
-  M((Start)) -->|Lead sourcing| F[Lead found]
-  F -->|Identity| I[Lead identified]
-  I -->|Email finding| E[Verified email]
-  I -->|Company research| C[Company researched]
-  E --> W[Message writer]
-  C --> W
+  M((Start)) --> F[Lead found]
+  A[ICP] --> F
+  F --> I[Lead identified]
+  I --> E[Verified email]
+  E --> W[Message written]
   T[Template] --> W
-  B[Brand context] --> W
   L[LLM completion] --> W
-  R[Rating] --> W
-  W --> MW[Message written]
-  MW -->|Cold email send| Q[Message queued]
-  Q -.mailbox webhook.-> S[Message sent]
-  Q -->|Mailbox replies| Y[Reply received]
-  Y --> J[Reply judge]
-  L --> J
-  J --> N[Lead interested]
+  W --> Q[Message queued]
+  Q --> S[Message sent]
+  Q --> Y[Reply received]
+  I --> Y
+  Y --> N[Lead interested]
+  N --> B[Meeting booked]
 ```
 
 ## 2. The objects
 
-Three objects carry a status of their own: **outcomes**, **legs** and **scripts**. Everything else describes them, orders from them or records what they did. Nothing in the code knows the name of an outcome, a leg or a script: add one and it competes like the others.
-
 | Object | What it is |
 |---|---|
-| **Outcome** | A part reference: Lead interested, Message sent, Template, Rating. It says what a piece is about (its subject): a lead, a company, the brand, or the run that ordered it. |
-| **Unit** | One physical piece of an outcome: Marie, interested on day 24. Every Unit lands in the ledger, names its producer and carries its traceability. In industrial cost accounting, the unit is what a cost is computed for. |
-| **Lead track** | An ordered ladder of lead states. The CRM lifecycle track holds lead interested, meeting booked, meeting attended, paid client. The website visits track holds lead visited. Tracks are never added together. A track is data. |
-| **Leg** | Goes from one outcome to another: it makes one output outcome, and competing scripts in dynasties perform it. A channel is not a leg: it is a tactic of the scripts. |
-| **Script** | What performs a leg. Several scripts compete on each leg. Every script belongs to a **dynasty** of versions, and declares its own Bill of materials. |
-| **Bill of materials** | What one script consumes per Unit it produces, as data. Each line is one **Material**: an outcome, and the conditions of the Specification the script builds from its own subject. Two scripts of one leg may need different Materials: a writer may research the company first or not; in the distribute.you catalogue, the cold email script on a leg takes a Template while the cold call script on the same leg does not. The Material that carries the subject (the verified email) is the Unit the script works on. |
+| **Outcome** | A part reference: Lead interested, Message sent, Template, Rating. It says what a piece is about (its subject): a lead, a company, the brand, or the run that asked for it. |
+| **Unit** | One physical piece of an outcome: Marie, interested on day 24. Every Unit lands in the ledger, names who performed it and carries its traceability. |
+| **Engine** | One per outcome. It makes new Units of its outcome, and only of its outcome. Competing scripts perform it. |
+| **Script** | Code that makes one Unit of its Engine's outcome, or none. Scripts of one Engine compete; each belongs to a **dynasty** of versions. |
+| **Provider** | One per outcome, never in competition: the stores of that outcome. A script asks a Provider for what it needs. |
 | **Run** | A production order: one script executed, one Unit or none. |
-| **Specification** | New generic object. What a consumer asks for when it pulls an outcome: a subject, conditions, a quantity (section 3). In plant words, a purchase order. |
-| **Campaign** | Orders production: a Target, a budget (a daily budget, with an optional volume per period), a start and a strategy (section 3). |
-| **Factory** | Who performs a leg: ours, or another factory (the client's team, the client's CRM, the mailbox, the organic market) at a named access cost, zero allowed. |
+| **Campaign** | Orders production: a Target, a start, a budget and a strategy written as a brief. |
+| **Plan** | The tree a campaign runs, recomputed at every tick: each outcome, its Engine, the script that Engine runs now, and the Plan of each outcome that script calls. |
+| **Routing** | The ordered milestones a Plan passes through, with a short name ("Meetings booked from the market"). A view, never a control. |
+| **Track** | An ordered ladder of states. The CRM lifecycle track holds Lead interested, Meeting booked, Meeting attended, Paid client. The Conversation track holds Reply received. The Website visits track holds Lead visited. A state of a track is a **milestone**. Tracks are never added together. |
 
-**Every API call output is an outcome.** A cold email is not one leg. The writer makes a Message written; our send call makes a Message queued; the mailbox reports a Message sent and reads each Reply received. Each is an outcome with its own Units, so each can be measured, priced and consumed.
+**Every API call output is an outcome.** A cold email is several outcomes: the writer makes a Message written; our send call makes a Message queued; the mailbox reports a Message sent and reads each Reply received. Each can be measured, priced and consumed.
 
-**A channel is a tactic, not an object.** Cold email, LinkedIn, WhatsApp, a cold call, an ad: each is a value of the list tactic "Channel" carried by scripts. Scripts of every channel compete on the same leg; a client who wants only some channels says so in the strategy of its campaign ("Channel is cold email"). Two legs differ only when what they go from or what they make differs.
+**A channel is a tactic.** Cold email and LinkedIn are two scripts of the Reply received Engine; each carries the value of the tactic "Channel". A client who wants only some channels says so in the brief.
 
-**Identity is a leg.** "Who is this lead?" is the outcome *lead identified*, made by competing scripts (an email and domain match, a name, company and title merge). Only the id space is common to every leg.
+**Who performs a script is a tactic.** "Performed by" says Ours, Client's team, Mailbox, CRM or Organic market. Budget and return read only "Performed by = Ours". A script of the client's team costs us nothing; its limit is its capacity (section 6).
 
-**The ICP is an outcome like any other.** An ICP is a plain sentence, written by the client (a person, in the client's factory) or by an AI (in ours). Several ICPs compete as Units of the brand. A judge reads who fits a sentence: an AI in production, the hidden truth in the simulator.
+**The ICP is an outcome like any other.** An ICP is a plain sentence, written by the client or by an AI. Several ICPs compete as Units of the brand. A judge reads who fits a sentence: an AI in production, the hidden truth in the simulator.
 
 **The market is Start.** A market has a finite size. A script that sources leads draws people its source covers; when its reserve empties, its yield falls and budget moves elsewhere by itself.
 
-## 3. Pull, push and the production tree
+## 3. The six decisions of v6
+
+1. **One Engine per outcome.** An Engine makes one outcome; competing scripts in dynasties perform it. A script makes one outcome and may consume any outcomes. The only choice left is the script, inside the Engine of an outcome: the best value per dollar among the scripts the strategy keeps.
+2. **No written manifest.** A script is code: it calls its Providers at run time. The outcomes it needs (its **materials**, for the Plan, costs, return and capacity) are first read from its code by a judge, once per version, then replaced by what the ledger measured each run consumed. An unexpected call joins the list.
+3. **Provider and Engine.** A Provider offers one function, `get()`, with no argument: it returns the most recent Unit of its outcome this caller has not received yet, for the caller's context (the run's subject, its company, its brand, or the run itself), from the stock, else by ordering one from the Engine. "Already received" is the ledger's record of consumption. An Engine offers `pull()` and `push(unit)`, and always makes a new piece. `pull()` makes one piece for a context, down from the Target. `push(unit)` makes the next outcome from a Unit that landed, up toward the Target.
+4. **Freshness is the script's job.** A script unhappy with what it got calls `get()` again, and a new piece is made, as long as the run's budget lasts.
+5. **The names.** Engine, Provider, Plan, Routing, Track.
+6. **"Performed by" is a tactic of scripts.** Who runs a script is data on the script, never an object of its own.
+
+## 4. Scripts are code
+
+A script lives in `scripts/<outcome>/<dynasty>/v<n>.ts`. Its default export `run(ctx)` receives its subject, `ctx.get(outcome)` on the Providers, its Engine's storage, the vendor client and its tactics, and returns one Unit content or none. The email lookup, in full:
+
+```ts
+export default function run(ctx: ScriptContext): ScriptResult {
+  const lead = ctx.get("lead_identified");
+  ctx.get("rating");
+  const failed = ctx.storage.get("failed", lead.subject);
+  if (typeof failed === "number" && ctx.day - failed < Number(ctx.tactics.retry_days ?? 30)) return null;
+  const r = ctx.vendor.call("apollo.reveal", { lead: lead.subject });
+  if (!r.ok) {
+    ctx.storage.set("failed", lead.subject, ctx.day);
+    return null;
+  }
+  return { content: { email: r.data.email ?? null, verified: true } };
+}
+```
+
+A change is a new version of its dynasty; a different idea is a fork. The simulator runs this same code against a vendor that answers from the hidden truth; a running GTM Factory runs it with real vendors.
+
+Two scripts of one Engine may call different Providers. The short writer calls no company research; the research writer does. Both compete in the Message written Engine, and no company research is ordered for a lead only the short writer served.
+
+A script that wants a fresh piece asks again: `if (context.ageDays > 90) context = ctx.get("brand_context")`. A script that never stops asking stops where the run's budget ends.
+
+**Storage.** An Engine's storage holds only its scripts' notes ("no email found for this lead", "picked this person on day 12") and references to ledger Units, never copies. It is shared by the scripts of that Engine and read by nobody else. Business rules such as "Days before recontact" or "Days before retry" are tactics the script reads and enforces in its own code.
+
+**One run, one script.** When a run does not produce its outcome, no other script is tried on that subject. A script may embed a fallback of its own, and it is then simply a different script.
+
+## 5. Pull, push and the Plan
 
 ### The Campaign fixes a Target, never a line
 
-A Campaign fixes only its **Target**, its budget (a daily budget, with an optional volume per period), its start and its **strategy** (conditions on tactics, such as "Channel is cold email", that every script it runs meets wherever the script carries the tactic). It never fixes a line of legs. Its **production tree** is rebuilt at every tick from performance.
+A Campaign fixes only its **Target**, its start, its budget (a daily budget, with an optional volume per period) and its strategy. It never fixes a line. Its **Plan** is recomputed at every tick: from the Target down, each outcome's Engine and the script it would run now (the best mean value per dollar of the Rating, among the scripts the brief keeps), then the Plan of each outcome that script calls, down to Start or to a Unit a Provider serves. Plan, expected cost and return change at every tick.
 
-- **Pull** (proactive, started from Start, the market): start from the Target and go down. Each needed Material is taken from the ledger's stock, else ordered from the best producer, recursively, down to Start.
-- **Push** (reactive, started from any other outcome): start from the Unit that landed (a reply received) and go up. At each lead state, the tree gives the next one toward the Target that is worth the most; the leg that makes it consumes the pushed Unit, and its other Materials are pulled.
+- **Pull** (proactive, from Start): the campaign pulls on its Target. Open work nearest the Target moves first, then Units waiting in the stock at a milestone below the Target, and only then new subjects from the market, with the budget left and within its volume.
+- **Push** (reactive, from any other outcome): each Unit of the start outcome that lands for the brand is pushed to the next Engine the Plan names, up toward the Target.
 
-Both read the same tree. From each lead state, the next one is the one worth the most, value flowing backward from the Target (section 8): `V = y x V(next) - c`, with each step's yield drawn from its belief when several steps compete, so a step with little data gets tried. A lead state with one way up is not drawn. Old evidence fades with the world's half-life, so when a way up stops working, the tree moves.
-
-In plant words, this is the explosion of the bill of materials: the Target is the car, the tree is every part and every supplier the plant uses for it today, and its full production cost is rolled up along the tree.
-
-**The sales path and the sales funnel are views.** The sales path is the straight line of lead states the tree actually went through ("Meetings booked from the market"); the sales funnel is that path with the leg that made each lead state ("Reply judge to meetings booked"). Each gets a short name the first time it is seen and keeps it, so it can be pinned and talked about. Neither controls anything.
-
-### The contract of a leg
-
-A script never calls anything itself. It **declares** its Bill of materials as data: per Material, the outcome and a Specification built from its own subject ("Brand context, subject the organisation of my lead, younger than 90 days"). It receives the Materials, its leg storage and the metered vendor client, and returns one Unit or none.
-
-The **leg** orchestrates, with the same generic code for every leg, through two functions:
-
-- `pull(specification, quantity, budget)` serves Units that conform to the Specification: from the stock when some conform, else by producing them.
-- `push(unit, budget)` advances that one Unit: the leg takes it as the Unit it works on and serves itself the rest of the Bill of materials.
-
-Producing one Unit is always the same four moves:
-
-1. Pick the script: the Supplier rating's best candidate (section 5), filtered by the strategy.
-2. For each Material of that script's Bill of materials, look up the ledger with its Specification.
-3. If none conforms, pull the **outcome**: the best producer is picked then, and receives the Specification.
-4. Run the script once all its Materials are there.
-
-A **Specification** addresses the outcome, never a producer. It states three things, nothing more:
-
-- the **subject**: "Paul", "the company of Paul", "Acme" (the brand), or "this run" for a Unit that answers one run's question;
-- **conditions** on tactics, with the three condition types of section 6 (equals, in a list, within a range): "younger than 90 days", "Model tier is pro". The conditions the script declares and those the strategy states at that Material enter here;
-- a **quantity**.
-
-The consumer does not need to know which leg or script will be picked: a purchase order names the part and its characteristics, not the machine. A push carries no Specification: the pushed Unit is the Material.
-
-A Material that takes time (a reply takes days) leaves the subject waiting in the stock; the next tick retries. A Unit advances one leg per tick: every run takes time, at least one tick. All campaigns run at each tick, each on its own budget, spread over the day's ticks. A capacity several campaigns share (a mailbox, a vendor's limit) is a budget like any other: it goes to the campaigns in order of value per dollar (section 4). A pull serves the most advanced Units first: open work nearest the Target, then Units waiting in the stock at a lead state of the tree. Only then does the Campaign take new subjects from the market, with the budget left and within its volume. Upstream produces only what downstream asked for.
+A Unit advances one Engine per tick. All campaigns run at each tick, each on its own budget spread over the day's ticks. An order that could not start (a script out of capacity, a cap reached) is undone, and the next tick asks again.
 
 ### Worked example: a pull
 
-Acme's campaign has the Target Meeting booked, starts from Start, with a daily budget of $10 and 20 new subjects a day. Each leg has one script and, to read the story, every yield is 1. Follow Paul, the first lead.
+Northwind Analytics, the fictional client, runs an ads campaign. Its brief reads: "Test ads for 30 days, at most 120 visits a day, and book meetings from the signups." It has the Target Meeting booked, starts from Start, with a daily budget of $30. A meeting is worth **$600** to Northwind.
 
-- Tick 0. Meeting booked is pulled. The tree goes down: the booking leg needs a Lead interested, none is in the stock, so the reply judge is pulled, the judge pulls the mailbox's reply, down to Start. Lead sourcing runs. Paul's Lead found lands at tick **1**.
-- Tick 1: identity runs on Paul; his Lead identified lands at tick **2**. Tick 2: email finding; his Verified email lands at tick **3**.
-- Tick 3. The message writer's script holds the Unit it works on and serves itself the rest of its Bill of materials. Its Template and today's Rating are in the stock. It pulls a Company researched with the Specification "the company of Paul", and a Brand context with "Acme, younger than 90 days". Neither conforms yet, so each outcome is ordered from its best producer, and an LLM completion is ordered for the run. Acme spends **$2.44** that tick, for every lead at every stage.
-- Tick 4: the writer runs. One Brand context was made for **157** messages over twelve days: every writer after the first is served from the stock. **20** Company researched Units served **157** messages: a colleague's research conforms.
-- Ticks 5 to 9: our send call, the mailbox's reply, the judge (its LLM completion ordered at tick 7). Paul's Lead interested lands in the stock, the booking leg pulls it at once, and his Meeting booked lands at tick **10**.
+After **14** days, its Plan reads, from the Target down:
+
+- Meeting booked, made by the slot booking script (**3** scripts compete);
+- Lead interested, made by the website signup, performed by the client's team (**1** script);
+- Lead visited, made by the search ads script (**2** scripts compete);
+- the ICP, served from the stock (**2** ICP dynasties compete), and today's Rating.
+
+Its Routing is "Meetings booked from the market". Per milestone:
+
+| Milestone | Attempts per Meeting booked | Cost from Start |
+|---|---|---|
+| Lead visited | **79.4** | **$0.41** |
+| Lead interested | **48.0** | **$8.47** |
+| Meeting booked | **2.3** | **$19.92** |
+
+One meeting costs **$19.92** from Start, so the expected return is $600 / $19.92 = **30.1** dollars per dollar. The signups cost nothing to us: the client's team performs them, and their cost of this outcome is $0.
 
 ### Worked example: a push
 
-A second Acme campaign has the Target Meeting booked and starts from Reply received: it is reactive. Another campaign of Acme writes and sends; this one pushes every reply up. Follow Lea, the first reply.
+Northwind's follow-up campaign starts from Message sent and has the Target Lead interested; its brief reads: "Follow up once on every cold email that got no answer, four days later." It is reactive. The outbound campaign writes and sends; this one receives every Message sent. Its Routing is "Leads interested from messages sent", and the next Engine its Plan names is Follow-up queued. Follow Lea, the first lead it won.
 
-- Tick **7**: Lea's Reply received lands. The tree gives the next lead state toward the Target, Lead interested; the reply judge consumes the reply and pulls the rest of its Bill of materials (an LLM completion ordered for the run, today's Rating).
-- Her Lead interested lands at tick **9**. The Unit is pushed on: the booking leg consumes it, and her Meeting booked lands at tick **10**.
-- The push campaign spent **$0.17** on Lea: the judge and its model call, then the booking.
+- Day **0**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
+- Day **4**: the follow-up is queued.
+- Day **6**: the mailbox reads Lea's reply and the reply judge marks her interested.
+- The follow-up campaign spent **$0.16** on Lea.
 
-### Webhooks
+The judge kept the strategy "Only people who have not answered nor asked to stop" for the Follow-up queued Engine: someone who already replied to the first email gets no follow-up.
 
-A **webhook** is the script of a leg with no internal Material, whose producer is another factory: the prospect, the client's CRM, the mailbox. It runs when the webhook is called, not at the tick. Its Units land in the ledger, available to every campaign, and their arrival pushes the reactive campaigns that start from that outcome. Downstream legs plug into the outcome, never into a webhook. The call names the Unit it reports on, so a Message sent carries the traceability of the message queued. The leg that attests a fact is incoming inspection; how far it can be trusted is its reliability (section 9).
+## 6. The brief, capacity and caps
 
-A follow-up campaign starts from Message sent and targets Lead interested. When the mailbox's webhook reports a Message sent, the Unit lands in the stock and the Campaign pushes it up its tree, into the follow-up. The follow-up's script reads its tactic "Days since last message" (4): it keeps a reference to the Unit in its leg storage and runs when 4 days have passed. A subject who reached the Target meanwhile is done. Who is never served (people who unsubscribed, people not interested) is an end state the strategy excludes.
+**The brief.** A campaign's strategy is a brief in plain words. A judge (an AI in production, the hidden truth in the simulator) reads it once per Engine, and again when the catalogue changes. For each Engine it keeps one of that Engine's strategies, or none: the Plan then routes around that Engine. Daily caps in the brief become most Units per day at an Engine. A test length becomes an end date. The verdicts are stored on the campaign.
 
-## 4. The ledger is the common stock
+A **strategy** is a set of conditions on tactics: equals, in a list, within a range. It filters the scripts of its Engine ("Channel is Cold email") and may also state who the Engine serves ("never write to people who asked to stop"). The subject is checked at every run, since a person may ask to stop while an order is open. Each Engine has a default strategy with no condition.
 
-Every Unit, from every producer, lands in one stock: our legs, the client's team, the client's CRM, the organic market. Several producers can feed one outcome: an interested lead found by our reply judge and one who came by herself sit side by side, and the booking leg serves itself from both.
+**Capacity.** Each script has a capacity: most Units per day, and days one Unit takes. It is measured for code and AI scripts. A person types it for a script of the client's team, on the "Done by your team" page. A script out of capacity today leaves today's choices and the order waits for tomorrow; the Plan ignores today's limits, so it still names the script.
 
-A script's Material is served from the stock, filtered by its Specification. If no Unit conforms, the outcome is pulled from ONE producer, chosen by the Supplier rating (section 5).
+## 7. The ledger is the common stock
 
-A leg's storage holds only its scripts' notes ("no email found for this lead", "picked this person on day 12") and references to ledger Units, never copies. It is shared by the scripts of that leg and read by nobody else.
+Every Unit, from whoever performed it, lands in one stock. Several scripts feed one outcome: an interested lead found by our reply judge and one who signed up on the website sit side by side, and the booking script serves itself from both. A campaign never takes, for a subject it holds, the work in progress of another campaign.
 
-**Reuse.** A Unit never wears out: information is copied, not consumed, like a mould rather than raw material. Several campaigns may consume the same Unit; the books show it as a reuse gain (section 10). Limiting action on the same person is the script's tactic "Days before recontact", filtered by the strategy, never a parameter of the outcome or of the campaign. "Consumed" means the Unit appears in the traceability of what it served.
-
-**One run, one script.** A run performs one script. When it does not produce the outcome, the run is a run without the outcome: no other script is tried on that subject. A script may embed a fallback of its own, and it is then simply a different script.
+**Reuse.** A Unit never wears out: information is copied, not consumed, like a mould rather than raw material. Several campaigns may consume the same Unit; the books show it as a reuse gain (section 10).
 
 ### Dynasties
 
-Anything a Material can choose (a script, or a Unit of the brand) may belong to a dynasty of versions. The choice picks a dynasty and serves its head version. Stats pool across the versions of a dynasty. An **upgrade** is a new version of the same dynasty: it starts from the dynasty's belief. A **fork** is a new dynasty: it starts from its parent's belief. LLM models, templates and ICPs are examples of this one rule; the code holds no line about any of them.
+Anything a choice can pick (a script, or a Unit of the brand) belongs to a dynasty of versions. The choice picks a dynasty and serves its head version. Stats pool across the versions of a dynasty. An **upgrade** is a new version of the same dynasty: it starts from the dynasty's belief. A **fork** is a new dynasty: it starts from its parent's belief. LLM models, templates and ICPs are examples of this one rule; the code holds no line about any of them.
 
-## 5. The choice and the Supplier rating
+## 8. The choice and the Supplier rating
 
-A **choice point** is any place where several candidates compete: the leg that makes a lead state, the producer of a Material, the Unit of the brand to consume. The choice lives on the **Material**, never on the producer: a choice point is a pair (consuming leg, Material). The same LLM leg in the message writer's Bill of materials and in the reply judge's makes two choice points. GLM can be the best value per dollar for the writer while Gemini Pro is the best for the judge.
+A **choice point** is a pair (consuming Engine, outcome it calls): the same LLM Engine called by the writer and by the reply judge makes two choice points, and each can settle on a different model.
 
-### Stats are an outcome: the Supplier rating
+The **Supplier rating** is an Engine like any other. At each tick it reads the ledger and produces a **Rating** Unit for each brand: per candidate at each choice point, its beliefs about value per dollar. Every choosing script calls the Rating's Provider.
 
-A leg cannot judge its candidates from its own data: a template's replies land later, in another leg. The **Supplier rating** leg, an auxiliary cost center in cost-accounting terms, reads the ledger and the traceability and produces, at each tick, a **Rating** Unit for each brand: per candidate at each choice point, its beliefs about value per dollar. Every choosing script takes the Rating as a Material. The Rating's cost is allocated, through the ledger, to the legs that consume it.
+The rule is one for every choice: **Thompson sampling on value per dollar**.
 
-The Rating's script is one rule for every choice: **Thompson sampling on value per dollar**.
-
-1. Each candidate carries a belief about the share of its decisions that reach the outcome the decision exists for (the next lead state of the tree), and a belief about its **measured** cost from the decision to that outcome (the cost of the candidate chosen, never an average over candidates).
+1. Each candidate carries a belief about the share of its decisions that reach the next milestone, and a belief about its measured cost from the decision to that milestone.
 2. Draw one rate and one cost from each belief.
 3. Score each candidate: rate x value / cost.
 4. Pick the highest.
 
-A candidate with little data has wide beliefs: sometimes it draws high and gets tried. Exploration comes by construction: no quota, no threshold, no learning phase.
+A candidate with little data has wide beliefs: sometimes it draws high and gets tried. Exploration comes by construction.
 
 ### Credit through traceability
 
-Every Unit carries its **traceability**: the choices that led to it, its own included, and those carried by the Units it consumed. When the next lead state lands, every choice on its traceability is credited. A candidate is scored on the outcome its decision exists for, never on its own leg: a template almost always lets the writer write, so its own leg says nothing; the reply rate of the messages it served says everything.
+Every Unit carries its **traceability**: the choices that led to it, its own included, and those carried by the Units it consumed. When the next milestone lands, every choice on its traceability is credited. A template is scored on the replies of the messages it served, never on whether the writer wrote. Reply received is a milestone of the Conversation track, so the choices of a cold email are credited at the reply, days before an interested lead.
 
-### Pooling: script, Material, clients sharing tactics, client
+### A branch is rated with its own choices at their best
 
-A belief is pooled across four levels, each pulled toward the one above with a strength fitted from the data (empirical Bayes): the script's level everywhere it is offered (relative to each point's average, so general knowledge travels) and its tactic group's, then this Material across the fleet, then clients sharing the client's tactics, then the client. Local data wins as it grows.
+A candidate's measured rate mixes every choice still being learned under it. A cold email branch tried while its email finder, writer and template are still explored looks worse than it is. So the Rating multiplies a candidate's value by its **uplift**: over each choice point under it, the best candidate's value per dollar over the value per dollar of the mix picked there this last week. The Plan reads the tree the same way.
+
+### Pooling, delays, time
+
+A belief is pooled across levels (the candidate everywhere it is offered, this choice point across clients, clients sharing tactics, the client), each pulled toward the one above with a strength fitted from the data. Local data wins as it grows.
 
 Worked example, with a fleet rate of 2% counted as 200 trials of prior experience, for a client whose true rate is 3%:
 
@@ -173,79 +187,65 @@ Worked example, with a fleet rate of 2% counted as 200 trials of prior experienc
 | 30 out of 1,000 | (30 + 4) / 1,200 = **2.83%** |
 | 300 out of 10,000 | (300 + 4) / 10,200 = **2.98%** |
 
-### Delays, settled failures, time
+A reply can land days after the message. A decision whose order is still open counts for the share of outcomes already due at its age; a decision whose order ended without the milestone counts in full. Worked example: 100 decisions made 7 days ago, 70% of outcomes usually arrive within 7 days, 2 successes so far, all still open. They are worth 100 x 0.7 = 70 full trials, and the estimate is 2 / 70 = **2.86%**, not 2%.
 
-A reply can land days after the message, and every leg still to run takes at least a tick. A decision whose attempt is still open counts for the share of outcomes already due at its age (the delay distribution's CDF); the ticks the remaining legs must take are certain, so nothing is due before them. A decision whose attempt has ended without the outcome counts in full: a known failure is not pending.
+Each day's decisions are read like for like, against the other candidates' results that day, so a candidate tried while the rest was still learning is not blamed for it, and a candidate cannot excuse its own failures. Old evidence fades with a half-life, so a world that changes is read again: a source that runs dry loses its picks.
 
-Worked example: 100 decisions made 7 days ago, 70% of outcomes usually arrive within 7 days, 2 successes so far, all still open. They are worth 100 x 0.7 = 70 full trials, and the estimate is 2 / 70 = **2.86%**, not 2%.
+### Regret
 
-Each day's decisions are read like for like: weighted by how that day's decisions did at the same point, all candidates together, so a candidate tried mostly while the rest of the factory was still learning is not blamed for it. Old evidence fades with a half-life (data of the world), so a world that changes is read again.
+The simulator knows the hidden truth, so it can grade the Rating. **Regret** is, per day, the share of each dollar's value the picks lost against always picking the hidden best (1 minus its value per dollar over the best's), weighted by picks, over every choice point of every campaign, each day graded against that day's truth. On five seeds of the fictional world, regret falls between days 0 to 10 and days 50 to 60 on each seed, and its mean over days 50 to 60 stays under **0.05**.
 
-## 6. Tactics and strategies
+## 9. Splits and proposals
 
-A **tactic** is a typed property: yes or no, one value from a list (country: United States, France...), or a number (revenue, headcount, days before recontact, days since last message, a Unit's age). The same tactics describe scripts, leads and Units, judged by an AI or read from data.
+The split mechanism looks for a tactic that separates successes from failures: a yes or no tactic splits true against false, a list tactic groups its values by rate, a number tactic is cut at the deciles of its values. A split is a conclusion only when the exact test on raw counts passes, corrected for the number of splits tried, and the like for like test inside the same client and month passes in the same direction.
 
-A **strategy** is a set of conditions on tactics: equals, in a list, within a range. A Campaign's strategy holds for every script it runs, wherever the script carries the tactic: "Channel is cold email" rules out the LinkedIn scripts and leaves identity alone. A **play** is a leg with a strategy of its own, stated **per Material** of that leg: its conditions enter the Specification of that Material, so they filter both the Units served from the stock and the producer scripts ordered from. A campaign's play on the writer can require "Model tier is pro" at its LLM completion while the reply judge's stays open, or "Brand context younger than 30 days" at its Brand context. A strategy may also state who the play serves (lead tactics, end states never reached: "never write to people who asked to stop"). A leg the campaign leaves out plays its default strategy, which has no condition. Eligibility rules such as recontact windows are script tactics filtered by the strategy: "Days before recontact is 60 or more" at the identity leg's Lead found.
+A split on **leads** proposes a finer ICP: an AI script writes a new Unit, a fork of the ICP it refines, that starts from its parent's belief and competes. A split on **scripts** proposes a strategy.
 
-## 7. One split mechanism
+## 10. The two calculations
 
-The split mechanism looks for a tactic that separates successes from failures, decision-tree style: a yes/no tactic splits true against false, a list tactic groups its values (sorted by rate, every cut of that order), a number tactic is cut at the deciles of its values. Each side needs at least 10 outcomes. The verdict rule:
+Every decision rests on two numbers that flow in opposite directions, milestone by milestone of the Routing.
 
-- **Conclusion**: the exact test on the raw counts passes, corrected for the number of splits tried (Bonferroni), and the like-for-like test (Mantel-Haenszel, inside the same client and month) passes in the same direction;
-- **Signal**: only the raw test passes, often a mix effect;
-- **Noise**: everything else, or a leader with fewer than 5 outcomes.
-
-A split on **leads** proposes a finer ICP: an AI script writes a new Unit, a fork of the ICP it refines, that starts from its parent's belief and competes. A split on **scripts** proposes a strategy (conditions at a Material) and its play. Main effects come first; an interaction enters only when a split proves it.
-
-## 8. The two calculations
-
-Every decision rests on two numbers that flow in opposite directions, step by step of the sales path.
-
-**Cost flows forward from Start.** One Unit of a state costs what it took to make the previous one, plus the step's own cost per attempt, divided by its yield:
+**Cost flows forward from Start.** One Unit of a milestone costs what it took to make the previous one, plus its own cost per attempt, divided by its yield:
 
 `C(start) = 0` and `C(to) = (C(from) + c) / y`
 
-**Value flows backward from the Target.** A paid client is worth the offer's lifetime revenue. A state before it is worth what you can make of it, net of what that costs, or nothing:
+**Value flows backward from the Target.** A paid client is worth the offer's lifetime revenue. A milestone before it is worth what you can make of it, net of what that costs, or nothing:
 
 `V(target) = value` and `V(s) = max(0, y x V(next) - c)`
 
-For a sales path of steps 1 to n, the cost of one Target Unit is
-
-`T = c1 / (y1 y2 ... yn) + c2 / (y2 ... yn) + ... + cn / yn`
-
-and its value per dollar is `value / T`.
+The cost of one Target Unit is `T = c1 / (y1 y2 ... yn) + c2 / (y2 ... yn) + ... + cn / yn`, and its value per dollar is `value / T`.
 
 ### Worked example
 
-A client sells a service with a lifetime revenue of **$2,100**, through a sales path of three steps:
+A client sells a service with a lifetime revenue of **$2,100**, through three milestones:
 
-| Step | Cost per attempt | Yield |
+| From, to | Cost per attempt | Yield |
 |---|---|---|
 | Start to Lead interested | $1 | 2% |
 | Lead interested to Meeting booked | $2 | 40% |
 | Meeting booked to Paid client | $10 | 20% |
 
-Cost forward, which a campaign page shows as each step's **cost from Start**: one interested lead costs $1 / 0.02 = **$50**. One meeting costs ($50 + $2) / 0.4 = **$130**. One paid client costs ($130 + $10) / 0.2 = **$700**. The **cost of this step per outcome** leaves out the steps before it: $2 / 0.4 = $5 per meeting.
+Cost forward, which a campaign page shows as each milestone's **cost from Start**: one interested lead costs $1 / 0.02 = **$50**. One meeting costs ($50 + $2) / 0.4 = **$130**. One paid client costs ($130 + $10) / 0.2 = **$700**. The **cost of this outcome** alone leaves out the milestones before it: $2 / 0.4 = $5 per meeting.
 
-Read per paid client, each step's attempts per Target Unit are its **attempts per Paid client**: the closing step makes 5 attempts on meetings, the booking step 12.5 on interested leads, the first step 625 from the market. Value per dollar: $2,100 / $700 = **3.0**.
+Read per paid client, the **attempts per Paid client** are 5 on meetings, 12.5 on interested leads and 625 from the market. Value per dollar: $2,100 / $700 = **3.0**.
 
 Value backward: a meeting is worth 0.2 x $2,100 - $10 = **$410**. An interested lead is worth 0.4 x $410 - $2 = **$162**. One attempt is worth 0.02 x $162 - $1 = **$2.24** net.
 
 ### Budget and the price of a dollar
 
-A budget, and any capacity several campaigns share, is funded in order of value per dollar until it runs out. With $500 to spend, an action returning $6 per dollar that can absorb $300, and one returning $3 that can absorb $1,000: the first gets $300, the second $200. One more dollar of budget is worth **$3**: the price of the marginal dollar. An action returning less than $1 per dollar is never funded.
+A budget is funded in order of value per dollar until it runs out. With $500 to spend, an action returning $6 per dollar that can absorb $300, and one returning $3 that can absorb $1,000: the first gets $300, the second $200. One more dollar of budget is worth **$3**: the price of the marginal dollar.
 
-## 9. Other factories and reliability
+## 11. Others who perform, and reliability
 
-Every Unit names its producer: one of our runs, or another factory (the client's team, their CRM, the mailbox, the organic market) at a named access cost, zero allowed. Everything is counted; the return of our legs values only what our runs brought in. A paid client who came in organically counts in the client's figures, never in our return.
+Every Unit names who performed it. Everything is counted; our return values only what our runs brought in. A report from another party about a fact one of our runs made (the CRM import of an interested lead our reply judge missed) is that run's campaign's value, and credits no choice: a judge that missed a fact missed it.
 
-Whoever attests an outcome is a leg: a reply judge, a CRM webhook, a website tracker. **Reliability** is the third measured property of a leg's or a script's output, beside yield and cost: its agreement with the outcome's reference leg on the same subjects. Merged over the producers that attested it, an outcome carries a **confidence**: one minus the chance that every one of them is wrong. A client counts in an outcome's figures only where a reliable producer covers it.
+Whoever attests an outcome is a script: a reply judge, a CRM import, a website tracker. **Reliability** is its agreement with the outcome's reference script on the same subjects.
 
-## 10. Decide versus report
+## 12. Decide versus report
 
-**To decide**, the Rating reads each candidate's own measured cost and rate, from the decision to the next lead state. **To report**, the ledger prices every outcome every path: its own production, plus its Materials at their own unit cost, with cycles solved. Expected and measured returns share one formula: value / T, T computed on the steps of the sales path the tree runs (expected: censoring-corrected step rates and measured costs; measured: the value won and the spend of the people who entered long enough ago). A campaign page also shows its **production tree**: per outcome, each branch (the leg that made it) with its share of the Units and its cost per Unit.
+**To decide**, the Rating reads each candidate's own measured cost and rate, from the decision to the next milestone. **To report**, the ledger prices every outcome by every path: its own production, plus its materials at their own unit cost. Expected and measured returns share one formula and one basis: subjects the campaign made from its start, never ones it took from the stock.
 
-A Unit keeps the price paid to produce it, its **standard cost**, and every consumption pays that price. When a Unit is consumed again (a company research serving every lead of that company, a template serving thousands of messages, a Rating serving every choice of its tick), the books show a **reuse gain**. Everything reconciles to the cent:
+A Unit keeps the price paid to produce it, its **standard cost**, and every consumption pays that price. When a Unit is consumed again, the books show a **reuse gain**. Everything reconciles to the cent:
 
 `standard cost charged - reuse gain + spend of runs producing none = total run spend`
 
@@ -253,12 +253,10 @@ Worked example, in cents. A sourcing run spends 1,000 and finds 3 leads (334, 33
 
 Standard cost charged: 334 x 2 + 333 + 333 + 600 = **$19.34**. Reuse gain: **$3.34**. Runs producing none: 300 + 500 + 200 = **$10.00**. And $19.34 - $3.34 + $10.00 = **$26.00**, the total spend.
 
-The email leg's own cost for decisions: $9 over 4 Units consumed is **$2.25** per Unit. The every-path unit cost of the interested lead for reports: $9 of its own production plus 4 leads at $3.33 each, about **$22.33**.
+The email Engine's own cost for decisions: $9 over 4 Units consumed is **$2.25** per Unit. The unit cost of the interested lead for reports: $9 of its own production plus 4 leads at $3.33 each, about **$22.33**.
 
-## 11. The simulator
+## 13. The simulator
 
-The framework ships with a fictional world as data ([`seed/fictional-world.json`](../seed/fictional-world.json)): four fictional clients, their market of fictional people and companies, the catalogue, and the hidden truth (yields, costs, delays, the effect of every script at every Material, of every template and of every lead tactic, and when each other factory calls its webhooks). The world ticks 24 times a day. At each tick every campaign rebuilds its tree, pulls or pushes, runs land their Units after their delay, the ledger fills and the Supplier rating learns. One seed gives one history, byte for byte. On the default world with its seed, every choice point with 200 picks or more ends day 60 with 80% or more of its picks on the hidden best candidate.
+The framework ships with one fictional world as data ([`seed/fictional-world.json`](../seed/fictional-world.json)): Northwind Analytics, a client starting from scratch tonight, with cold email, LinkedIn and ads, vendor list prices and rates from public benchmarks; its market of fictional people and companies; the catalogue; and the hidden truth (yields, costs, delays, the effect of every script, template and lead tactic). The world ticks 24 times a day. At each tick every campaign recomputes its Plan, pulls or pushes, runs land their Units after their delay, the ledger fills and the Supplier rating learns. One seed gives one history, byte for byte.
 
-A second scenario, **distribute.you catalogue** ([`seed/distribute-world.json`](../seed/distribute-world.json)), plays distribute.you's whole public GTM catalogue: every channel, leg and step it serves ([`seed/distribute-catalogue.json`](../seed/distribute-catalogue.json), its identity-free reads stripped of every production figure and price), translated by [`packages/scenarios`](../packages/scenarios) into this model. Each of the 53 channels is a value of the "Channel" tactic its generated scripts carry, and each channel's script declares its own Bill of materials (a writing channel takes a template, a cold call by a person does not). A leg that reacts to an outcome has its scripts consume it, a delay is its scripts' "Days since last message", and a fact another system reports is an outcome its webhook makes. Its clients and numbers are fictional.
-
-The dashboard plays it: [`apps/dashboard`](../apps/dashboard), live at https://distribute-you.github.io/gtm-factory/. Built with its api data source, the same dashboard reads a running factory through the factory API ([`docs/api.md`](api.md)).
+The dashboard runs it: [`apps/dashboard`](../apps/dashboard), live at https://distribute-you.github.io/gtm-factory/. Built with its api data source, the same dashboard reads a running GTM Factory through its API ([`docs/api.md`](api.md)).

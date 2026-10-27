@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { DayChart, Legend } from "@/components/charts";
-import { FunnelLine } from "@/components/funnel-line";
+import { PlanLineView } from "@/components/plan-line";
 import { Mark } from "@/components/mark";
 import { BarSpark, EmptyNote, Figure, Page, PageHeader, RoiLabel, SectionTitle, Shimmer, SparkLine, StatTile, TickGauge, TopBar } from "@/components/ui";
 import { costPerOutcomeSeries, cumulative, explainChoice, candidateLabel, outcomeLabel, pointInfo, recentChoices, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
@@ -81,7 +81,7 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
             </p>
           </div>
         </StatTile>
-        <StatTile label="Value won by our runs" note={`+${formatUsd(f.valueOther)} other factories`}>
+        <StatTile label="Value won by our runs" note={`+${formatUsd(f.valueOther)} performed by others`}>
           <Figure value={formatUsd(f.valueOurs)} />
           <SparkLine className="mt-auto h-8 pt-2" values={cumulative(f.dailyValueOurs)} color="var(--run)" />
         </StatTile>
@@ -96,12 +96,12 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
       </div>
 
       <div className="mt-8">
-        <SectionTitle right={<span>A lead moves on each track on its own. Tracks are never added together.</span>}>Outcomes by lead track</SectionTitle>
+        <SectionTitle right={<span>A subject moves on each track on its own. Tracks are never added together.</span>}>Milestones by track</SectionTitle>
         <div className="grid gap-3 lg:[grid-template-columns:var(--cols)]" style={{ "--cols": model.tracks.map((t) => `minmax(0,${Math.max(1.5, t.states.length)}fr)`).join(" ") } as React.CSSProperties}>
           {model.tracks.map((t) => (
             <div key={t.id} className="k-card p-4">
               <div className="flex items-center gap-2">
-                <Mark kind="leadTrack" id={t.id} size={22} />
+                <Mark kind="track" id={t.id} size={22} />
                 <span className="text-[14px] font-medium">{t.label}</span>
               </div>
               <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${t.states.length}, minmax(0, 1fr))` }}>
@@ -138,7 +138,7 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
               const brandName = model.clients.find((x) => x.brand.id === c.brandId)?.brand.name;
               return (
                 <Link key={c.id} href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`} className="k-hover flex items-center gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
-                  <Mark kind="funnel" id={c.id} size={32} />
+                  <Mark kind="campaign" id={c.id} size={32} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{c.name}</span>
                     <span className="k-fg3 block truncate text-[12px]">
@@ -154,8 +154,8 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
           </div>
           {campaigns[0] && (
             <div className="k-card mt-3 p-4">
-              <p className="k-label mb-2">The first sales funnel</p>
-              <FunnelLine model={model} campaign={campaigns[0]} />
+              <p className="k-label mb-2">The first campaign's Plan</p>
+              <PlanLineView model={model} campaign={campaigns[0]} />
             </div>
           )}
         </section>
@@ -186,7 +186,7 @@ export function CostPerOutcomeCard({ model, f }: { model: Model; f: ScopeFigures
             ))}
           </div>
         </div>
-        <div className="mt-3">{measured.some((x) => x != null) ? <DayChart series={series} format={formatUsd} /> : <EmptyNote>No outcome yet. Press play.</EmptyNote>}</div>
+        <div className="mt-3">{measured.some((x) => x != null) ? <DayChart series={series} format={formatUsd} /> : <EmptyNote>No outcome yet. Press Run.</EmptyNote>}</div>
         <Legend series={series} />
       </div>
     </section>
@@ -223,7 +223,7 @@ export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campa
     <section>
       <SectionTitle right={<span>Newest first</span>}>Why each choice was made</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
-        {items.length === 0 && <EmptyNote>No choice yet. Press play.</EmptyNote>}
+        {items.length === 0 && <EmptyNote>No choice yet. Press Run.</EmptyNote>}
         {items.map((c, i) => {
           const info = pointInfo(model.catalogue, c.point);
           const campaign = model.campaigns.find((x) => x.id === c.campaignId);

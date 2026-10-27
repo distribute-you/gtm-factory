@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import type { ApiOverview } from "@gtm-factory/engine";
+import type { ApiOverview } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
-import { useFactory } from "@/lib/api/factory";
+import { useOverview } from "@/lib/api/overview";
 import { outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCount, plural } from "@/lib/format";
 import { BudgetButton, CampaignStatusButton, CapBar, ChoicesTable, Read, RunsTable, timeAgo } from "./common";
 
 export function ApiTodayPage() {
-  const read = useFactory();
+  const read = useOverview();
   return (
     <>
       <TopBar crumbs={[{ label: "Today" }]} />
@@ -31,7 +31,7 @@ function Today({ o }: { o: ApiOverview }) {
     <>
       <PageHeader
         title={`${live} of ${plural(o.campaigns.length, "campaign", "campaigns")} live`}
-        sub="Every script runs for real on this factory. Each choice and each cent is below."
+        sub="Every script runs for real here. Each choice and each cent is below."
         right={
           o.scheduler.running ? (
             <span className="inline-flex items-center gap-1.5">
@@ -91,7 +91,7 @@ function Today({ o }: { o: ApiOverview }) {
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{c.name}</span>
                         <span className="k-fg3 block truncate text-[12px]">
-                          {brandName(c.brandId)} · {c.salesFunnel?.name ?? "Not run yet"}
+                          {brandName(c.brandId)} · {c.routing?.name ?? "Not run yet"}
                         </span>
                       </span>
                     </Link>

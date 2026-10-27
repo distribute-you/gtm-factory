@@ -1,6 +1,6 @@
-# GTM Factory v5
+# GTM Factory v6
 
-An open framework for running go-to-market as an agentic factory, in a plant's own words: Campaigns order a Target, legs make outcomes, scripts compete inside each leg (rules, AI, people) each with its own Bill of materials, every Unit lands in one ledger that is the common stock, and a Supplier rating makes every choice with the best value per dollar. The production tree is rebuilt at every tick from performance.
+An open framework for running go-to-market as an industrial plant, in a plant's own words. A Campaign orders a Target. One Engine per outcome makes it, with competing scripts written as code. A script asks Providers for what it needs, at run time. Every Unit lands in one ledger, the common stock, and a Supplier rating makes every choice with the best value per dollar. The Plan is recomputed at every tick.
 
 Built by [distribute.you](https://distribute.you). Revenue made easy.
 
@@ -10,11 +10,12 @@ Built by [distribute.you](https://distribute.you). Revenue made easy.
 
 ## What it is
 
-- **A model.** Three objects carry a status: outcomes, legs and scripts. An outcome is a part reference; a Unit is one piece of it. A leg goes from one outcome to another; each script performing it declares its own Bill of materials, the outcomes it consumes per Unit produced, one Material per line. Tactics (typed: yes/no, a list, a number) and strategies (conditions per Material) describe them. Scripts and brand Units (templates, ICPs) live in dynasties of versions. Everything is data.
-- **Pull and push, on a tree rebuilt every tick.** A Campaign fixes only its Target, its budget, its start and its strategy ("Channel is cold email"). From Start it pulls from the Target down, most advanced Units first; from any other outcome it pushes each Unit that lands up toward the Target. Every leg runs the same code: pick a script, serve each Material from the stock with its Specification (subject, conditions, quantity), else pull that outcome from the best producer, then run. The sales path and the sales funnel are views of the tree. Every Run is one script executed: one Unit or none.
-- **A Supplier rating.** An auxiliary cost center that reads the ledger and the traceability and makes, each tick, the Rating every choosing script consumes: Thompson sampling on value per dollar, pooled from the script's level everywhere down to the client, with delay censoring and measured costs. Every Unit carries its traceability, so every choice is credited when the next lead state lands.
-- **A ledger.** The common stock of every Unit, from every producer. Decisions read each candidate's own cost; reports read the every-path ledger, reconciled to the cent.
-- **A simulator.** A fictional world published as data, with a hidden truth, played tick by tick, so you can watch every choice converge.
+- **A model.** An outcome is a part reference; a Unit is one piece of it. One Engine per outcome makes it. Scripts compete inside each Engine (rules, AI, people), in dynasties of versions. "Performed by" says who runs a script: Ours, Client's team, Mailbox, CRM, Organic market. Tactics (yes or no, a list, a number) and strategies (conditions on tactics) describe them. Tracks order the milestones (CRM lifecycle, Conversation, Website visits).
+- **Scripts are code.** Each script is a file of `scripts/`. It calls `ctx.get(outcome)` on the Providers it needs and returns one Unit or none. A Provider serves the most recent Unit the caller has not received, from the stock, else orders one from the Engine. A script unhappy with an old piece asks again, within its run's budget.
+- **Pull and push, on a Plan recomputed every tick.** A Campaign fixes only its Target, its start, its budget and a brief in plain words, which a judge reads once per Engine. From Start it pulls from the Target down, most advanced Units first; from any other outcome it pushes each Unit that lands up toward the Target. Its Routing (the milestones it passes through) is a view with a short name.
+- **A Supplier rating.** Thompson sampling on value per dollar, pooled from the candidate everywhere down to the client, with delay censoring, measured costs and the choices under each branch rated at their best. Every Unit carries its traceability, so every choice is credited when the next milestone lands.
+- **A ledger.** The common stock of every Unit. Decisions read each candidate's own cost; reports price every outcome by every path, reconciled to the cent.
+- **A simulator.** One fictional world as data, with a hidden truth, played tick by tick. It runs the same script code against a vendor that answers from the hidden truth, and grades the Rating by its regret.
 
 Read the spec: [docs/framework.md](docs/framework.md).
 
@@ -22,13 +23,12 @@ Read the spec: [docs/framework.md](docs/framework.md).
 
 | Path | What |
 |---|---|
-| `packages/engine` | The framework's code: catalogue, pull and push, ledger, Supplier rating, simulator. TypeScript, zero runtime dependencies, pure and deterministic. |
-| `seed/fictional-world.json` | The fictional world: catalogue, clients, market and hidden truth. Every scenario number lives here. |
-| `seed/distribute-catalogue.json`, `seed/distribute-world.json` | distribute.you's public catalogue (no production figure, no price) and the "distribute.you catalogue" scenario built on it, fictional clients and numbers. |
-| `packages/scenarios` | The translation of distribute.you's public catalogue into the model (a channel is a tactic, each channel's script carries its own Bill of materials) and the scenario builder. |
+| `packages/core` | The framework's code: catalogue, Engines and Providers, the Plan, ledger, Supplier rating, simulator, and the API contract. TypeScript, zero runtime dependencies, deterministic. |
+| `scripts/` | Every script as code: `scripts/src/<outcome>/<dynasty>/v<n>.ts`. |
+| `seed/fictional-world.json` | The fictional world: Northwind Analytics starting from scratch, with cold email, LinkedIn and ads. Catalogue, campaigns and their briefs, market and hidden truth. Every scenario number lives here. |
 | `docs/framework.md` | The framework, in plain English, with worked examples checked by tests. |
+| `docs/api.md` | The API a running GTM Factory serves to the dashboard. |
 | `apps/dashboard` | The live dashboard: the whole product on the simulated world, in the browser. Next.js static export, deployed to GitHub Pages on every push to `main`. |
-| `docs/screenshots/` | One screenshot per dashboard page after 30 simulated days. |
 
 ## Quick start
 
@@ -40,31 +40,20 @@ pnpm -r test
 
 ```ts
 import { readFileSync } from "node:fs";
-import { SimulationSession, convergence, shareOnBest, worldFromData } from "@gtm-factory/engine";
+import { SimulationSession, meanRegret, regretByDay, runGraded, worldFromData } from "@gtm-factory/core";
+import { LIBRARY } from "@gtm-factory/scripts";
 
-const world = worldFromData(JSON.parse(readFileSync("seed/fictional-world.json", "utf8")));
+const world = worldFromData(JSON.parse(readFileSync("seed/fictional-world.json", "utf8")), LIBRARY);
 const session = new SimulationSession(world);
-session.run(60);
-for (const point of convergence(session)) console.log(point.point, shareOnBest(point, 50, 60));
+const regret = regretByDay(session, runGraded(session, 60));
+console.log(meanRegret(regret, 0, 10), meanRegret(regret, 50, 60));
 ```
 
 ## The dashboard
 
-Open the [live site](https://distribute-you.github.io/gtm-factory/), press **Play**, and watch fictional clients win paying clients. Every page reads the framework's code:
+Open the [live site](https://distribute-you.github.io/gtm-factory/), start the clock, and watch a fictional client win paying clients. Every page reads the framework's code: the campaign page shows its Goal, proactive or reactive, its Plan with the share and cost of each branch, its Routing, the cost of each milestone from Start and the attempts per Target, and each script with its materials and the Provider each comes from. The "Done by your team" page holds the capacity of the scripts the client's team performs. The research page shows every choice beside the hidden best, and the ledger reconciles to the cent.
 
-| Page | What you see |
-|---|---|
-| Today | Return measured beside expected on one formula, value won by our runs beside other factories, outcomes per lead track, why each choice was made. |
-| New campaign | Pick a client, a Target and a start (Start, or an outcome whose Units the campaign pushes), see the sales funnels its tree can run by value per dollar, choose strategies per leg, set a budget, launch. |
-| Campaigns | Each campaign's Goal (its Target), proactive or reactive, its strategy and budget, its sales funnel and sales path (views), every leg with a "materials" badge opening its script's Bill of materials, each step's cost and cost from Start, the production tree with each branch's share and cost, and every choice titled "Leg · its script" or "Leg · Material", beliefs beside the hidden best. |
-| ICPs | Competing ICP sentences per client, the finer ones the splits proposed, and the verdict of every split. |
-| Leads, Companies | A board per lead state and track; each lead's timeline with the traceability of every Unit. |
-| Pinned pages | Pin any outcome or leg: Templates and LLMs ship pinned. Read, edit (a new version) and compare versions; scripts as cards; each script's Bill of materials, where the leg is plugged and the best script at each Material; its leg storage. |
-| Research | Convergence of every choice point toward the hidden best candidate, beliefs beside the hidden truth, strategies proposed by splits. |
-| Catalogue | Outcomes, legs, scripts with their Bill of materials, sales paths and funnels (views), tactics, strategies and factories. Upgrade, fork, retire, pin. |
-| Ledger | Every-path unit costs beside each leg's own cost, our spend beside other factories', reconciled to the cent. |
-| How it works | The framework's core ideas, linked to the spec. |
-| Api data source | Build with `NEXT_PUBLIC_DATA_SOURCE=api` and the same dashboard runs a real factory through the factory API: brands, campaigns with a daily cap, leads, templates, LLMs, research and the ledger. See [docs/api.md](docs/api.md). |
+With `NEXT_PUBLIC_DATA_SOURCE=api`, the same dashboard runs a real GTM Factory through its API. See [docs/api.md](docs/api.md).
 
 Run it locally:
 

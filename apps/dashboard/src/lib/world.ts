@@ -1,39 +1,29 @@
 /**
- * The simulated world the dashboard plays: the fictional world published as data
+ * The simulated world the dashboard runs: the fictional world published as data
  * (seed/fictional-world.json), and the actions a visitor can take while it runs. Every
  * action is data, logged with the day it happened, so a reload replays the same history
  * byte for byte. No scenario number lives here: tuning is the world's data.
  */
 
-import { SimulationSession, worldFromData, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/engine";
+import { SimulationSession, worldFromData, type Capacity, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/core";
+import { LIBRARY } from "@gtm-factory/scripts";
 import worldJson from "../../../../seed/fictional-world.json";
-import distributeJson from "../../../../seed/distribute-world.json";
 
+/** The one world the simulator runs: a client starting from scratch tonight. */
 export const WORLD: WorldData = worldJson as unknown as WorldData;
 
-/** The scenarios the simulator plays: each a world as data. */
-export const SCENARIOS = {
-  fictional: { label: "Fictional world", data: WORLD },
-  distribute: { label: "distribute.you catalogue", data: distributeJson as unknown as WorldData },
-} as const;
-export type ScenarioId = keyof typeof SCENARIOS;
-export const SCENARIO_IDS = Object.keys(SCENARIOS) as ScenarioId[];
-
-export function scenarioData(id: ScenarioId): WorldData {
-  return (SCENARIOS[id] ?? SCENARIOS.fictional).data;
-}
-
-export type CatalogueKind = Exclude<keyof CatalogueData, "salesPaths" | "salesFunnels">;
+export type CatalogueKind = Exclude<keyof CatalogueData, "routings">;
 
 export type SimAction =
   | { type: "launch"; client: WorldClient }
   | { type: "status"; campaignId: string; status: "running" | "paused" }
   | { type: "budget"; campaignId: string; dailyBudgetCents: number }
-  | { type: "strategy"; campaignId: string; legId: string; strategyId: string }
+  | { type: "verdict"; campaignId: string; outcome: string; strategyId: string }
+  | { type: "capacity"; scriptId: string; capacity: Capacity }
   | { type: "retire"; kind: CatalogueKind; id: string }
   | { type: "restore"; kind: CatalogueKind; id: string }
   | { type: "upgradeScript"; dynasty: string; id: string; name: string; costCents?: number }
-  | { type: "forkScript"; parentDynasty: string; script: Omit<Script, "parentDynasty" | "version" | "legId" | "status"> }
+  | { type: "forkScript"; parentDynasty: string; script: Omit<Script, "parentDynasty" | "version" | "outcome" | "status" | "code" | "materials"> }
   | { type: "objectVersion"; brandId: string; outcome: string; dynasty: string; text: string; name?: string }
   | { type: "objectFork"; brandId: string; outcome: string; parentDynasty: string; dynasty: string; text: string; name?: string };
 
@@ -42,8 +32,8 @@ export interface LoggedAction {
   action: SimAction;
 }
 
-export function buildWorld(seed: number, scenario: ScenarioId = "fictional"): WorldSpec {
-  return worldFromData(scenarioData(scenario), seed);
+export function buildWorld(seed: number): WorldSpec {
+  return worldFromData(WORLD, LIBRARY, seed);
 }
 
 /** Apply one action to a running world. Throws on an action the engine refuses. */
@@ -59,8 +49,11 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
     case "budget":
       session.setCampaignBudget(action.campaignId, action.dailyBudgetCents);
       return;
-    case "strategy":
-      session.setCampaignStrategy(action.campaignId, action.legId, action.strategyId);
+    case "verdict":
+      session.setVerdict(action.campaignId, action.outcome, action.strategyId);
+      return;
+    case "capacity":
+      c.setCapacity(action.scriptId, action.capacity);
       return;
     case "retire":
       c.retire(action.kind, action.id);
@@ -83,9 +76,9 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
   }
 }
 
-/** Build the world and play it to `day`, applying each logged action on its day. */
-export function replay(seed: number, actions: readonly LoggedAction[], day: number, scenario: ScenarioId = "fictional"): { world: WorldSpec; session: SimulationSession; applied: LoggedAction[] } {
-  const world = buildWorld(seed, scenario);
+/** Build the world and run it to `day`, applying each logged action on its day. */
+export function replay(seed: number, actions: readonly LoggedAction[], day: number): { world: WorldSpec; session: SimulationSession; applied: LoggedAction[] } {
+  const world = buildWorld(seed);
   const session = new SimulationSession(world);
   const applied: LoggedAction[] = [];
   const applyDue = (d: number) => {
@@ -101,7 +94,7 @@ export function replay(seed: number, actions: readonly LoggedAction[], day: numb
   };
   while (session.day < day) {
     applyDue(session.day);
-    session.step();
+    session.nextDay();
   }
   applyDue(session.day);
   return { world, session, applied };

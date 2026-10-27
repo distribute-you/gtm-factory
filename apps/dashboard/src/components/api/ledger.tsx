@@ -1,16 +1,16 @@
 "use client";
 
-import type { ApiLedger, CatalogueData } from "@gtm-factory/engine";
+import type { ApiLedger, CatalogueData } from "@gtm-factory/core";
 import { BarSpark, CardTable, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { useFactory } from "@/lib/api/factory";
-import { outcomeName, legTitle } from "@/lib/api/labels";
+import { useOverview } from "@/lib/api/overview";
+import { engineTitle, outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCentsExact, formatCount, formatUsd } from "@/lib/format";
 import { Read, RunsTable } from "./common";
 
 export function ApiLedgerPage() {
   const read = useApi<ApiLedger>("/ledger");
-  const { data: o } = useFactory();
+  const { data: o } = useOverview();
   return (
     <>
       <TopBar crumbs={[{ label: "Ledger" }]} />
@@ -87,20 +87,20 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
           </CardTable>
         </section>
         <section>
-          <SectionTitle count={l.byLeg.length}>By leg</SectionTitle>
+          <SectionTitle count={l.byEngine.length}>By Engine</SectionTitle>
           <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`}>Leg</th>
+                <th className={`${TH} w-full`}>Engine</th>
                 <th className={`${TH} text-right`}>Runs</th>
                 <th className={`${TH} text-right`}>Outputs</th>
                 <th className={`${TH} text-right`}>Spent</th>
               </tr>
             </thead>
             <tbody>
-              {l.byLeg.map((p) => (
-                <tr key={p.legId} className="k-row k-line-subtle border-b last:border-b-0">
-                  <td className={TD}>{legTitle(catalogue, p.legId)}</td>
+              {l.byEngine.map((p) => (
+                <tr key={p.engine} className="k-row k-line-subtle border-b last:border-b-0">
+                  <td className={TD}>{engineTitle(catalogue, p.engine)}</td>
                   <td className={TDN}>{formatCount(p.runs)}</td>
                   <td className={TDN}>{formatCount(p.outputs)}</td>
                   <td className={TDN}>{formatCentsExact(p.spentCents)}</td>

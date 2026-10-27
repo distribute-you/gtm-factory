@@ -1,44 +1,32 @@
 /**
- * Read models of the campaign pages: which legs a campaign plays, which step each of its
- * choice points serves, and its steps with leads needed. Read off the catalogue and the engine.
+ * Read models of the campaign pages: which milestone each of its choice points serves, and
+ * its milestones with attempts and cost per Target. Read off the catalogue and the simulator.
  */
 
-import { hiddenTruth, stepBreakdown, type Campaign, type OutcomeId, type Leg, type WorldClient } from "@gtm-factory/engine";
-import { campaignLine, lineLegs } from "./funnels";
+import { isOurs, targetBreakdown, type Campaign, type OutcomeId, type WorldClient } from "@gtm-factory/core";
 import type { Model } from "./model";
 
-function memo<T>(model: Model, key: string, f: () => T): T {
-  if (model.memo.has(key)) return model.memo.get(key) as T;
-  const v = f();
-  model.memo.set(key, v);
-  return v;
-}
-
-/** The step end each choice point of a campaign is scored on (cached per day). */
-export function stepEndOfPoints(model: Model, campaign: Campaign): Map<string, OutcomeId> {
-  return memo(model, `stepEnd:${campaign.id}`, () => {
-    const out = new Map<string, OutcomeId>();
-    for (const { from, to } of model.session.stepsOf(campaign)) for (const point of hiddenTruth(model.session, campaign, from, to).keys()) if (!out.has(point)) out.set(point, to);
-    return out;
-  });
-}
-
-/** Every leg a campaign runs through today, in the order its funnel line draws them. */
-export function playedLegs(model: Model, campaign: Campaign): Leg[] {
-  return lineLegs(campaignLine(model, campaign));
+/** The milestone each choice point of a campaign is scored on. */
+export function milestoneOfPoints(model: Model, campaign: Campaign): Map<string, OutcomeId> {
+  const out = new Map<string, OutcomeId>();
+  for (const p of model.session.choicePoints()) {
+    if (p.campaignId !== campaign.id) continue;
+    const m = model.session.milestoneOfPoint(p.point, campaign.id);
+    if (m) out.set(p.point, m);
+  }
+  return out;
 }
 
 /**
- * A campaign's steps as decisions read them: attempts per Target Unit, the cost
- * of this step per outcome and the cost from Start (cumulative, the one the
- * return reads).
+ * A campaign's milestones as decisions read them: attempts per Target Unit, the cost of
+ * this outcome alone and the cost from Start (cumulative, the one the return reads).
  */
-export function campaignSteps(model: Model, campaign: Campaign) {
-  const steps = model.session.stepEstimates(campaign);
-  const costs = model.session.stepCosts(campaign);
-  const priced = steps.every((l) => l.yieldRate !== null && l.costPerAttempt !== null);
-  const per = priced ? stepBreakdown(steps.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }))) : steps.map(() => null);
-  return steps.map((l, i) => ({ ...l, attemptsPerTarget: per[i]?.attemptsPerTarget ?? null, costPerTarget: per[i]?.costPerTarget ?? null, costOfStep: costs[i]?.costOfStep ?? null, costFromStart: costs[i]?.costFromStart ?? null }));
+export function campaignMilestones(model: Model, campaign: Campaign) {
+  const rows = model.session.milestoneEstimates(campaign);
+  const costs = model.session.milestoneCosts(campaign);
+  const priced = rows.length > 0 && rows.every((l) => l.yieldRate !== null && l.costPerAttempt !== null && l.yieldRate > 0);
+  const per = priced ? targetBreakdown(rows.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }))) : rows.map(() => null);
+  return rows.map((l, i) => ({ ...l, attemptsPerTarget: per[i]?.attemptsPerTarget ?? null, costPerTarget: per[i]?.costPerTarget ?? null, costOfOutcome: costs[i]?.costOfOutcome ?? null, costFromStart: costs[i]?.costFromStart ?? null }));
 }
 
 /** A campaign id no other campaign holds. */
@@ -49,12 +37,11 @@ export function freshCampaignId(model: Model, base: string): string {
   return `${base}-${i}`;
 }
 
-/** The script of another factory that states who to reach (a leg whose output holds an audience). */
+/** The script another party performs that states who to reach (the client's own words for its audience). */
 export function clientAudienceScript(model: Model): string | null {
   const outcome = model.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired);
   if (!outcome) return null;
-  const leg = model.catalogue.providersOf(outcome.id).find((p) => !model.catalogue.isOurs(p));
-  return leg ? model.catalogue.dynastiesOf(leg.id)[0]?.id ?? null : null;
+  return model.catalogue.scriptsOf(outcome.id).find((s) => !isOurs(s))?.id ?? null;
 }
 
 /** A brand-new client, its objects (other than who to reach) copied from a client of the world. */

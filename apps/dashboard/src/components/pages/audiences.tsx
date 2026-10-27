@@ -1,11 +1,11 @@
 "use client";
 
-import { describeCondition, type Proposal, type Split } from "@gtm-factory/engine";
+import { describeCondition, isOurs, type Proposal, type Split } from "@gtm-factory/core";
 import { ContentView } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { headScript, objectDynasties, outcomeLabel, pointInfo, type Model } from "@/lib/model";
+import { engineName, headScript, objectDynasties, outcomeLabel, pointInfo, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, plural } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -46,7 +46,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {mine.map((d) => {
                 const producer = d.head.scriptId ? model.catalogue.script(d.head.scriptId) : undefined;
-                const ours = producer ? model.catalogue.isOurs(model.catalogue.leg(producer.legId)!) : false;
+                const ours = producer ? isOurs(producer) : false;
                 const proposal = proposals.find((p) => p.kind === "audience" && p.createdId === d.versions[0]!.id);
                 return (
                   <div key={d.dynasty} className="k-card flex flex-col gap-3 p-4">
@@ -59,7 +59,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
                           {d.parentDynasty ? ` · forked from ${dyns.find((x) => x.brandId === d.brandId && x.dynasty === d.parentDynasty)?.name ?? d.parentDynasty}` : ""}
                         </p>
                       </div>
-                      <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : "Other factory"}</ToneDot>
+                      <ToneDot tone={ours ? "run" : "amber"}>{ours ? "Our runs" : "Another party"}</ToneDot>
                     </div>
                     <ContentView model={model} unit={d.head} type={o.contentType} />
                     <div className="k-inset grid grid-cols-2 divide-x divide-[var(--line-subtle)] rounded-[8px]">
@@ -89,7 +89,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
         </SectionTitle>
         {proposals.length === 0 ? (
           <div className="k-card">
-            <EmptyNote>No split proved anything yet. Press play: a study runs every week.</EmptyNote>
+            <EmptyNote>No split proved anything yet. Press Run: a study runs every week.</EmptyNote>
           </div>
         ) : (
           <div className="space-y-3">
@@ -106,7 +106,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
 function ProposalCard({ model, p }: { model: Model; p: Proposal }) {
   const brand = model.clients.find((c) => c.brand.id === p.brandId)?.brand.name;
   const strategy = p.kind === "strategy" ? model.catalogue.strategy(p.createdId) : undefined;
-  const where = p.point ? pointInfo(model.catalogue, p.point).title : strategy ? model.catalogue.leg(strategy.legId)?.name : undefined;
+  const where = p.point ? pointInfo(model.catalogue, p.point).title : strategy ? engineName(model.catalogue, strategy.outcome) : undefined;
   const audience = model.catalogue.outcomes.find((o) => o.contentType === "audience");
   return (
     <div className="k-card p-4">

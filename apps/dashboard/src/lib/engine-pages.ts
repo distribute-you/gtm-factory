@@ -1,26 +1,26 @@
 /**
- * Read models of the engine pages (Research, Catalogue, Ledger). Figures only: pages divide
- * nothing. Nothing here knows an outcome, a leg or a script by name.
+ * Read models of the Research, Catalogue and Ledger pages. Figures only: pages divide
+ * nothing. Nothing here knows an outcome or a script by name.
  */
 
-import type { PointConvergence } from "@gtm-factory/engine";
-import { convergenceOf, pluggedAt, pointInfo, type Model, type PluggedInput, type PointInfo } from "./model";
+import { OURS, type PointConvergence } from "@gtm-factory/core";
+import { convergenceOf, engineName, pluggedAt, pointInfo, type Model, type PluggedInput, type PointInfo } from "./model";
 
 export interface PointGroup {
-  /** The consuming leg's id, or "step" for a step's own choices. */
+  /** The consuming Engine's outcome, or "campaign" for the Target itself. */
   key: string;
   title: string;
   points: { info: PointInfo; conv: PointConvergence }[];
 }
 
-/** Choice points grouped by the leg that consumes the Material (a step's own choices together). */
+/** Choice points grouped by the Engine that calls the outcome. */
 export function pointGroups(model: Model): PointGroup[] {
   const groups = new Map<string, PointGroup>();
   for (const conv of convergenceOf(model)) {
     const info = pointInfo(model.catalogue, conv.point);
-    const key = info.consumer?.id ?? "step";
+    const key = info.consumer;
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, title: info.consumer?.name ?? "Plays of each step", points: [] }));
+    if (!g) groups.set(key, (g = { key, title: key === "campaign" ? "The campaign's Target" : `Called by ${engineName(model.catalogue, key)}`, points: [] }));
     g.points.push({ info, conv });
   }
   return [...groups.values()];
@@ -37,40 +37,42 @@ export function recentShare(conv: PointConvergence, days = 7): number | null {
   return p > 0 ? b / p : null;
 }
 
-/** Provider legs plugged at two Materials or more, with the best script at each. */
-export function multiPlugged(model: Model): { legId: string; inputs: PluggedInput[] }[] {
-  const out: { legId: string; inputs: PluggedInput[] }[] = [];
-  for (const p of model.catalogue.legs) {
-    const inputs = pluggedAt(model, p.id).filter((x) => x.info.consumer);
-    if (inputs.length >= 2) out.push({ legId: p.id, inputs });
+/** Engines called by two Engines or more, with the best script at each caller. */
+export function multiPlugged(model: Model): { outcome: string; inputs: PluggedInput[] }[] {
+  const out: { outcome: string; inputs: PluggedInput[] }[] = [];
+  for (const o of model.catalogue.engines()) {
+    const inputs = pluggedAt(model, o).filter((x) => x.info.kind === "script");
+    if (inputs.length >= 2) out.push({ outcome: o, inputs });
   }
   return out;
 }
 
-export interface FactoryFigures {
+export interface PerformerFigures {
+  /** The "Performed by" value. */
   id: string;
-  name: string;
   ours: boolean;
-  legs: string[];
+  scripts: string[];
   runs: number;
   units: number;
   spendCents: number;
 }
 
-/** What each factory ran: its legs, runs, Units and what it cost (our spend or an access cost). */
-export function factoryFigures(model: Model): FactoryFigures[] {
-  return model.catalogue.factories.map((f) => {
-    const legs = model.catalogue.legs.filter((p) => p.factory === f.id).map((p) => p.id);
-    let runs = 0;
-    let spend = 0;
-    for (const r of model.session.runs) {
-      if (r.factory !== f.id) continue;
-      runs++;
-      spend += r.spendCents;
-    }
-    const units = model.session.units.filter((o) => o.factory === f.id).length;
-    return { id: f.id, name: f.name, ours: f.ours, legs, runs, units, spendCents: spend };
-  });
+/** What each performer ran (the "Performed by" tactic): its scripts, runs, Units and what it cost (our spend or an access cost). */
+export function performerFigures(model: Model): PerformerFigures[] {
+  const by = new Map<string, PerformerFigures>();
+  const of = (id: string) => {
+    let f = by.get(id);
+    if (!f) by.set(id, (f = { id, ours: id === OURS, scripts: [], runs: 0, units: 0, spendCents: 0 }));
+    return f;
+  };
+  for (const s of model.catalogue.scripts) of(String(s.tactics.performed_by ?? OURS)).scripts.push(s.id);
+  for (const r of model.session.runs) {
+    const f = of(r.performedBy);
+    f.runs++;
+    f.spendCents += r.spendCents;
+  }
+  for (const u of model.session.units) of(u.performedBy).units++;
+  return [...by.values()].sort((a, b) => Number(b.ours) - Number(a.ours) || a.id.localeCompare(b.id));
 }
 
 /** The Units consumed most often: where the reuse gain of the ledger comes from. */
