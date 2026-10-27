@@ -13,8 +13,8 @@ export function outcomePluralName(c: CatalogueData | null | undefined, id: Outco
   return o?.plural ?? `${outcomeName(c, id)}s`;
 }
 
-export function pipeTitle(c: CatalogueData | null | undefined, id: string): string {
-  return c?.pipes.find((p) => p.id === id)?.name ?? humanize(id);
+export function legTitle(c: CatalogueData | null | undefined, id: string): string {
+  return c?.legs.find((p) => p.id === id)?.name ?? humanize(id);
 }
 
 export function factoryTitle(c: CatalogueData | null | undefined, id: string): string {

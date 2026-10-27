@@ -121,7 +121,7 @@ function Sidebar() {
               key={c.id}
               href={`/campaigns/view/?id=${encodeURIComponent(c.id)}`}
               label={`${brandName(c.brandId)}: ${c.name}`}
-              icon={<Mark kind="funnel" id={c.funnelId} size={16} />}
+              icon={<Mark kind="outcome" id={c.target} size={16} />}
               active={pathname.startsWith("/campaigns/view") && id === c.id}
               trailing={
                 c.status === "live" ? (

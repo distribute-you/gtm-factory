@@ -55,7 +55,7 @@ export interface EvidenceContext {
   memoryHalfLifeDays?: number;
 }
 
-export interface LegEstimateRead {
+export interface StepEstimateRead {
   attempts: number;
   reached: number;
   yieldRate: number | null;
@@ -68,7 +68,7 @@ export interface LegEstimateRead {
  * attempts count for the share of outcomes already due) and the measured cost
  * per attempt.
  */
-export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): LegEstimateRead {
+export function stepEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): StepEstimateRead {
   const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)), fixedDays);
   const cohorts: Cohort[] = [];
   let attempts = 0;
@@ -92,7 +92,7 @@ export function legEstimateOf(cohort: ReadonlyMap<number, Cell> | undefined, day
 }
 
 /** A leg's raw counts from its cohorts: attempts, reached, censoring-corrected trials, cents spent. */
-export function legCountsOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): { attempts: number; reached: number; successes: number; trials: number; costCents: number } {
+export function stepCountsOf(cohort: ReadonlyMap<number, Cell> | undefined, day: number, delayMeanDays: number, fixedDays = 0): { attempts: number; reached: number; successes: number; trials: number; costCents: number } {
   const delay = geometricDelay(delayMeanDays, Math.max(1, Math.ceil(delayMeanDays * 5)), fixedDays);
   const cohorts: Cohort[] = [];
   let attempts = 0;

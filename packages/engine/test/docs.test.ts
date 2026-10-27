@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { allocateBudget, buildLedger, censoredCounts, chainCostPerTarget, costForwardLine, legBreakdown, pooledEstimate, valueBackwardLine } from "../src";
+import { allocateBudget, buildLedger, censoredCounts, chainCostPerTarget, costForwardLine, stepBreakdown, pooledEstimate, valueBackwardLine } from "../src";
 import { acmeSession } from "./acme";
 import { RETIRED } from "./helpers";
 
@@ -60,7 +60,7 @@ describe("docs/framework.md", () => {
     expect(doc).toContain(`**${(2100 / chainCostPerTarget(legs)).toFixed(1)}**`);
     const back = valueBackwardLine(legs, 2100).values;
     for (const v of back.slice(0, 3)) expect(doc).toContain(`**${money(v)}**`);
-    expect(legBreakdown(legs).map((l) => Math.round(l.leadsNeeded * 10) / 10)).toEqual([625, 12.5, 5]);
+    expect(stepBreakdown(legs).map((l) => Math.round(l.attemptsPerTarget * 10) / 10)).toEqual([625, 12.5, 5]);
     expect(doc).toContain("needs 5 meetings, the booking leg needs 12.5 interested leads, the first leg needs 625 attempts");
   });
 

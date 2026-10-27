@@ -46,7 +46,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {mine.map((d) => {
                 const producer = d.head.scriptId ? model.catalogue.script(d.head.scriptId) : undefined;
-                const ours = producer ? model.catalogue.isOurs(model.catalogue.pipe(producer.pipeId)!) : false;
+                const ours = producer ? model.catalogue.isOurs(model.catalogue.leg(producer.legId)!) : false;
                 const proposal = proposals.find((p) => p.kind === "audience" && p.createdId === d.versions[0]!.id);
                 return (
                   <div key={d.dynasty} className="k-card flex flex-col gap-3 p-4">
@@ -106,7 +106,7 @@ function Audiences({ model, scope, outcome }: { model: Model; scope: string | nu
 function ProposalCard({ model, p }: { model: Model; p: Proposal }) {
   const brand = model.clients.find((c) => c.brand.id === p.brandId)?.brand.name;
   const strategy = p.kind === "strategy" ? model.catalogue.strategy(p.createdId) : undefined;
-  const where = p.point ? pointInfo(model.catalogue, p.point).title : strategy ? model.catalogue.pipe(strategy.pipeId)?.name : undefined;
+  const where = p.point ? pointInfo(model.catalogue, p.point).title : strategy ? model.catalogue.leg(strategy.legId)?.name : undefined;
   const audience = model.catalogue.outcomes.find((o) => o.contentType === "audience");
   return (
     <div className="k-card p-4">

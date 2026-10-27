@@ -38,6 +38,7 @@ import {
   LightningIcon,
   LinkedinLogoIcon,
   ListIcon,
+  MapTrifoldIcon,
   MagnifyingGlassIcon,
   MegaphoneIcon,
   MicrophoneIcon,
@@ -133,14 +134,20 @@ const ICONS: Record<string, Icon> = {
   youtube: YoutubeLogoIcon,
 };
 
-/** The glyph of each kind of object that has no icon of its own. */
+/**
+ * The glyph of each kind of object that has no icon of its own. The four objects a choice card
+ * names wear one glyph each: a leg, an outcome, a script (distribute.you dashboard v2's workflow
+ * glyph) and a Material.
+ */
 export const KIND_ICON = {
-  outcome: FlowArrowIcon,
+  outcome: TargetIcon,
   leadTrack: PathIcon,
   campaign: LightningIcon,
-  pipe: BirdIcon,
+  leg: PathIcon,
+  script: FlowArrowIcon,
+  material: PackageIcon,
   funnel: FunnelIcon,
-  path: PathIcon,
+  path: MapTrifoldIcon,
   play: PlayIcon,
   tactic: TagIcon,
   strategy: StrategyIcon,

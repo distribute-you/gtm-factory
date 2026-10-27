@@ -1,10 +1,10 @@
 /**
- * Read models of the campaign pages: which pipes a campaign plays, which leg each of its
- * choice points serves, and its legs with leads needed. Read off the catalogue and the engine.
+ * Read models of the campaign pages: which legs a campaign plays, which step each of its
+ * choice points serves, and its steps with leads needed. Read off the catalogue and the engine.
  */
 
-import { hiddenTruth, legBreakdown, type Campaign, type OutcomeId, type Pipe, type WorldClient } from "@gtm-factory/engine";
-import { campaignLine, linePipes } from "./funnels";
+import { hiddenTruth, stepBreakdown, type Campaign, type OutcomeId, type Leg, type WorldClient } from "@gtm-factory/engine";
+import { campaignLine, lineLegs } from "./funnels";
 import type { Model } from "./model";
 
 function memo<T>(model: Model, key: string, f: () => T): T {
@@ -14,28 +14,31 @@ function memo<T>(model: Model, key: string, f: () => T): T {
   return v;
 }
 
-/** The leg end each choice point of a campaign is scored on (cached per day). */
-export function legEndOfPoints(model: Model, campaign: Campaign): Map<string, OutcomeId> {
-  return memo(model, `legEnd:${campaign.id}`, () => {
+/** The step end each choice point of a campaign is scored on (cached per day). */
+export function stepEndOfPoints(model: Model, campaign: Campaign): Map<string, OutcomeId> {
+  return memo(model, `stepEnd:${campaign.id}`, () => {
     const out = new Map<string, OutcomeId>();
-    campaign.line.forEach((to, k) => {
-      for (const point of hiddenTruth(model.session, campaign, k).keys()) if (!out.has(point)) out.set(point, to);
-    });
+    for (const { from, to } of model.session.stepsOf(campaign)) for (const point of hiddenTruth(model.session, campaign, from, to).keys()) if (!out.has(point)) out.set(point, to);
     return out;
   });
 }
 
-/** Every pipe a campaign runs through today, in the order its funnel line draws them. */
-export function playedPipes(model: Model, campaign: Campaign): Pipe[] {
-  return linePipes(campaignLine(model, campaign));
+/** Every leg a campaign runs through today, in the order its funnel line draws them. */
+export function playedLegs(model: Model, campaign: Campaign): Leg[] {
+  return lineLegs(campaignLine(model, campaign));
 }
 
-/** A campaign's legs as decisions read them, with the leads each leg needs per target outcome. */
-export function campaignLegs(model: Model, campaign: Campaign) {
-  const legs = model.session.legEstimates(campaign);
-  const priced = legs.every((l) => l.yieldRate !== null && l.costPerAttempt !== null);
-  const per = priced ? legBreakdown(legs.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }))) : legs.map(() => null);
-  return legs.map((l, i) => ({ ...l, leadsNeeded: per[i]?.leadsNeeded ?? null, costPerTarget: per[i]?.costPerTarget ?? null }));
+/**
+ * A campaign's steps as decisions read them: attempts per Target Unit, the cost
+ * of this step per outcome and the cost from Start (cumulative, the one the
+ * return reads).
+ */
+export function campaignSteps(model: Model, campaign: Campaign) {
+  const steps = model.session.stepEstimates(campaign);
+  const costs = model.session.stepCosts(campaign);
+  const priced = steps.every((l) => l.yieldRate !== null && l.costPerAttempt !== null);
+  const per = priced ? stepBreakdown(steps.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! }))) : steps.map(() => null);
+  return steps.map((l, i) => ({ ...l, attemptsPerTarget: per[i]?.attemptsPerTarget ?? null, costPerTarget: per[i]?.costPerTarget ?? null, costOfStep: costs[i]?.costOfStep ?? null, costFromStart: costs[i]?.costFromStart ?? null }));
 }
 
 /** A campaign id no other campaign holds. */
@@ -46,12 +49,12 @@ export function freshCampaignId(model: Model, base: string): string {
   return `${base}-${i}`;
 }
 
-/** The script of another factory that states who to reach (a pipe whose output holds an audience). */
+/** The script of another factory that states who to reach (a leg whose output holds an audience). */
 export function clientAudienceScript(model: Model): string | null {
   const outcome = model.catalogue.outcomes.find((o) => o.contentType === "audience" && !o.retired);
   if (!outcome) return null;
-  const pipe = model.catalogue.providersOf(outcome.id).find((p) => !model.catalogue.isOurs(p));
-  return pipe ? model.catalogue.dynastiesOf(pipe.id)[0]?.id ?? null : null;
+  const leg = model.catalogue.providersOf(outcome.id).find((p) => !model.catalogue.isOurs(p));
+  return leg ? model.catalogue.dynastiesOf(leg.id)[0]?.id ?? null : null;
 }
 
 /** A brand-new client, its objects (other than who to reach) copied from a client of the world. */

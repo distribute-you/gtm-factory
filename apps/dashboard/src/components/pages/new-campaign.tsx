@@ -5,13 +5,13 @@ import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type RankedFunnel, type WorldClient } from "@gtm-factory/engine";
 import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
-import { linePipes, rankedLine } from "@/lib/funnels";
+import { lineLegs, rankedLine } from "@/lib/funnels";
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar, SelectItem } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { campaignHref } from "./campaigns";
 import { freshCampaignId, newClient } from "@/lib/campaigns";
-import { outcomeLabel, proposeFunnels, type Model } from "@/lib/model";
+import { outcomeLabel, outcomePlural, proposeFunnels, type Model } from "@/lib/model";
 import { formatCount, formatRatePct, formatRoi, formatUsd, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -19,7 +19,7 @@ type Step = "client" | "goal" | "funnels";
 const STEPS: { id: Step; label: string }[] = [
   { id: "client", label: "Client" },
   { id: "goal", label: "What you want" },
-  { id: "funnels", label: "Best funnels" },
+  { id: "funnels", label: "Plays and budget" },
 ];
 
 interface Draft {
@@ -34,7 +34,6 @@ interface Draft {
   perDay: string;
   campaignName: string;
   strategies: Record<string, string>;
-  funnel: number;
 }
 
 export function NewCampaignPage() {
@@ -78,7 +77,6 @@ function defaultDraft(model: Model, existing: boolean): Draft {
     perDay: "30",
     campaignName: "",
     strategies: {},
-    funnel: 0,
   };
 }
 
@@ -95,36 +93,37 @@ function Flow({ model }: { model: Model }) {
   const client = d.brandId ? model.clients.find((c) => c.brand.id === d.brandId) ?? null : null;
   const offerOutcomes = client ? client.offer.outcomes : trackedOutcomes(model);
   const targets = trackedOutcomes(model).filter((o) => offerOutcomes.includes(o));
-  // Start, or any lead outcome a pipe consumes as the Unit it works on: a reactive campaign pushes each one that lands.
-  const consumed = [...new Set(model.catalogue.pipes.filter((p) => !p.webhook && model.catalogue.isPipeLive(p)).map((p) => model.catalogue.subjectMaterial(p)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
+  // Start, or any lead outcome a leg consumes as the Unit it works on: a reactive campaign pushes each one that lands.
+  const consumed = [...new Set(model.catalogue.legs.filter((p) => !p.webhook && model.catalogue.isLegLive(p)).map((p) => model.catalogue.subjectMaterial(p)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
   const starts = [{ id: START, label: "The market (Start): pulls each tick" }, ...consumed.map((o) => ({ id: o, label: `${outcomeLabel(model.catalogue, o)}: pushes each one` }))];
   const start = starts.find((e) => e.id === d.start) ?? starts[0]!;
   const value = Number(d.value) || 0;
   const funnels = useMemo(() => (step === "funnels" && d.target ? proposeFunnels(model, offerOutcomes, d.target, value, start.id) : []), [model, step, offerOutcomes, d.target, value, start.id]);
-  const chosen: RankedFunnel | undefined = funnels[Math.min(d.funnel, funnels.length - 1)];
-  // The plays of the chosen funnel: every pipe its line draws, each with the strategy the campaign picks.
-  const playable = useMemo(() => (chosen ? linePipes(rankedLine(model, chosen)) : []), [model, chosen]);
+  const best: RankedFunnel | undefined = funnels[0];
+  // The plays: every leg the tree can run toward the Target today, each with the strategy the campaign picks.
+  const playable = useMemo(() => {
+    const out: ReturnType<typeof lineLegs> = [];
+    for (const f of funnels) for (const l of lineLegs(rankedLine(model, f))) if (!out.some((x) => x.id === l.id)) out.push(l);
+    return out;
+  }, [model, funnels]);
 
   const launch = () => {
-    if (!chosen) return;
+    if (!best) return;
     const brandId = client?.brand.id ?? null;
     const base: WorldClient = client
       ? { ...client, campaigns: [], seeds: [] }
       : newClient(model, { name: d.name.trim() || "New client", audienceText: d.audienceText, offerOutcomes: trackedOutcomes(model), outcomeValues: { [d.target]: value } });
     const id = freshCampaignId(model, `campaign-${(brandId ?? base.brand.id).replace(/^brand-/, "")}`);
-    const pinned: Record<number, string> = {};
-    chosen.legs.forEach((l, k) => (pinned[k] = l.pipeId));
     const campaign: Campaign = {
       id,
       brandId: base.brand.id,
       offerId: base.offer.id,
-      name: d.campaignName.trim() || rankedLine(model, chosen).funnel?.name || outcomeLabel(model.catalogue, d.target),
+      name: d.campaignName.trim() || `${outcomePlural(model.catalogue, d.target)} for ${client?.brand.name ?? (d.name.trim() || "a new client")}`,
       start: start.id,
-      line: chosen.line.slice(1),
+      target: d.target,
       dailyBudgetCents: Math.round((Number(d.perDay) || 0) * 100),
       status: "running",
-      strategies: Object.fromEntries(Object.entries(d.strategies).filter(([pipe, s]) => s !== defaultStrategyId(pipe))),
-      pinned,
+      strategies: Object.fromEntries(Object.entries(d.strategies).filter(([leg, s]) => s !== defaultStrategyId(leg))),
     };
     const err = dispatch({ type: "launch", client: { ...base, campaigns: [campaign] } });
     setError(err);
@@ -133,7 +132,7 @@ function Flow({ model }: { model: Model }) {
 
   return (
     <>
-      <PageHeader title="New campaign" sub="Say who it is for and what you want. The sales funnels are ranked by value per dollar." />
+      <PageHeader title="New campaign" sub="Say who it is for, the Target you want and your budget. The production tree is rebuilt at every tick from performance." />
       <ol className="mb-6 flex flex-wrap gap-2" aria-label="Steps">
         {STEPS.map((s, i) => {
           const at = STEPS.findIndex((x) => x.id === step);
@@ -197,7 +196,7 @@ function Flow({ model }: { model: Model }) {
                     className={`k-chip ${d.target === o ? "k-chip-on" : ""}`}
                     onClick={() => {
                       const v = statedValue(model, d.brandId, o);
-                      set({ target: o, value: v ? String(v) : d.value, funnel: 0 });
+                      set({ target: o, value: v ? String(v) : d.value });
                     }}
                   >
                     {outcomeLabel(model.catalogue, o)}
@@ -208,7 +207,7 @@ function Flow({ model }: { model: Model }) {
             <Field label="Start outcome">
               <div className="flex flex-wrap gap-1">
                 {starts.map((e) => (
-                  <button key={e.id} type="button" className={`k-chip ${start.id === e.id ? "k-chip-on" : ""}`} onClick={() => set({ start: e.id, funnel: 0 })}>
+                  <button key={e.id} type="button" className={`k-chip ${start.id === e.id ? "k-chip-on" : ""}`} onClick={() => set({ start: e.id })}>
                     {e.label}
                   </button>
                 ))}
@@ -235,8 +234,8 @@ function Flow({ model }: { model: Model }) {
       {step === "funnels" && (
         <div className="space-y-6">
           <section>
-            <SectionTitle count={funnels.length} right={<span>Priced on every client&apos;s measured legs</span>}>
-              Best sales funnels to {outcomeLabel(model.catalogue, d.target).toLowerCase()}
+            <SectionTitle count={funnels.length} right={<span>Views of the tree, priced on every client&apos;s measured steps</span>}>
+              Sales funnels the tree can run to {outcomeLabel(model.catalogue, d.target).toLowerCase()} today
             </SectionTitle>
             {funnels.length === 0 ? (
               <div className="k-card">
@@ -244,14 +243,14 @@ function Flow({ model }: { model: Model }) {
               </div>
             ) : (
               <div className="space-y-2">
-                {funnels.map((f, i) => (
-                  <FunnelCard key={f.legs.map((l) => l.pipeId).join(">")} model={model} funnel={f} selected={i === Math.min(d.funnel, funnels.length - 1)} onSelect={() => set({ funnel: i })} />
+                {funnels.map((f) => (
+                  <FunnelCard key={f.steps.map((l) => l.legId).join(">")} model={model} funnel={f} />
                 ))}
               </div>
             )}
           </section>
 
-          {chosen && (
+          {best && (
             <section>
               <SectionTitle count={playable.length} right={<span>A strategy states conditions per Material. The default lets every script compete.</span>}>
                 Plays
@@ -264,7 +263,7 @@ function Flow({ model }: { model: Model }) {
                   return (
                     <div key={p.id} className="grid items-center gap-2 px-4 py-3 md:grid-cols-[220px_minmax(0,1fr)]">
                       <span className="flex min-w-0 items-center gap-2">
-                        <Mark kind="pipe" id={p.id} icon={p.icon} size={22} />
+                        <Mark kind="leg" id={p.id} icon={p.icon} size={22} />
                         <span className="truncate text-[13px] font-medium">{p.name}</span>
                       </span>
                       <span className="min-w-0">
@@ -288,16 +287,16 @@ function Flow({ model }: { model: Model }) {
                     </div>
                   );
                 })}
-                {playable.length === 0 && <EmptyNote>Every pipe of this funnel plays its default.</EmptyNote>}
+                {playable.length === 0 && <EmptyNote>Every leg plays its default.</EmptyNote>}
               </div>
             </section>
           )}
 
-          {chosen && (
+          {best && (
             <div className="k-card space-y-3 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Campaign name">
-                  <input className="k-input w-full px-2" style={{ font: "inherit" }} placeholder="Named after its funnel" value={d.campaignName} onChange={(e) => set({ campaignName: e.target.value })} />
+                  <input className="k-input w-full px-2" style={{ font: "inherit" }} placeholder="Named after its Target" value={d.campaignName} onChange={(e) => set({ campaignName: e.target.value })} />
                 </Field>
                 <Field label="Daily budget">
                   <span className="k-input inline-flex w-full items-center gap-1 px-2">
@@ -309,7 +308,7 @@ function Flow({ model }: { model: Model }) {
               </div>
               <button type="button" className="k-cta w-full justify-center" onClick={launch}>
                 <RocketLaunchIcon size={16} weight="fill" />
-                Launch and earn {formatRoi(chosen.valuePerDollar)} per $1 expected
+                Launch and earn up to {formatRoi(best.valuePerDollar)} per $1 expected
               </button>
               {error && <p className="text-[12px] text-[var(--data-rose)]">{error}</p>}
             </div>
@@ -332,10 +331,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** One proposed funnel: its line, value per dollar, cost per target, and each leg's leads needed. */
-function FunnelCard({ model, funnel, selected, onSelect }: { model: Model; funnel: RankedFunnel; selected: boolean; onSelect: () => void }) {
+/** One sales funnel the tree can run (a view): its line, value per dollar, cost per Target Unit, and each step's attempts per Target Unit. */
+function FunnelCard({ model, funnel }: { model: Model; funnel: RankedFunnel }) {
+  const target = outcomeLabel(model.catalogue, funnel.line[funnel.line.length - 1] ?? "").toLowerCase();
   return (
-    <button type="button" onClick={onSelect} className={`k-card ${selected ? "k-card-on" : ""} block w-full p-4 text-left`}>
+    <div className="k-card block w-full p-4 text-left">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <span className="min-w-0 flex-1 space-y-1.5">
           <FunnelName model={model} funnel={funnel} />
@@ -350,21 +350,21 @@ function FunnelCard({ model, funnel, selected, onSelect }: { model: Model; funne
           </span>
         </span>
       </div>
-      <div className="k-inset mt-3 grid rounded-[8px] text-[12px]" style={{ gridTemplateColumns: `repeat(${funnel.legs.length + 1}, minmax(0, 1fr))` }}>
+      <div className="k-inset mt-3 grid rounded-[8px] text-[12px]" style={{ gridTemplateColumns: `repeat(${funnel.steps.length + 1}, minmax(0, 1fr))` }}>
         <div className="px-3 py-2">
-          <p className="k-label">$ per target</p>
+          <p className="k-label">Cost from Start</p>
           <p className="text-[14px] font-medium tabular-nums">{formatUsd(funnel.costPerTarget)}</p>
         </div>
-        {funnel.legs.map((l) => (
+        {funnel.steps.map((l) => (
           <div key={`${l.from}>${l.to}`} className="min-w-0 border-l border-[var(--line-subtle)] px-3 py-2">
             <p className="k-label truncate">{outcomeLabel(model.catalogue, l.to)}</p>
             <p className="tabular-nums">
               {formatRatePct(l.estimate.yieldRate)} · {formatUsd(l.estimate.costPerAttempt)} each
             </p>
-            <p className="k-fg3 tabular-nums">{Number.isFinite(l.leadsNeeded) ? `${formatCount(l.leadsNeeded)} leads needed` : "—"}</p>
+            <p className="k-fg3 tabular-nums">{Number.isFinite(l.attemptsPerTarget) ? `${formatCount(l.attemptsPerTarget)} attempts per ${target}` : "—"}</p>
           </div>
         ))}
       </div>
-    </button>
+    </div>
   );
 }

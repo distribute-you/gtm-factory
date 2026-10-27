@@ -8,7 +8,7 @@ import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, SectionTitle, TopBar, SelectItem } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
-import { outcomeName, pipeTitle } from "@/lib/api/labels";
+import { outcomeName, legTitle } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRatePct, formatRoi, roiIsGood } from "@/lib/format";
 import { Field, ShimmerRows } from "./common";
 
@@ -36,7 +36,10 @@ export function ApiNewCampaignPage() {
     if (!valid) return;
     setBusy(true);
     setError(null);
-    const body: ApiNewCampaign = { brandId: brandId!, funnelId: funnelId!, dailyBudgetCents: Math.round(dollars * 100) };
+    const f = funnels.data?.find((x) => x.id === funnelId);
+    if (!f) return;
+    // A sales funnel is a view: the campaign takes its start and its Target; its tree is rebuilt at every tick.
+    const body: ApiNewCampaign = { brandId: brandId!, start: f.line[0]!, target: f.line[f.line.length - 1]!, dailyBudgetCents: Math.round(dollars * 100) };
     try {
       const c = await apiSend<ApiCampaign>("POST", "/campaigns", body);
       router.push(`/campaigns/view/?id=${encodeURIComponent(c.id)}`);
@@ -50,7 +53,7 @@ export function ApiNewCampaignPage() {
     <>
       <TopBar crumbs={[{ label: "Campaigns", href: "/campaigns/" }, { label: "New campaign" }]} />
       <Page narrow>
-        <PageHeader title="Start a campaign" sub="Pick a brand and one of its sales funnels. The campaign starts paused: you launch it." />
+        <PageHeader title="Start a campaign" sub="Pick a brand and a Target among the sales funnels its tree can run today. The campaign starts paused: you launch it." />
         {overview && brands.length === 0 ? (
           <div className="k-card">
             <EmptyNote>
@@ -128,9 +131,9 @@ function FunnelCard({ funnel, rank, catalogue, on, onPick }: { funnel: ApiRanked
               <span key={o} className="inline-flex items-center gap-1.5">
                 {i > 0 && (
                   <span className="k-fg3">
-                    {funnel.legs[i - 1]?.pipes.length ? (
+                    {funnel.steps[i - 1]?.legs.length ? (
                       <>
-                        → <span className="k-fg2">{funnel.legs[i - 1]!.pipes.map((p) => pipeTitle(catalogue, p)).join(", ")}</span> →
+                        → <span className="k-fg2">{funnel.steps[i - 1]!.legs.map((p) => legTitle(catalogue, p)).join(", ")}</span> →
                       </>
                     ) : (
                       "→"
@@ -150,8 +153,8 @@ function FunnelCard({ funnel, rank, catalogue, on, onPick }: { funnel: ApiRanked
         </div>
       </div>
       {on && (
-        <div className="k-inset mt-3 grid gap-px overflow-hidden rounded-[8px] text-[12px]" style={{ gridTemplateColumns: `repeat(${Math.max(1, funnel.legs.length)}, minmax(0,1fr))` }}>
-          {funnel.legs.map((l) => (
+        <div className="k-inset mt-3 grid gap-px overflow-hidden rounded-[8px] text-[12px]" style={{ gridTemplateColumns: `repeat(${Math.max(1, funnel.steps.length)}, minmax(0,1fr))` }}>
+          {funnel.steps.map((l) => (
             <div key={`${l.from}>${l.to}`} className="px-3 py-2">
               <span className="k-label block">
                 {outcomeName(catalogue, l.from)} to {outcomeName(catalogue, l.to)}
@@ -160,7 +163,7 @@ function FunnelCard({ funnel, rank, catalogue, on, onPick }: { funnel: ApiRanked
                 {formatRatePct(l.yieldRate)} yield · {formatCents(l.costPerAttemptCents)} per attempt
               </span>
               <span className="k-fg3 block tabular-nums">
-                {formatCount(l.leadsNeeded)} leads needed · {l.label === "measured" ? "measured" : "expected"}
+                {formatCount(l.attemptsPerTarget)} attempts per {outcomeName(catalogue, funnel.line[funnel.line.length - 1] ?? "").toLowerCase()} · {l.label === "measured" ? "measured" : "expected"}
               </span>
             </div>
           ))}

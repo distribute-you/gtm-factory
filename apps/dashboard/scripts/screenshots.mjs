@@ -43,11 +43,11 @@ export const PAGES = [
   ["lead", "LEAD"],
   ["companies", "/companies/"],
   ["pinned-templates", "/pinned/?pin=outcome%3Atemplate_written"],
-  ["pinned-llms", "/pinned/?pin=pipe%3Allm"],
-  ["pipe-writer", "/pinned/?pin=pipe%3Awriter"],
+  ["pinned-llms", "/pinned/?pin=leg%3Allm"],
+  ["leg-writer", "/pinned/?pin=leg%3Awriter"],
   ["research", "/research/"],
   ["catalogue", "/catalogue/"],
-  ["catalogue-pipes", "/catalogue/?tab=pipes"],
+  ["catalogue-legs", "/catalogue/?tab=legs"],
   ["catalogue-scripts", "/catalogue/?tab=scripts"],
   ["catalogue-tactics", "/catalogue/?tab=tactics"],
   ["catalogue-strategies", "/catalogue/?tab=strategies"],
@@ -101,9 +101,9 @@ const shoot = async (name) => {
 await page.goto(`${origin}/?scenario=distribute&day=20`);
 await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 20")', { timeout: 180000 });
 await shoot("distribute-today");
-await page.goto(`${origin}/catalogue/?tab=pipes`);
+await page.goto(`${origin}/catalogue/?tab=legs`);
 await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 20")', { timeout: 180000 });
-await shoot("distribute-catalogue-pipes");
+await shoot("distribute-catalogue-legs");
 await browser.close();
 server.close();
 if (errors.length) {

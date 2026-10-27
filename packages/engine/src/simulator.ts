@@ -21,8 +21,8 @@
  */
 
 import { START, billOf, defaultStrategyId, type Catalogue, type Leg, type OutcomeId, type Script, type Specification, type Strategy } from "./catalogue";
-import { EvidenceBook, SEP, bumpCell, legCountsOf, legEstimateOf, type Cell, type CellStore } from "./evidence";
-import { chainCostPerTarget, costForwardLine, legBreakdown, valueBackwardLine } from "./funnels";
+import { EvidenceBook, SEP, bumpCell, stepCountsOf, stepEstimateOf, type Cell, type CellStore } from "./evidence";
+import { chainCostPerTarget, costForwardLine, stepBreakdown, valueBackwardLine } from "./funnels";
 import { buildLedger, type LedgerReport, type LedgerRun, type LedgerUnit } from "./ledger";
 import { prioritize, type PricedCandidate } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
@@ -368,7 +368,7 @@ export class SimulationSession {
   private readonly evidence: EvidenceBook;
   /** What a Rating that reads no evidence sees: every candidate at its prior. */
   private readonly blind: EvidenceBook;
-  private readonly legCohorts: CellStore = new Map();
+  private readonly stepCohorts: CellStore = new Map();
   private readonly picks = new Map<string, Map<string, number[]>>();
   private readonly spent = new Map<string, number>();
   private readonly budgetLeft = new Map<string, number>();
@@ -658,11 +658,11 @@ export class SimulationSession {
     const plays = this.playsFor(campaign, from, to);
     const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
     const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
-    const own = legCountsOf(this.faded(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
+    const own = stepCountsOf(this.faded(this.stepCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
     if (own.attempts >= 20) return own;
     let acc = { successes: 0, trials: 0, costCents: 0, attempts: 0 };
     for (const c of this.campaigns()) {
-      const x = legCountsOf(this.faded(this.legCohorts.get(`${c.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
+      const x = stepCountsOf(this.faded(this.stepCohorts.get(`${c.id}${SEP}${stepKey(from, to)}`)), this.dayIndex, mean, fixed);
       acc = { successes: acc.successes + x.successes, trials: acc.trials + x.trials, costCents: acc.costCents + x.costCents, attempts: acc.attempts + x.attempts };
     }
     return acc;
@@ -901,7 +901,7 @@ export class SimulationSession {
       this.setPerson(a, person);
       this.enroll(person.id, campaign.id);
     }
-    bumpCell(this.legCohorts, `${campaign.id}${SEP}${stepKey(from, to)}`, day, "t", 1);
+    bumpCell(this.stepCohorts, `${campaign.id}${SEP}${stepKey(from, to)}`, day, "t", 1);
     if (this.today) this.today.attempts[campaign.id] = (this.today.attempts[campaign.id] ?? 0) + 1;
     return a;
   }
@@ -948,7 +948,7 @@ export class SimulationSession {
       if (dec.credited) continue;
       this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "f", 1);
     }
-    if (status === "failed") bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "f", 1);
+    if (status === "failed") bumpCell(this.stepCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "f", 1);
     a.choices.clear();
     a.got.clear();
   }
@@ -1485,7 +1485,7 @@ export class SimulationSession {
       this.evidence.bump(dec.point, dec.candidate, dec.brandId, dec.day, "c", cents);
     }
     // Leg economics read our own spend: what another factory charges is its cost, not ours.
-    if (ours) bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "c", cents);
+    if (ours) bumpCell(this.stepCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "c", cents);
     const root = a.from === a.campaign.start ? a : a.person ? this.attemptFrom.get(`${a.campaign.id}${SEP}${a.campaign.start}${SEP}${a.person.id}`) : undefined;
     if (root && ours) {
       const k = `${a.campaign.id}${SEP}${root.id}`;
@@ -1597,7 +1597,7 @@ export class SimulationSession {
       }
       if (done && !this.legDone.has(done.id)) {
         this.legDone.add(done.id);
-        bumpCell(this.legCohorts, `${cid}${SEP}${stepKey(done.from, done.to)}`, done.startDay, "s", 1);
+        bumpCell(this.stepCohorts, `${cid}${SEP}${stepKey(done.from, done.to)}`, done.startDay, "s", 1);
       }
       if (u.outcome === campaign.target) this.creditValue(campaign, u.subject);
       // A reactive campaign pushes the Unit on up its tree; a proactive one pulls it from the stock.
@@ -1753,7 +1753,7 @@ export class SimulationSession {
     this.dayPicksAll.set(`${point}${SEP}${a.campaign.id}`, offered);
     let chosen = candidates[0]!;
     if (candidates.length > 1) {
-      const value = this.legValue(a);
+      const value = this.stepValue(a);
       const book = this.bookOf(a.client.brand.id);
       const priced: PricedCandidate[] = candidates.map((o) => ({ id: o, ...book.belief(point, o, candidates, a.client.brand.id, day) }));
       chosen = prioritize(priced, value, this.rng).chosenId;
@@ -1805,23 +1805,23 @@ export class SimulationSession {
   private readonly parentDynasty = new Map<string, string>();
 
   /** Value of one Unit at the end of an attempt's step (backward from the campaign's Target, along today's tree). */
-  private legValue(a: Pick<Attempt, "campaign" | "to">): number {
+  private stepValue(a: Pick<Attempt, "campaign" | "to">): number {
     const ck = `${a.campaign.id}${SEP}${a.to}`;
-    if (this.legValueDay !== this.dayIndex) {
-      this.legValueCache.clear();
-      this.legValueDay = this.dayIndex;
+    if (this.stepValueDay !== this.dayIndex) {
+      this.stepValueCache.clear();
+      this.stepValueDay = this.dayIndex;
     }
-    const hit = this.legValueCache.get(ck);
+    const hit = this.stepValueCache.get(ck);
     if (hit !== undefined) return hit;
-    const v = this.computeLegValue(a);
-    this.legValueCache.set(ck, v);
+    const v = this.computeStepValue(a);
+    this.stepValueCache.set(ck, v);
     return v;
   }
 
-  private readonly legValueCache = new Map<string, number>();
-  private legValueDay = -1;
+  private readonly stepValueCache = new Map<string, number>();
+  private stepValueDay = -1;
 
-  private computeLegValue(a: Pick<Attempt, "campaign" | "to">): number {
+  private computeStepValue(a: Pick<Attempt, "campaign" | "to">): number {
     const target = this.targetValue(a.campaign).amount;
     const steps: { costPerAttempt: number; yieldRate: number }[] = [];
     for (let x: OutcomeId | null = a.to, n = 0; x && x !== a.campaign.target && n < 20; n++) {
@@ -1892,7 +1892,7 @@ export class SimulationSession {
    * carries the subject; the others feed a Material of a leg on it (a research,
    * a model call). `campaign` null reads the picks of every campaign.
    */
-  legsOfStep(play: string, from: OutcomeId, campaign: Campaign | null): StepLeg[] {
+  stepLegs(play: string, from: OutcomeId, campaign: Campaign | null): StepLeg[] {
     const out: StepLeg[] = [];
     const seen = new Set<string>();
     const strategic = campaign ?? ({ strategies: {}, start: from, target: from } as unknown as Campaign);
@@ -1952,12 +1952,12 @@ export class SimulationSession {
     return out;
   }
 
-  /** Every leg each step of a campaign's tree runs through today (see `legsOfStep`), step by step. */
+  /** Every leg each step of a campaign's tree runs through today (see `stepLegs`), step by step. */
   campaignLegs(campaign: Campaign): StepLeg[][] {
     const plays = this.playsToday(campaign);
     return this.stepsOf(campaign).map(({ from }, k) => {
       const play = plays[k];
-      return play ? this.legsOfStep(play, from, campaign) : [];
+      return play ? this.stepLegs(play, from, campaign) : [];
     });
   }
 
@@ -2015,7 +2015,7 @@ export class SimulationSession {
     const plays = this.playsFor(campaign, from, to);
     const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
     const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
-    return { from, to, ...legEstimateOf(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`), day, mean, fixed) };
+    return { from, to, ...stepEstimateOf(this.stepCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`), day, mean, fixed) };
   }
 
   /** Each step of the sales path a campaign's tree runs today. */
@@ -2106,11 +2106,11 @@ export class SimulationSession {
     const ok = steps.every((l) => l.yieldRate !== null && l.costPerAttempt !== null && l.yieldRate > 0);
     const chain = ok ? steps.map((l) => ({ costPerAttempt: l.costPerAttempt!, yieldRate: l.yieldRate! })) : [];
     const forward = ok ? costForwardLine(chain) : [];
-    const per = ok ? legBreakdown(chain) : [];
+    const per = ok ? stepBreakdown(chain) : [];
     return steps.map((l, k) => ({
       from: l.from,
       to: l.to,
-      attemptsPerTarget: ok ? per[k]!.leadsNeeded : null,
+      attemptsPerTarget: ok ? per[k]!.attemptsPerTarget : null,
       costOfStep: l.yieldRate && l.costPerAttempt !== null ? l.costPerAttempt / l.yieldRate : null,
       costFromStart: ok ? forward[k]! : null,
     }));
@@ -2165,7 +2165,7 @@ export class SimulationSession {
     const candidates = this.candidatesFor(point, campaign);
     const brandId = campaign.brandId;
     const delay = this.evidence.delayOf(point);
-    const value = this.legValue({ campaign, to: this.pointStep.get(`${point}${SEP}${campaign.id}`) ?? campaign.target });
+    const value = this.stepValue({ campaign, to: this.pointStep.get(`${point}${SEP}${campaign.id}`) ?? campaign.target });
     return candidates.map((o) => {
       const b = this.belief(point, o, candidates, brandId, this.dayIndex);
       const c = this.evidence.counts(point, o, [brandId], this.dayIndex, delay);

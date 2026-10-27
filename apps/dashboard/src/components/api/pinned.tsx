@@ -6,19 +6,19 @@ import { Mark } from "@/components/mark";
 import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
-import { outcomeName, pipeTitle } from "@/lib/api/labels";
+import { outcomeName, legTitle } from "@/lib/api/labels";
 import { useSearchParams } from "next/navigation";
 import type { Pin } from "@gtm-factory/engine";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
 import { Field, Read, ShimmerRows, formatTime } from "./common";
 
-/** A pinned page: an outcome pin lists its object dynasties, a pipe pin its scripts. Pins are the factory's data. */
+/** A pinned page: an outcome pin lists its object dynasties, a leg pin its scripts. Pins are the factory's data. */
 export function ApiPinnedPage() {
   const key = useSearchParams().get("pin") ?? "";
   const { data: o, answered } = useFactory();
   const pin = o?.pins?.find((p) => `${p.kind}:${p.id}` === key) ?? null;
   if (!answered) return <Page><ShimmerRows /></Page>;
-  if (!pin || (pin.kind !== "outcome" && pin.kind !== "pipe")) {
+  if (!pin || (pin.kind !== "outcome" && pin.kind !== "leg")) {
     return (
       <>
         <TopBar crumbs={[{ label: "Pinned" }]} />
@@ -90,7 +90,7 @@ function ObjectsPage({ pin }: { pin: Pin }) {
                                 <div key={s.point} className="px-3 py-2 text-[12px]">
                                   <span className="k-label block truncate">{s.pointLabel}</span>
                                   <span className="mt-0.5 block tabular-nums">
-                                    {formatRatePct(s.rateMean)} reach the leg&apos;s end · {formatCount(s.successes)} of {formatCount(s.picks)} picks
+                                    {formatRatePct(s.rateMean)} reach the step&apos;s end · {formatCount(s.successes)} of {formatCount(s.picks)} picks
                                   </span>
                                 </div>
                               ))}
@@ -197,12 +197,12 @@ function TemplateEditor({ outcome, mode, dynasty, onClose }: { outcome: string; 
 }
 
 // ---------------------------------------------------------------------------
-// A pipe pin: the scripts competing on it (LLMs...)
+// A leg pin: the scripts competing on it (LLMs...)
 // ---------------------------------------------------------------------------
 
 function ScriptsPage({ pin }: { pin: Pin }) {
   const { data: o } = useFactory();
-  const read = useApi<ApiScriptStats[]>(`/scripts?pipeId=${encodeURIComponent(pin.id)}`);
+  const read = useApi<ApiScriptStats[]>(`/scripts?legId=${encodeURIComponent(pin.id)}`);
   return (
     <>
       <TopBar crumbs={[{ label: pin.label }]} />
@@ -211,7 +211,7 @@ function ScriptsPage({ pin }: { pin: Pin }) {
           <Read read={read}>
             {(scripts) => (
               <>
-                <PageHeader title={`${plural(scripts.length, "script", "scripts")} on ${pipeTitle(o?.catalogue, pin.id)}`} sub="Scripts compete on this pipe. Each pipe consuming its output picks its own best one." />
+                <PageHeader title={`${plural(scripts.length, "script", "scripts")} on ${legTitle(o?.catalogue, pin.id)}`} sub="Scripts compete on this leg. Each leg consuming its output picks its own best one." />
                 {scripts.length === 0 ? (
                   <div className="k-card">
                     <EmptyNote>No script yet.</EmptyNote>
@@ -279,7 +279,7 @@ function ScriptCard({ s }: { s: ApiScriptStats }) {
             <tr className="k-line-subtle border-b border-t">
               <th className={`${TH} w-full`}>Material</th>
               <th className={`${TH} text-right`}>Rate</th>
-              <th className={`${TH} text-right`}>Cost to leg end</th>
+              <th className={`${TH} text-right`}>Cost to step end</th>
               <th className={`${TH} text-right`}>Picks</th>
               <th className={`${TH} text-right`}>Reached</th>
             </tr>

@@ -6,7 +6,7 @@ import {
   candidateCuts,
   chainCostPerTarget,
   costForwardLine,
-  legBreakdown,
+  stepBreakdown,
   meets,
   pickFromMarket,
   scriptAccepts,
@@ -130,7 +130,7 @@ describe("the two calculations", () => {
   it("costs forward and values backward", () => {
     expect(costForwardLine(meeting).map((x) => Math.round(x * 100) / 100)).toEqual([50, 130, 700]);
     expect(chainCostPerTarget(meeting)).toBeCloseTo(700, 9);
-    expect(legBreakdown(meeting).map((l) => Math.round(l.leadsNeeded * 100) / 100)).toEqual([625, 12.5, 5]);
+    expect(stepBreakdown(meeting).map((l) => Math.round(l.attemptsPerTarget * 100) / 100)).toEqual([625, 12.5, 5]);
     const v = valueBackwardLine(meeting, 2100);
     expect(v.values.map((x) => Math.round(x * 100) / 100)).toEqual([2.24, 162, 410, 2100]);
   });
