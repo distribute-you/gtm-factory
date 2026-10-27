@@ -25,3 +25,4 @@ export function worldFromData(data: WorldData, library: ScriptLibrary, seed?: nu
 }
 export * from "./factory-api";
 export * from "./release";
+export * from "./replay";

@@ -1,6 +1,6 @@
 {
   "name": "@gtm-factory/core",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "The GTM Factory framework: outcomes and their Engines and Providers, scripts as code, a Plan recomputed at every tick, pull and push, the ledger as common stock, the Supplier rating with traceability credit, typed tactics and splits, capacity, reliability and a seeded simulator. Pure TypeScript; one runtime dependency (sucrase) to load script code given as text.",
   "license": "MIT",
   "type": "module",
