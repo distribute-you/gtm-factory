@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SimulationSession, type PlanNode } from "../src";
+import { SimulationSession, type PlanNode, type PlanTreeNode } from "../src";
 import { defaultWorld } from "./helpers";
 
 /** The node of an outcome in a Plan, searched depth first. */
@@ -55,7 +55,7 @@ describe("the Plan is recomputed at every tick", () => {
     expect(made.has("follow_up_queued")).toBe(true);
     expect(made.has("lead_interested")).toBe(true);
     expect(made.has("lead_found")).toBe(false);
-    expect(s.routingOf(c).line).toEqual(["reply_received", "lead_interested"]);
+    expect(s.milestoneLine(c)).toEqual(["reply_received", "lead_interested"]);
   }, 120_000);
 });
 
@@ -70,5 +70,52 @@ describe("budget", () => {
     z.run(10);
     expect(z.pushes.filter((p) => p.campaignId === "campaign-follow-ups").length).toBeGreaterThan(20);
     expect(z.runs.filter((r) => r.campaignId === "campaign-follow-ups" && r.spendCents > 0).length).toBe(0);
+  }, 120_000);
+});
+
+/** Every node of a Plan tree, depth first. */
+function nodesOf(n: PlanTreeNode | null): PlanTreeNode[] {
+  if (!n) return [];
+  return [n, ...n.branches.flatMap((b) => b.children.flatMap(nodesOf))];
+}
+
+describe("the Plan is shown as what ran", () => {
+  it("a tree: every script that made Units is a branch, with its own Plan below, the pick of this tick marked", () => {
+    const s = new SimulationSession(defaultWorld());
+    s.run(25);
+    const c = s.campaign("campaign-outbound")!;
+    const tree = s.planTree(c)!;
+    expect(tree.outcome).toBe("paid_client");
+    const all = nodesOf(tree);
+    for (const n of all) {
+      expect(n.branches.filter((b) => b.current).length, n.outcome).toBeLessThanOrEqual(1);
+      const total = n.branches.reduce((x, b) => x + b.share, 0);
+      if (n.branches.some((b) => b.units > 0)) expect(total, n.outcome).toBeCloseTo(1, 6);
+    }
+    // Two ways to a reply ran this week; the LinkedIn branch finds no email under it, the cold email branch does.
+    const replies = all.filter((n) => n.outcome === "reply_received").flatMap((n) => n.branches);
+    const li = replies.find((b) => b.scriptId === "li_connect");
+    const mb = replies.find((b) => b.scriptId === "mb_replies");
+    expect(li && mb).toBeTruthy();
+    const below = (b: { children: PlanTreeNode[] }): string[] => b.children.flatMap((n) => [n.outcome, ...n.branches.flatMap(below)]);
+    expect(below(li!)).not.toContain("email_found");
+    expect(below(mb!)).toContain("email_found");
+    // The brand inputs a script used ride on its branch: the ICP versions behind the people found.
+    const sourcing = all.filter((n) => n.outcome === "lead_found").flatMap((n) => n.branches).filter((b) => b.runs > 0);
+    const icp = sourcing.flatMap((b) => b.inputs).find((x) => x.material === "audience_built")!;
+    expect(icp.versions.length).toBeGreaterThan(0);
+    expect(icp.versions.reduce((x, v) => x + v.share, 0)).toBeCloseTo(1, 6);
+    expect(s.inputsOf("src_filters", c.id)[0]?.material).toBe("audience_built");
+  }, 120_000);
+
+  it("what the subjects went through, milestone to milestone, by script", () => {
+    const s = new SimulationSession(defaultWorld());
+    s.run(25);
+    const f = s.flows(s.campaign("campaign-outbound")!);
+    expect(f.length).toBeGreaterThan(2);
+    const first = f.find((h) => h.from === "start" && h.to === "reply_received")!;
+    expect(first.subjects).toBeGreaterThan(10);
+    expect(first.by.reduce((x, b) => x + b.share, 0)).toBeCloseTo(1, 6);
+    for (const h of f) expect(h.by.reduce((x, b) => x + b.subjects, 0)).toBeGreaterThanOrEqual(h.subjects);
   }, 120_000);
 });

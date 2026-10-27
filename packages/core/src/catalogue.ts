@@ -152,33 +152,15 @@ export interface Strategy {
   retired?: boolean;
 }
 
-/**
- * A Routing: the ordered milestones a Plan passes through, from its start
- * (Start, or an outcome) to its Target. A view, named on first sight and kept.
- */
-export interface Routing {
-  id: string;
-  name: string;
-  start: OutcomeId;
-  /** The milestones after the start; the last one is the Target. */
-  line: OutcomeId[];
-}
-
-export function routingId(start: OutcomeId, line: readonly OutcomeId[]): string {
-  return `routing:${[start, ...line].join(">")}`;
-}
-
 export interface CatalogueData {
   tracks: Track[];
   outcomes: Outcome[];
   scripts: Script[];
   tactics: Tactic[];
   strategies: Strategy[];
-  /** Routings named so far (views: a name is given on first sight and kept). */
-  routings?: Routing[];
 }
 
-type Kind = Exclude<keyof CatalogueData, "routings">;
+type Kind = keyof CatalogueData;
 
 export interface CatalogueIssue {
   kind: string;
@@ -217,7 +199,6 @@ export class Catalogue {
       scripts: [...(data?.scripts ?? [])],
       tactics: [...(data?.tactics ?? [])],
       strategies: [...(data?.strategies ?? [])],
-      routings: [...(data?.routings ?? [])],
     };
     for (const o of this.engines()) this.ensureDefaultStrategy(o);
   }
@@ -245,9 +226,6 @@ export class Catalogue {
   get strategies(): readonly Strategy[] {
     return this.data.strategies;
   }
-  get routings(): readonly Routing[] {
-    return this.data.routings ?? [];
-  }
 
   outcome(id: OutcomeId): Outcome | undefined {
     return this.data.outcomes.find((o) => o.id === id);
@@ -260,9 +238,6 @@ export class Catalogue {
   }
   strategy(id: string): Strategy | undefined {
     return this.data.strategies.find((s) => s.id === id);
-  }
-  routing(id: string): Routing | undefined {
-    return this.routings.find((r) => r.id === id);
   }
 
   /** Outcomes that have an Engine: at least one script makes them. */
@@ -316,42 +291,6 @@ export class Catalogue {
 
   strategiesOf(outcome: OutcomeId): Strategy[] {
     return this.data.strategies.filter((s) => s.outcome === outcome && !s.retired);
-  }
-
-  // ---- Routings: views, named on first sight ---------------------------------------
-
-  private plural(o: OutcomeId): string {
-    const out = this.outcome(o);
-    return out?.plural ?? `${out?.label ?? o}s`;
-  }
-
-  /** Short plain words: "Paid clients from the market"; the milestones it passes through only to tell two apart, a number last. */
-  private routingNames(start: OutcomeId, line: readonly OutcomeId[]): string[] {
-    const target = line[line.length - 1] ?? start;
-    const from = start === START ? "the market" : this.plural(start).toLowerCase();
-    const base = `${this.plural(target)} from ${from}`;
-    const via = line.slice(0, -1).map((o) => this.plural(o).toLowerCase());
-    const all = via.length > 1 ? `${via.slice(0, -1).join(", ")} and ${via[via.length - 1]}` : via[0];
-    return via.length > 0 ? [...new Set([base, `${base}, via ${via[0]}`, `${base}, via ${all}`])] : [base];
-  }
-
-  /** The Routing of a line: its stored name, or the name it would get now (nothing is stored). */
-  peekRouting(start: OutcomeId, line: readonly OutcomeId[]): Routing {
-    const id = routingId(start, line);
-    const found = this.routing(id);
-    if (found) return found;
-    const taken = new Set(this.routings.map((r) => r.name));
-    const names = this.routingNames(start, line);
-    let name = names.find((n) => !taken.has(n));
-    for (let n = 2; !name; n++) if (!taken.has(`${names[0]} ${n}`)) name = `${names[0]} ${n}`;
-    return { id, name, start, line: [...line] };
-  }
-
-  /** The Routing of a line, named on first sight and kept. */
-  nameRouting(start: OutcomeId, line: readonly OutcomeId[]): Routing {
-    const r = this.peekRouting(start, line);
-    if (!this.routing(r.id)) this.data.routings!.push(r);
-    return r;
   }
 
   // ---- writes ---------------------------------------------------------------

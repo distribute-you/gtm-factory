@@ -390,7 +390,8 @@ export function pointsOf(model: Model, campaign: Campaign): PointRow[] {
     const hidden = hiddenOf(model, campaign);
     const keys = model.session.candidatePlaces().filter((p) => p.campaignId === campaign.id).map((p) => p.point);
     const ordered = [...hidden.keys(), ...keys.filter((k) => !hidden.has(k))].filter((k) => keys.includes(k));
-    return ordered.map((key) => pointRow(model, campaign, key, hidden.get(key) ?? null));
+    // Brand inputs (ICPs, templates) are read on the row of the script that used them, never as a place of their own.
+    return ordered.filter((key) => pointInfo(model.catalogue, key).kind === "script").map((key) => pointRow(model, campaign, key, hidden.get(key) ?? null));
   });
 }
 
@@ -440,7 +441,7 @@ export function shareSeries(pc: PointConvergence): (number | null)[] {
 }
 
 /** The latest pick records of a set of campaigns, newest first. */
-export function recentChoices(model: Model, campaignIds: Set<string>, limit: number): PickRecord[] {
+export function recentPicks(model: Model, campaignIds: Set<string>, limit: number): PickRecord[] {
   const out: PickRecord[] = [];
   const all = model.session.pickLog;
   for (let i = all.length - 1; i >= 0 && out.length < limit; i--) if (campaignIds.has(all[i]!.campaignId)) out.push(all[i]!);
@@ -448,7 +449,7 @@ export function recentChoices(model: Model, campaignIds: Set<string>, limit: num
 }
 
 /** Why a pick went the way it did, in plain words. */
-export function explainChoice(model: Model, c: PickRecord): string {
+export function explainPick(model: Model, c: PickRecord): string {
   const brandId = model.campaigns.find((x) => x.id === c.campaignId)?.brandId;
   const picked = candidateLabel(model, c.point, c.pickedId, brandId);
   const total = c.candidates.reduce((s, o) => s + o.picks, 0);
@@ -692,7 +693,7 @@ export function initials(name: string): string {
 // A new campaign: the Plan it would run today
 // ---------------------------------------------------------------------------
 
-/** The Plan a new campaign of a brand would run this tick, from a start to a Target, and the Routing it passes through. */
+/** The Plan a new campaign of a brand would run this tick, from a start to a Target, and the milestones it passes through. */
 export function previewPlan(model: Model, brandId: string, start: OutcomeId, target: OutcomeId): { plan: PlanNode | null; line: OutcomeId[] } {
   const draft: Campaign = { id: `draft:${brandId}:${start}:${target}:${model.day}`, brandId, offerId: "", name: "", start, target, dailyBudgetCents: 0, status: "paused", brief: "" };
   const plan = model.session.planOf(draft);

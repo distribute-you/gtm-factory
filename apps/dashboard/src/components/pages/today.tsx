@@ -6,7 +6,7 @@ import { DayChart, Legend } from "@/components/charts";
 import { PlanLineView } from "@/components/plan-line";
 import { Mark } from "@/components/mark";
 import { BarSpark, EmptyNote, Figure, Page, PageHeader, RoiLabel, SectionTitle, Shimmer, SparkLine, StatTile, TickGauge, TopBar } from "@/components/ui";
-import { costPerOutcomeSeries, cumulative, explainChoice, candidateLabel, outcomeLabel, pointInfo, recentChoices, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
+import { costPerOutcomeSeries, cumulative, engineName, explainPick, candidateLabel, outcomeLabel, pointInfo, recentPicks, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
 import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -219,24 +219,38 @@ export function ReturnCard({ f, expected }: { f: ScopeFigures; expected: number 
 
 /** The engine's latest picks and why: newest first. */
 export function WhyFeed({ model, campaignIds, limit = 8 }: { model: Model; campaignIds: Set<string>; limit?: number }) {
-  const items = recentChoices(model, campaignIds, limit);
+  const items = recentPicks(model, campaignIds, limit);
   return (
     <section>
-      <SectionTitle right={<span>Newest first</span>}>Why each pick was made</SectionTitle>
+      <SectionTitle right={<span>Newest first</span>}>Why each one was picked</SectionTitle>
       <div className="k-card divide-y divide-[var(--line-subtle)]">
         {items.length === 0 && <EmptyNote>No pick yet. Press Run.</EmptyNote>}
         {items.map((c, i) => {
           const info = pointInfo(model.catalogue, c.point);
           const campaign = model.campaigns.find((x) => x.id === c.campaignId);
+          const picked = candidateLabel(model, c.point, c.pickedId, campaign?.brandId);
+          const input = info.kind === "unit";
           return (
-            <Link key={i} href={`/research/?point=${encodeURIComponent(c.point)}`} className="k-hover flex gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]">
-              <Mark kind="point" id={c.point} size={28} />
+            <Link
+              key={i}
+              href={input ? `/pinned/?pin=${encodeURIComponent(`outcome:${info.material}`)}` : `/research/?point=${encodeURIComponent(c.point)}`}
+              className="k-hover flex gap-3 px-4 py-3 first:rounded-t-[12px] last:rounded-b-[12px]"
+            >
+              <Mark kind={input ? "material" : "engine"} id={info.material} icon={model.catalogue.outcome(info.material)?.icon} size={28} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px]">
-                  <span className="k-fg3">{info.title}:</span> <span className="font-medium">{candidateLabel(model, c.point, c.pickedId, campaign?.brandId)}</span>
+                  {input ? (
+                    <>
+                      <span className="k-fg3">{outcomeLabel(model.catalogue, info.material)} used:</span> <span className="font-medium">{picked}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="k-fg3">{engineName(model.catalogue, info.material)} · script:</span> <span className="font-medium">{picked}</span>
+                    </>
+                  )}
                 </p>
                 <p className="k-fg3 truncate text-[12px]">
-                  {campaign?.name} · {explainChoice(model, c)}
+                  {campaign?.name}: {explainPick(model, c)}
                 </p>
               </div>
               <span className="k-mono k-fg3 shrink-0 text-[12px]">Day {c.day}</span>

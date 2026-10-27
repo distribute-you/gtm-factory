@@ -89,7 +89,7 @@ export interface ApiNewBrand {
   leads?: { email?: string; firstName?: string; lastName?: string; company?: string; title?: string; domain?: string }[];
 }
 
-/** One milestone of a Routing: from one milestone (or Start) to the next, every Engine it runs through. */
+/** One milestone of a campaign's Plan: from one milestone (or Start) to the next, every Engine it runs through. */
 export interface ApiMilestone {
   from: OutcomeId;
   to: OutcomeId;
@@ -107,52 +107,80 @@ export interface ApiMilestone {
   label: "expected" | "measured";
 }
 
-/** A Routing (a view with a short name): the ordered milestones a Plan passes through. */
-export interface ApiRouting {
-  id: string;
-  name: string;
-  line: OutcomeId[];
-}
-
 /** What a new campaign toward a Target would run today (a view, ranked by value per dollar). */
 export interface ApiPlanPreview {
   target: OutcomeId;
-  routing: ApiRouting;
+  /** The milestones it would pass through today, start excluded, Target last. */
+  line: OutcomeId[];
   milestones: ApiMilestone[];
   costPerTargetCents: number;
   valuePerDollar: number;
   label: "expected" | "measured";
 }
 
-/** A branch of an outcome of the Plan: the share of its Units one script made over the last 7 days, and its cost per Unit. */
+/** One version of a brand input (an ICP, a template) a script used, and its share of that script's runs over the last 7 days. */
+export interface ApiInputShare {
+  /** The version's dynasty. */
+  id: string;
+  label: string;
+  share: number;
+}
+
+/** A brand input whose versions compete inside a script's runs: which versions it used. */
+export interface ApiScriptInput {
+  /** The outcome called (an ICP, a template). */
+  material: OutcomeId;
+  label: string;
+  versions: ApiInputShare[];
+}
+
+/**
+ * A branch of the Plan tree: one script that made the outcome of its node for
+ * this campaign over the last 7 days, with its share of those Units, its cost
+ * per Unit, the brand inputs it used, and under it what ran on that branch.
+ */
 export interface ApiPlanBranch {
   scriptId: string;
+  runs: number;
   units: number;
   share: number;
   costPerUnitCents: number | null;
+  /** The script the Plan picks there this tick. */
+  current: boolean;
+  inputs: ApiScriptInput[];
+  /** The outcomes this script calls, each a node with its own branches. */
+  children: ApiPlanNode[];
+  /** It calls the same outcomes as a sibling branch drawn in full: what runs below is not repeated. */
+  sameBelow: boolean;
 }
 
 /**
- * A node of a campaign's Plan: an outcome, the script its Engine runs now
- * (the Rating's best among the scripts the brief keeps), the Plan of each
- * outcome that script calls, and the branches actually used.
+ * A node of a campaign's Plan tree: an outcome, the script the Plan picks
+ * there this tick, and every script that actually made it over the last 7
+ * days as a branch (the Plan's pick highlighted). Recomputed at every tick.
  */
 export interface ApiPlanNode {
   outcome: OutcomeId;
-  /** The script its Engine runs now; null at a leaf served by its Provider (the start, a brand Unit, the Rating). */
+  /** The script the Plan picks this tick; null at a leaf served by its Provider (the start, the Rating). */
   scriptId: string | null;
-  /** Scripts (or brand dynasties at a leaf) that compete there. */
+  /** Scripts that compete there. */
   candidates: number;
   branches: ApiPlanBranch[];
-  materials: ApiPlanNode[];
 }
 
 /**
- * A new Campaign orders production. It fixes only its Target, its start
- * (Start: proactive, it pulls; any other outcome: reactive, it pushes each
- * landed Unit up), its budget and its strategy, a brief in plain words. A
- * judge reads the brief once per Engine; the Plan is recomputed at every tick.
+ * What a campaign's subjects went through over the last 7 days: reaching one
+ * milestone from the one before, how many, and by which script.
  */
+export interface ApiMilestoneFlow {
+  from: OutcomeId;
+  to: OutcomeId;
+  subjects: number;
+  /** Share of all subjects of the campaign that reached a milestone over the period. */
+  share: number;
+  by: { scriptId: string; name: string; subjects: number; share: number }[];
+}
+
 export interface ApiNewCampaign {
   brandId: string;
   offerId: string;
@@ -179,8 +207,8 @@ export interface ApiCampaign {
   /** The offer it sells. */
   offerId: string;
   name: string;
-  /** The Routing its Plan runs (a view with a short name, never a control), null before its first tick. */
-  routing: ApiRouting | null;
+  /** The milestones its Plan passes through most this week, start excluded, Target last (empty before its first tick). */
+  line: OutcomeId[];
   /** START (the market: the campaign pulls), or the outcome whose Units it pushes. */
   start: OutcomeId;
   /** The outcome it orders. */
@@ -228,6 +256,8 @@ export interface ApiCandidate {
   picks: number;
   successes: number;
   spentCents: number;
+  /** The brand inputs (ICPs, templates) whose versions compete inside this script's runs, and the share of each version. */
+  inputs: ApiScriptInput[];
 }
 
 /**
@@ -241,8 +271,7 @@ export interface ApiCandidates {
   consumer: string;
   material: OutcomeId;
   label: string;
-  /** Scripts of the material's Engine, or the brand's Units (a template, an ICP). */
-  kind: "script" | "unit";
+  /** The scripts of the material's Engine, each with the brand inputs it used. */
   candidates: ApiCandidate[];
 }
 
@@ -253,7 +282,9 @@ export interface ApiPick {
   campaignId: string;
   brandId: string;
   leadId: string | null;
-  /** The ApiCandidates id it was made at, and its title. */
+  /** What was picked: a script of an Engine, or the version of a brand input (an ICP, a template) a script used. */
+  kind: "script" | "input";
+  /** The ApiCandidates id it was made at (for a script), and its title. */
   place: string;
   placeLabel: string;
   picked: string;
@@ -308,10 +339,12 @@ export interface ApiOverview {
 export interface ApiCampaignDetail {
   campaign: ApiCampaign;
   brand: ApiBrand;
-  /** The milestones of the Routing its Plan runs today. */
+  /** The milestones its Plan passes through most this week. */
   milestones: ApiMilestone[];
-  /** Its Plan this tick, with the branches actually used over the last 7 days. */
+  /** Its Plan as a tree of what ran over the last 7 days, the Plan's pick at each node highlighted. */
   plan: ApiPlanNode | null;
+  /** What its subjects went through over the last 7 days, milestone to milestone. */
+  flows: ApiMilestoneFlow[];
   /** Spend per UTC day, oldest first. */
   spendByDay: { day: string; cents: number }[];
   /** What competes at each Engine this campaign calls. */

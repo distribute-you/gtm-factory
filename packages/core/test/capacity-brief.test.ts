@@ -46,7 +46,7 @@ describe("the strategy brief", () => {
     const outbound = s.campaign("campaign-outbound")!;
     expect(outbound.verdicts?.lead_visited).toBe("none");
     expect(s.runs.filter((r) => r.campaignId === outbound.id && outcomeOf(r.scriptId) === "lead_visited").length).toBe(0);
-    expect(s.routingOf(outbound).line).not.toContain("lead_visited");
+    expect(s.milestoneLine(outbound)).not.toContain("lead_visited");
   });
 
   it("a kept strategy filters the scripts of its Engine, and a stated cap and test length hold", () => {

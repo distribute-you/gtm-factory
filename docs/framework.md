@@ -40,8 +40,7 @@ flowchart LR
 | **Provider** | One per outcome, never in competition: the stores of that outcome. A script asks a Provider for what it needs. |
 | **Run** | A production order: one script executed, one Unit or none. |
 | **Campaign** | Orders production: a Target, a start, a budget and a strategy written as a brief. |
-| **Plan** | The tree a campaign runs, recomputed at every tick: each outcome, its Engine, the script that Engine runs now, and the Plan of each outcome that script calls. |
-| **Routing** | The ordered milestones a Plan passes through, with a short name ("Meetings booked from the market"). A view, never a control. |
+| **Plan** | The tree a campaign runs, recomputed at every tick: each outcome, its Engine, the script that Engine picks now, and the Plan of each outcome that script calls. It is shown as what actually ran this week: at each Engine every script that made Units is a branch, with its share and cost, the pick of this tick highlighted. Nothing about it is frozen. |
 | **Track** | An ordered ladder of states. The CRM lifecycle track holds Lead interested, Meeting booked, Meeting attended, Paid client. The Conversation track holds Reply received. The Website visits track holds Lead visited. A state of a track is a **milestone**. Tracks are never added together. |
 
 **Every API call output is an outcome.** A cold email is several outcomes: the writer makes a Message written; our send call makes a Message queued; the mailbox reports a Message sent and reads each Reply received. Each can be measured, priced and consumed.
@@ -58,9 +57,9 @@ flowchart LR
 
 1. **One Engine per outcome.** An Engine makes one outcome; competing scripts in dynasties perform it. A script makes one outcome and may consume any outcomes. The only pick left is the script, inside the Engine of an outcome: the best value per dollar among the scripts the strategy keeps.
 2. **No written manifest.** A script is code: it calls its Providers at run time. The outcomes it needs (its **materials**, for the Plan, costs and return) are read from its code: each `ctx.get("...")` names one, always a literal, and a test enforces it. Then the ledger measures what each run consumed, and an unexpected call joins the list. No judge is needed.
-3. **Provider and Engine.** A Provider offers one function, `get()`, with no argument: it returns the most recent Unit of its outcome this caller has not received yet, for the caller's context (the run's subject, its company, its brand, or the run itself), from the stock, else by ordering one from the Engine. "Already received" is the ledger's record of consumption. An Engine offers `pull()` and `push(unit)`, and always makes a new piece. `pull()` makes one piece for a context, down from the Target. `push(unit)` makes the next outcome from a Unit that landed, up toward the Target.
+3. **Provider and Engine.** A Provider offers one function, `get()`, with no argument: it returns the most recent Unit of its outcome this caller has not received yet, for the caller's context (the run's subject, its company, its brand, or the run itself), from the stock, else by ordering one from the Engine. "Already received" is the ledger's record of consumption. One exception: when the brand holds several competing versions of an input (ICPs, templates), the Provider puts them against each other and the Rating picks one per run. That is how a new version proves itself against the old ones. An Engine offers `pull()` and `push(unit)`, and always makes a new piece. `pull()` makes one piece for a context, down from the Target. `push(unit)` makes the next outcome from a Unit that landed, up toward the Target.
 4. **Freshness is the script's job.** A script unhappy with what it got calls `get()` again, and a new piece is made, as long as the run's budget lasts.
-5. **The names.** Engine, Provider, Plan, Routing, Track.
+5. **The names.** Engine, Provider, Plan, Track.
 6. **"Performed by" is a tactic of scripts.** Who runs a script is data on the script, never an object of its own.
 
 ## 4. Scripts are code
@@ -114,7 +113,7 @@ After **14** days, its Plan reads, from the Target down:
 - Lead visited, made by the search ads script (**2** scripts compete);
 - the ICP, served from the stock (**2** ICP dynasties compete), and today's Rating.
 
-Its Routing is "Meetings booked from the market". Per milestone:
+It passes through Lead visited, Lead interested and Meeting booked. Per milestone:
 
 | Milestone | Attempts per Meeting booked | Cost from Start |
 |---|---|---|
@@ -126,7 +125,7 @@ One meeting costs **$19.92** from Start, so the expected return is $600 / $19.92
 
 ### Worked example: a push
 
-Northwind's follow-up campaign starts from Message sent and has the Target Lead interested; its brief reads: "Follow up once on every cold email that got no answer, four days later." It is reactive. The outbound campaign writes and sends; this one receives every Message sent. Its Routing is "Leads interested from messages sent", and the next Engine its Plan names is Follow-up queued. Follow Lea, the first lead it won.
+Northwind's follow-up campaign starts from Message sent and has the Target Lead interested; its brief reads: "Follow up once on every cold email that got no answer, four days later." It is reactive. The outbound campaign writes and sends; this one receives every Message sent. The next Engine its Plan names is Follow-up queued. Follow Lea, the first lead it won.
 
 - Day **0**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
 - Day **4**: the follow-up is queued.
@@ -207,7 +206,7 @@ A split on **leads** proposes a finer ICP: an AI script writes a new Unit, a for
 
 ## 10. The two calculations
 
-Every decision rests on two numbers that flow in opposite directions, milestone by milestone of the Routing.
+Every decision rests on two numbers that flow in opposite directions, milestone by milestone of the campaign's Plan.
 
 **Cost flows forward from Start.** One Unit of a milestone costs what it took to make the previous one, plus its own cost per attempt, divided by its yield:
 

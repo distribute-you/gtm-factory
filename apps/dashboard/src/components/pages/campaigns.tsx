@@ -6,14 +6,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { START, defaultStrategyId, describeCondition, type Campaign, type OutcomeId, type PlanNode } from "@gtm-factory/core";
-import { MaterialsBadge, OutcomeChip, PlanLineView, RoutingName } from "@/components/plan-line";
-import { PlanFlow, type FlowNode } from "@/components/plan-flow";
+import { MaterialsBadge, OutcomeChip, PlanLineView } from "@/components/plan-line";
+import { Flows, InputsLine, PlanTree as PlanTreeView } from "@/components/plan-tree";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton, WhyFeed } from "./today";
 import { campaignMilestones, milestoneOfPoints } from "@/lib/campaigns";
 import { candidateWord, engineLine, engineName, outcomeLabel, outcomePlural, pointsOf, scopedCampaigns, targetOf, type Model, type PointInfo, type PointRow } from "@/lib/model";
-import { campaignPlanLine, planBranches, type ChainPart } from "@/lib/plan";
+import { campaignPlanLine, flowsOf, inputsView, planTreeOf, type ChainPart } from "@/lib/plan";
 import { formatCents, formatCount, formatRatePct, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -214,12 +214,10 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         </Kpi>
       </div>
 
-      <div className="k-card mb-6 px-4 py-3" data-testid="campaign-routing">
-        <RoutingName model={model} campaign={campaign} />
-        <div className="mt-2.5">
-          <PlanLineView model={model} campaign={campaign} size="md" />
-        </div>
-      </div>
+      <section className="mb-6">
+        <SectionTitle right={<span>Last 7 days, by the script that got them there</span>}>What its {model.catalogue.outcome(campaign.start)?.subject === "lead" || campaign.start === "start" ? "people" : "subjects"} went through</SectionTitle>
+        <Flows flows={flowsOf(model, campaign)} unit="people" />
+      </section>
 
       <div className="k-card mb-6 grid grid-cols-2 divide-x divide-[var(--line-subtle)] md:grid-cols-4">
         <Kpi label={<RoiLabel>Expected ROI</RoiLabel>}>
@@ -250,7 +248,7 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
       </p>
 
       <section className="mb-8">
-        <SectionTitle count={milestones.length}>Milestones of the Routing</SectionTitle>
+        <SectionTitle count={milestones.length}>Milestones</SectionTitle>
         <CardTable>
           <thead>
             <tr className="k-line-subtle border-b">
@@ -315,46 +313,14 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
   );
 }
 
-/** The Plan of this tick as a vertical workflow: the start, each Engine on the subject's chain, the Target. */
+/** The Plan as what ran this week: a tree from the Target down, the pick of this tick marked. */
 function PlanTree({ model, campaign }: { model: Model; campaign: Campaign }) {
-  const line = campaignPlanLine(model, campaign);
-  const branches = planBranches(model, campaign);
-  const c = model.catalogue;
-  const nodes: FlowNode[] = line.parts.map((p) => {
-    const script = p.scriptId ? c.script(p.scriptId) : undefined;
-    const subject = script ? c.subjectOf(script) : null;
-    return {
-      outcome: p.outcome,
-      label: outcomeLabel(c, p.outcome),
-      icon: c.outcome(p.outcome)?.icon,
-      script: script ? { name: script.name, kind: script.kind, dynasty: script.dynasty } : null,
-      candidates: p.candidates,
-      branches: (branches.get(p.outcome) ?? []).map((b) => ({ name: c.script(b.scriptId)?.name ?? b.scriptId, share: b.share, costPerUnit: b.costPerUnit })),
-      sides: p.materials.filter((m) => m.outcome !== subject).map((m) => ({ outcome: m.outcome, label: outcomeLabel(c, m.outcome), icon: c.outcome(m.outcome)?.icon, from: providerOf(model, m) })),
-    };
-  });
   return (
     <section className="mb-8">
-      <SectionTitle right={<span>Recomputed at every tick; shares over the last 7 days</span>}>Plan</SectionTitle>
-      {nodes.length === 0 ? (
-        <div className="k-card">
-          <EmptyNote>No Plan yet. Press Run.</EmptyNote>
-        </div>
-      ) : (
-        <PlanFlow start={campaign.start} startLabel={outcomeLabel(c, campaign.start)} nodes={nodes} target={campaign.target} />
-      )}
+      <SectionTitle right={<span>Recomputed at every tick; what ran over the last 7 days</span>}>Plan</SectionTitle>
+      <PlanTreeView root={planTreeOf(model, campaign)} start={campaign.start} startLabel={outcomeLabel(model.catalogue, campaign.start)} target={campaign.target} />
     </section>
   );
-}
-
-/** Where a Material's Provider gets it, in words. */
-function providerOf(model: Model, node: PlanNode): string {
-  const script = node.scriptId ? model.catalogue.script(node.scriptId) : undefined;
-  if (script) return script.name;
-  const o = model.catalogue.outcome(node.outcome);
-  if (o?.contentType === "rating") return "Today's Rating";
-  if (o?.subject === "brand" && node.candidates > 0) return node.candidates === 1 ? "The brand's Unit" : `${node.candidates} brand Units`;
-  return "The stock";
 }
 
 function Kpi({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
@@ -586,6 +552,7 @@ function PointCard({ model, campaign, point }: { model: Model; campaign: Campaig
                     <span className="truncate">{o.label}</span>
                     {o.isBelievedBest && <span className="k-chip">Best expected</span>}
                   </span>
+                  <InputsLine inputs={inputsView(model, model.session.inputsOf(o.candidate, campaign.id))} className="mt-0.5" />
                 </td>
                 <td className={TDN}>
                   <span className="inline-flex items-center gap-2">

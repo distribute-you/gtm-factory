@@ -18,6 +18,8 @@ export function pointGroups(model: Model): PointGroup[] {
   const groups = new Map<string, PointGroup>();
   for (const conv of convergenceOf(model)) {
     const info = pointInfo(model.catalogue, conv.point);
+    // Brand inputs (ICPs, templates) show on the row of the script that used them.
+    if (info.kind !== "script") continue;
     const key = info.consumer;
     let g = groups.get(key);
     if (!g) groups.set(key, (g = { key, title: key === "campaign" ? "The campaign's Target" : `Called by ${engineName(model.catalogue, key)}`, points: [] }));

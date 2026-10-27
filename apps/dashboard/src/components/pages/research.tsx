@@ -10,6 +10,8 @@ import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { headScript, candidateLabel, engineName, pointInfo, pointRow, hiddenOf, shareSeries, type Model } from "@/lib/model";
+import { InputsLine } from "@/components/plan-tree";
+import { inputsView } from "@/lib/plan";
 import { multiPlugged, pointGroups, recentShare } from "@/lib/engine-pages";
 import { formatCents, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
@@ -159,6 +161,7 @@ function PointDetail({ model, point }: { model: Model; point: string }) {
                             </span>
                           )}
                         </span>
+                        <InputsLine inputs={inputsView(model, model.session.inputsOf(o.candidate, c.id))} className="mt-0.5 pl-7" />
                       </td>
                       <td className={TDN}>{formatRatePct(o.share)}</td>
                       <td className={TDN}>

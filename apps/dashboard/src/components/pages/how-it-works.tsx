@@ -46,7 +46,7 @@ const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
     lines: [
       "A Campaign fixes only its Target, its start, its budget and a brief in plain words. A judge reads the brief once per Engine: the strategy it keeps, or none, daily caps and a test length.",
       "Its Plan is recomputed at every tick: from the Target down, each Engine with its best script now, its total cost and its return. From Start it pulls; from any other outcome it pushes each Unit that lands up toward the Target.",
-      "The Routing is a view: the milestones the Plan passes through, with a short name to talk about it.",
+      "The page shows the Plan as what actually ran this week: every script that made Units is a branch, with its share and cost. Nothing is frozen.",
     ],
   },
   {

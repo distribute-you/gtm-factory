@@ -1,5 +1,5 @@
 /**
- * The two calculations, on the milestones of a Routing (each from the one
+ * The two calculations, on the milestones of a campaign's Plan (each from the one
  * before it).
  *
  * Cost flows FORWARD from Start: C(to) = (C(from) + c) / y.

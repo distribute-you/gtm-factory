@@ -122,7 +122,7 @@ export interface Proposal {
   study: SplitStudy;
 }
 
-/** Reaching one milestone of a campaign's Routing from the one before, as the decisions read it. */
+/** Reaching one milestone of a campaign's Plan from the one before, as the decisions read it. */
 export interface MilestoneEstimate {
   from: OutcomeId;
   to: OutcomeId;
@@ -159,6 +159,58 @@ export interface PlanNode {
   /** Scripts that compete there. */
   candidates: number;
   materials: PlanNode[];
+}
+
+/** One version of a brand input (an ICP, a template) a script used, and its share of that script's runs. */
+export interface InputShare {
+  id: string;
+  label: string;
+  share: number;
+}
+
+/** A brand input whose versions compete inside a script's runs. */
+export interface ScriptInput {
+  material: OutcomeId;
+  versions: InputShare[];
+}
+
+/**
+ * A node of a campaign's Plan tree: an outcome, the script the Plan picks
+ * there this tick, and every script that made it for the campaign over the
+ * period as a branch, each with what ran under it.
+ */
+export interface PlanTreeNode {
+  outcome: OutcomeId;
+  /** The Plan's pick this tick (null at a leaf served by its Provider). */
+  scriptId: string | null;
+  candidates: number;
+  branches: PlanTreeBranch[];
+}
+
+export interface PlanTreeBranch {
+  scriptId: string;
+  runs: number;
+  units: number;
+  /** Share of the node's Units this script made (of its runs while none landed). */
+  share: number;
+  /** Dollars per Unit made. */
+  costPerUnit: number | null;
+  /** The Plan's pick this tick. */
+  current: boolean;
+  inputs: ScriptInput[];
+  /** What this script calls, each a node with its own branches. */
+  children: PlanTreeNode[];
+  /** It calls the same outcomes as the branch drawn in full beside it: what runs below is the same, not drawn twice. */
+  sameBelow: boolean;
+}
+
+/** What a campaign's subjects went through over a period: reaching a milestone from the one before, and by which script. */
+export interface MilestoneFlow {
+  from: OutcomeId;
+  to: OutcomeId;
+  subjects: number;
+  share: number;
+  by: { scriptId: string; subjects: number; share: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +371,8 @@ export class SimulationSession {
   private readonly dayPicksAll = new Map<string, Set<string>>();
   private readonly madePerDay = new Map<string, number[]>();
   private readonly plans = new Map<string, PlanNode | null>();
-  private readonly routingsUsed = new Map<string, Map<string, number>[]>();
+  /** Per campaign, per day: how many ticks its Plan passed through each line of milestones. */
+  private readonly linesUsed = new Map<string, Map<string, number>[]>();
   /** What each script's runs consumed: the Materials the ledger measured. */
   private readonly measured = new Map<string, Set<OutcomeId>>();
   private readonly decisionObject = new Map<number, string>();
@@ -540,7 +593,6 @@ export class SimulationSession {
     }
     if (day > 0 && day % this.world.settings.splitEveryDays === 0) this.studyAndPropose(day);
     this.logPicks(day);
-    for (const c of this.campaigns()) if (c.status === "running") this.routingOf(c, true);
     this.days.push(snap);
     this.today = null;
     this.dayIndex++;
@@ -626,10 +678,10 @@ export class SimulationSession {
    */
   private replan(campaign: Campaign, day: number): void {
     this.plans.set(campaign.id, this.planNode(campaign, CAMPAIGN, campaign.target, day, new Set()));
-    const line = this.routingOfPlan(campaign);
+    const line = this.lineOfPlan(campaign);
     if (line.length === 0) return;
-    let days = this.routingsUsed.get(campaign.id);
-    if (!days) this.routingsUsed.set(campaign.id, (days = []));
+    let days = this.linesUsed.get(campaign.id);
+    if (!days) this.linesUsed.set(campaign.id, (days = []));
     const m = (days[day] ??= new Map<string, number>());
     const key = line.join(">");
     m.set(key, (m.get(key) ?? 0) + 1);
@@ -667,7 +719,7 @@ export class SimulationSession {
   }
 
   /** The milestones the Plan passes through, along the chain that carries the subject, up to the Target. */
-  private routingOfPlan(campaign: Campaign): OutcomeId[] {
+  private lineOfPlan(campaign: Campaign): OutcomeId[] {
     const line: OutcomeId[] = [];
     let node: PlanNode | undefined = this.planOf(campaign) ?? undefined;
     while (node && node.outcome !== campaign.start) {
@@ -678,18 +730,17 @@ export class SimulationSession {
   }
 
   /**
-   * The Routing of a campaign (a view): the milestones its Plan went through
-   * most over the last 7 days, start excluded, Target last. `name` stores its
-   * name (on first sight, kept).
+   * The milestones a campaign's Plan went through most over the last 7 days,
+   * start excluded, Target last: what its figures are read along. Never stored:
+   * the Plan changes at every tick and so does this line.
    */
-  routingOf(campaign: Campaign, name = false) {
-    const days = this.routingsUsed.get(campaign.id) ?? [];
+  milestoneLine(campaign: Campaign): OutcomeId[] {
+    const days = this.linesUsed.get(campaign.id) ?? [];
     const n = new Map<string, number>();
     for (let d = Math.max(0, this.dayIndex - 7); d <= this.dayIndex; d++) for (const [k, v] of days[d] ?? []) n.set(k, (n.get(k) ?? 0) + v);
     let best: string | null = null;
     for (const [k, v] of n) if (best === null || v > n.get(best)! || (v === n.get(best)! && k < best)) best = k;
-    const line = best ? best.split(">") : this.routingOfPlan(campaign);
-    return name ? this.catalogue.nameRouting(campaign.start, line) : this.catalogue.peekRouting(campaign.start, line);
+    return best ? best.split(">") : this.lineOfPlan(campaign);
   }
 
   // ---- pull and push ----------------------------------------------------------------
@@ -1668,7 +1719,7 @@ export class SimulationSession {
     return this.parentDynasty.get(candidate) ?? null;
   }
 
-  /** Value of one Unit of a milestone for a campaign: backward from its Target, along its Routing. */
+  /** Value of one Unit of a milestone for a campaign: backward from its Target, along its milestones. */
   milestoneValue(campaign: Campaign, milestone: OutcomeId): number {
     if (this.milestoneValueDay !== this.dayIndex) {
       this.milestoneValueCache.clear();
@@ -1706,11 +1757,11 @@ export class SimulationSession {
     return !this.catalogue.outcomes.some((o) => o.track?.track === t.track && o.track.rank > t.rank);
   }
 
-  /** Reaching each milestone of a campaign's Routing from the one before: censoring-corrected yield and measured cost per attempt. */
+  /** Reaching each milestone of a campaign's Plan from the one before: censoring-corrected yield and measured cost per attempt. */
   milestoneEstimates(campaign: Campaign, day = this.dayIndex): MilestoneEstimate[] {
-    const routing = this.routingOf(campaign);
-    return routing.line.map((to, k) => {
-      const from = k === 0 ? campaign.start : routing.line[k - 1]!;
+    const line = this.milestoneLine(campaign);
+    return line.map((to, k) => {
+      const from = k === 0 ? campaign.start : line[k - 1]!;
       const scripts = this.catalogue.scriptsOf(to);
       const mean = Math.max(0, ...scripts.map((s) => this.chainDelay(s, from)));
       const fixed = Math.max(0, ...scripts.map((s) => this.scriptTicks(s).fixed));
@@ -1729,7 +1780,7 @@ export class SimulationSession {
   }
 
   /**
-   * The rows of a campaign page, per milestone of its Routing: attempts per
+   * The rows of a campaign page, per milestone of its Plan: attempts per
    * Target Unit, the cost of this outcome (its own production) and its cost
    * from Start (cumulative: the one the return reads).
    */
@@ -1772,8 +1823,8 @@ export class SimulationSession {
         expected = { value: v, low: v * Math.exp(-1.96 * rel), high: v * Math.exp(1.96 * rel) };
       }
     }
-    const routing = this.routingOf(campaign);
-    const horizon = Math.ceil(routing.line.reduce((s, to, k) => s + Math.max(0, ...this.catalogue.scriptsOf(to).map((x) => this.chainDelay(x, k === 0 ? campaign.start : routing.line[k - 1]!))) * 3, 0));
+    const line = this.milestoneLine(campaign);
+    const horizon = Math.ceil(line.reduce((s, to, k) => s + Math.max(0, ...this.catalogue.scriptsOf(to).map((x) => this.chainDelay(x, k === 0 ? campaign.start : line[k - 1]!))) * 3, 0));
     const cutoffDay = this.dayIndex - horizon;
     let mSpend = 0;
     let mValue = 0;
@@ -1891,6 +1942,175 @@ export class SimulationSession {
 
   // ---- brand Units -------------------------------------------------------------------
 
+  /**
+   * A campaign's Plan as a tree of what ran over the last `days` days: at each
+   * outcome, every script that made it for the campaign is a branch (its share
+   * of the Units, its cost per Unit, the brand inputs it used), and under each
+   * branch the outcomes that script calls, each with its own branches. A
+   * LinkedIn branch has no email finding under it; a cold email branch does.
+   * The Plan's pick of this tick is marked. Before anything ran, the Plan alone.
+   */
+  planTree(campaign: Campaign, days = 7): PlanTreeNode | null {
+    const plan = this.planOf(campaign);
+    if (!plan) return null;
+    const since = this.dayIndex - days;
+    const runsBy = new Map<OutcomeId, Run[]>();
+    for (const r of this.runs) {
+      if (r.day < since || r.campaignId !== campaign.id || !r.scriptId) continue;
+      const o = this.catalogue.script(r.scriptId)?.outcome;
+      if (!o) continue;
+      const l = runsBy.get(o);
+      if (l) l.push(r);
+      else runsBy.set(o, [r]);
+    }
+    const made = new Map<string, number>();
+    for (const u of this.units) if (u.day >= since && u.campaignId === campaign.id) made.set(u.runId, (made.get(u.runId) ?? 0) + 1);
+    return this.treeNode(campaign, campaign.target, plan, { runsBy, made }, new Set());
+  }
+
+  private treeNode(campaign: Campaign, outcome: OutcomeId, planNode: PlanNode | undefined, ix: { runsBy: Map<OutcomeId, Run[]>; made: Map<string, number> }, seen: Set<OutcomeId>, only?: Run[]): PlanTreeNode {
+    const runs = only ?? ix.runsBy.get(outcome) ?? [];
+    const groups = new Map<string, Run[]>();
+    for (const r of runs) {
+      const l = groups.get(r.scriptId!);
+      if (l) l.push(r);
+      else groups.set(r.scriptId!, [r]);
+    }
+    if (planNode?.scriptId && !groups.has(planNode.scriptId)) groups.set(planNode.scriptId, []);
+    const node: PlanTreeNode = { outcome, scriptId: planNode?.scriptId ?? null, candidates: planNode?.candidates ?? groups.size, branches: [] };
+    const next = new Set(seen).add(outcome);
+    const unitsOf = (rs: Run[]) => rs.reduce((n, r) => n + (ix.made.get(r.id) ?? 0), 0);
+    const totalUnits = [...groups.values()].reduce((n, rs) => n + unitsOf(rs), 0);
+    // Below each branch: drawn in full for the Plan's pick (else the busiest), and for every branch that calls other outcomes.
+    const callsOf = (id: string) => {
+      const sc = this.catalogue.script(id);
+      return sc ? this.materialsOf(sc).filter((m) => this.catalogue.outcome(m)?.subject !== "brand" && m !== campaign.start && !next.has(m)).sort().join(",") : "";
+    };
+    const busiest = [...groups].sort((a, b) => unitsOf(b[1]) - unitsOf(a[1]) || b[1].length - a[1].length)[0]?.[0];
+    const lead = planNode?.scriptId && groups.has(planNode.scriptId) ? planNode.scriptId : busiest;
+    const drawn = new Set<string>();
+    if (lead) drawn.add(callsOf(lead));
+    for (const [scriptId, rs] of groups) {
+      const script = this.catalogue.script(scriptId);
+      if (!script) continue;
+      const units = unitsOf(rs);
+      const spend = rs.reduce((n, r) => n + r.spendCents, 0);
+      const current = planNode?.scriptId === scriptId;
+      const calls = callsOf(scriptId);
+      const sameBelow = scriptId !== lead && drawn.has(calls) && calls !== "";
+      if (scriptId !== lead) drawn.add(calls);
+      const children: PlanTreeNode[] = [];
+      if (!sameBelow) for (const m of this.materialsOf(script)) {
+        const o = this.catalogue.outcome(m);
+        if (!o || o.subject === "brand" || m === campaign.start || next.has(m)) continue;
+        const childPlan = current ? planNode?.materials.find((x) => x.outcome === m) : undefined;
+        // A piece made for each run (an LLM completion) is read only from the runs of this script that consumed it.
+        let only: Run[] | undefined;
+        if (o.subject === "run") {
+          const byId = new Set<string>();
+          for (const r of rs) for (const id of r.consumed) {
+            const u = this.unitById.get(id);
+            if (u?.outcome === m) byId.add(u.runId);
+          }
+          only = (ix.runsBy.get(m) ?? []).filter((r) => byId.has(r.id));
+        }
+        if (!(only ?? ix.runsBy.get(m))?.length && !childPlan?.scriptId) continue;
+        children.push(this.treeNode(campaign, m, childPlan, ix, next, only));
+      }
+      node.branches.push({
+        scriptId,
+        runs: rs.length,
+        units,
+        share: totalUnits > 0 ? units / totalUnits : runs.length > 0 ? rs.length / runs.length : current ? 1 : 0,
+        costPerUnit: units > 0 ? spend / 100 / units : null,
+        current,
+        inputs: this.inputsOfRuns(rs),
+        children,
+        sameBelow,
+      });
+    }
+    // The Plan's pick first (drawn in full), then by share.
+    node.branches.sort((a, b) => Number(b.current) - Number(a.current) || b.share - a.share || (a.scriptId < b.scriptId ? -1 : 1));
+    return node;
+  }
+
+  /** The brand inputs (ICPs, templates) a set of runs used, and the share of each version among them. */
+  private inputsOfRuns(runs: readonly Run[]): ScriptInput[] {
+    const by = new Map<OutcomeId, Map<string, { label: string; n: number }>>();
+    for (const r of runs) {
+      for (const id of r.consumed) {
+        const u = this.unitById.get(id);
+        const o = u ? this.catalogue.outcome(u.outcome) : undefined;
+        if (!u || o?.subject !== "brand" || o.contentType === "rating") continue;
+        const dyn = this.candidateOf(u);
+        let m = by.get(u.outcome);
+        if (!m) by.set(u.outcome, (m = new Map()));
+        const e = m.get(dyn) ?? { label: u.name ?? (u.scriptId ? this.catalogue.script(u.scriptId)?.name : undefined) ?? dyn, n: 0 };
+        e.n++;
+        m.set(dyn, e);
+      }
+    }
+    return [...by].map(([material, m]) => {
+      const total = [...m.values()].reduce((x, e) => x + e.n, 0);
+      return { material, versions: [...m].map(([id, e]) => ({ id, label: e.label, share: e.n / total })).sort((a, b) => b.share - a.share || (a.id < b.id ? -1 : 1)) };
+    });
+  }
+
+  /** The brand inputs a script used over the last `days` days, for one campaign or every one. */
+  inputsOf(scriptDynasty: string, campaignId?: string, days = 7): ScriptInput[] {
+    const since = this.dayIndex - days;
+    return this.inputsOfRuns(this.runs.filter((r) => r.day >= since && r.scriptId && this.catalogue.script(r.scriptId)?.dynasty === scriptDynasty && (!campaignId || r.campaignId === campaignId)));
+  }
+
+  /**
+   * What a campaign's subjects went through over the last `days` days: each
+   * milestone they reached with its Units, from the milestone they were at
+   * before (or the start), and the script that made it.
+   */
+  flows(campaign: Campaign, days = 7): MilestoneFlow[] {
+    const since = this.dayIndex - days;
+    const line = this.milestoneLine(campaign);
+    const at = new Map(line.map((o, k) => [o, k] as const));
+    // Each person once per milestone, by the first script that got them there this week.
+    const first = new Map<string, Unit>();
+    for (const u of this.units) {
+      if (u.day < since || u.campaignId !== campaign.id || !u.scriptId || !at.has(u.outcome)) continue;
+      const k = `${u.subject}${SEP}${u.outcome}`;
+      if (!first.has(k)) first.set(k, u);
+    }
+    const hops = new Map<string, { from: OutcomeId; to: OutcomeId; subjects: number; by: Map<string, number> }>();
+    let all = 0;
+    for (const u of first.values()) {
+      const k = at.get(u.outcome)!;
+      // The milestone before it on the campaign's line the person had reached by then, else the start.
+      let from: OutcomeId = campaign.start;
+      const reached = this.reached.get(u.subject);
+      for (let x = k - 1; x >= 0; x--) {
+        const d = reached?.get(line[x]!);
+        if (d !== undefined && d <= u.day) {
+          from = line[x]!;
+          break;
+        }
+      }
+      const key = `${from}${SEP}${u.outcome}`;
+      let h = hops.get(key);
+      if (!h) hops.set(key, (h = { from, to: u.outcome, subjects: 0, by: new Map() }));
+      h.subjects++;
+      h.by.set(u.scriptId!, (h.by.get(u.scriptId!) ?? 0) + 1);
+      all++;
+    }
+    const rank = (o: OutcomeId) => (o === campaign.start ? -1 : at.get(o) ?? 99);
+    return [...hops.values()]
+      .map((h) => ({
+        from: h.from,
+        to: h.to,
+        subjects: h.subjects,
+        share: all > 0 ? h.subjects / all : 0,
+        by: [...h.by].map(([scriptId, n]) => ({ scriptId, subjects: n, share: n / h.subjects })).sort((a, b) => b.subjects - a.subjects || (a.scriptId < b.scriptId ? -1 : 1)),
+      }))
+      .sort((a, b) => rank(a.to) - rank(b.to) || rank(a.from) - rank(b.from));
+  }
+
   candidateOf(u: Unit): string {
     return u.dynasty ?? (u.scriptId ? this.catalogue.script(u.scriptId)?.dynasty : undefined) ?? u.id;
   }
@@ -1973,7 +2193,7 @@ export class SimulationSession {
       if (!audience || !this.isProactive(campaign) || campaign.status !== "running") continue;
       const brandId = campaign.brandId;
       if (this.objectVersions(brandId, audience).filter((o) => o.parentDynasty).length >= this.world.settings.maxProposedIcps) continue;
-      const first = this.routingOf(campaign).line[0];
+      const first = this.milestoneLine(campaign)[0];
       if (!first) continue;
       const icpCount = new Map<string, number>();
       for (const o of this.orders) {
