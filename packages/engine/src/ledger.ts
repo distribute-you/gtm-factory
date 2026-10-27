@@ -3,8 +3,8 @@
  * Units and has a cost. From the runs alone the ledger answers two
  * different questions:
  *
- *  DECIDE (choices read this): each pipe's OWN cost per input processed and
- *  its yield. Inputs bought from other pipes are not in it.
+ *  DECIDE (choices read this): each leg's OWN cost per input processed and
+ *  its yield. Inputs bought from other legs are not in it.
  *
  *  REPORT (prices, indexes, reports read this): the unit cost of each outcome
  *  every path, inputs at their own unit cost, normal loss absorbed, cycles
@@ -30,8 +30,8 @@ export interface LedgerUnit {
 
 export interface LedgerRun {
   id: string;
-  pipeId: string | null;
-  /** The outcome this run works toward (its pipe's to step). */
+  legId: string | null;
+  /** The outcome this run works toward (its leg's to step). */
   target: StepKey | null;
   day: number;
   /** Integer cents. */
@@ -51,8 +51,8 @@ export interface LedgerRun {
   scriptId?: string;
 }
 
-export interface PipeOwnCost {
-  pipeId: string;
+export interface LegOwnCost {
+  legId: string;
   spendCents: number;
   /** Inputs processed (each run's `inputs`, else its consumed Units, else 1). */
   inputs: number;
@@ -86,7 +86,7 @@ export interface LedgerReport {
   reuseGainCents: number;
   runsProducingNone: { normalLossCents: number; abnormalLossCents: number; supportCents: number; totalCents: number };
   reconciles: boolean;
-  decide: PipeOwnCost[];
+  decide: LegOwnCost[];
   report: OutcomeUnitCost[];
   /** Outcomes whose cycle of inputs does not converge. */
   divergent: StepKey[];
@@ -150,18 +150,18 @@ export function buildLedger(runs: readonly LedgerRun[], units: readonly LedgerUn
     reuseGainCents += s * (charges - 1);
   }
 
-  // ---- DECIDE: each pipe's own cost --------------------------------------
-  const pipeAgg = new Map<string, { spend: number; inputs: number; outputs: number }>();
+  // ---- DECIDE: each leg's own cost --------------------------------------
+  const legAgg = new Map<string, { spend: number; inputs: number; outputs: number }>();
   for (const r of runs) {
-    if (!r.pipeId || r.support || r.abnormalLoss) continue;
-    const a = pipeAgg.get(r.pipeId) ?? { spend: 0, inputs: 0, outputs: 0 };
+    if (!r.legId || r.support || r.abnormalLoss) continue;
+    const a = legAgg.get(r.legId) ?? { spend: 0, inputs: 0, outputs: 0 };
     a.spend += r.spendCents;
     a.inputs += r.inputs ?? (r.consumed.length > 0 ? r.consumed.length : 1);
     a.outputs += (producedBy.get(r.id) ?? []).reduce((s, o) => s + (o.quantity ?? 1), 0);
-    pipeAgg.set(r.pipeId, a);
+    legAgg.set(r.legId, a);
   }
-  const decide: PipeOwnCost[] = [...pipeAgg.entries()].map(([pipeId, a]) => ({
-    pipeId,
+  const decide: LegOwnCost[] = [...legAgg.entries()].map(([legId, a]) => ({
+    legId,
     spendCents: a.spend,
     inputs: a.inputs,
     outputs: a.outputs,

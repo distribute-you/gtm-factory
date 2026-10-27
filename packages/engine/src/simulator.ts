@@ -1,32 +1,35 @@
 /**
- * A factory at work on a simulated world, tick by tick (one tick = one day).
+ * A factory at work on a simulated world, tick by tick.
  *
- * The Campaign orders production. A proactive Campaign (started from Start)
- * pulls on its target at each tick: the most advanced Units in the stock are
- * served first, then new subjects are made from the market with what is left
- * of its budget. A reactive Campaign (started from any other outcome) pushes
- * each landed Unit of its start outcome into its first pipe, as far as its
- * budget allows.
+ * The Campaign orders production and fixes only its Target, its budget, its
+ * start and its strategy. The production tree is rebuilt at every tick from
+ * performance. A proactive Campaign (started from Start) pulls on its Target:
+ * the most advanced Units in the stock are served first, then new subjects are
+ * made from the market with what is left of its budget. A reactive Campaign
+ * (started from any other outcome) pushes each landed Unit of its start
+ * outcome up toward the Target, as far as its budget allows.
  *
- * Each pipe serves itself its Bill of materials: from the ledger's common
- * stock when a Unit conforms to its Specification, else by ordering a new
- * piece from one producer it chooses with the Supplier rating. Every Run
- * performs one script and lands one Unit or none, after its delay: a Unit
- * advances one pipe per tick. Each Unit carries its traceability (the choices
- * that led to it), and when the end of a leg lands every choice on its
+ * Every leg runs the same generic code. It picks its script with the Supplier
+ * rating, filtered by the strategy; for each Material of that script's Bill of
+ * materials it looks up the ledger with the Material's Specification; if none
+ * conforms it pulls the OUTCOME: the best producer is picked then and receives
+ * the Specification. The script runs once all its Materials are there. Every
+ * Run performs one script and lands one Unit or none, after its delay: a Unit
+ * advances one leg per tick. Each Unit carries its traceability (the choices
+ * that led to it), and when the next lead state lands every choice on its
  * traceability is credited. Deterministic: one seed, one history.
  */
 
-import { START, defaultStrategyId, type Catalogue, type OutcomeId, type Pipe, type Script, type Specification, type Strategy } from "./catalogue";
-import { EvidenceBook, SEP, bumpCell, legEstimateOf, type CellStore } from "./evidence";
-import { chainCostPerTarget, valueBackwardLine } from "./funnels";
+import { START, billOf, defaultStrategyId, type Catalogue, type Leg, type OutcomeId, type Script, type Specification, type Strategy } from "./catalogue";
+import { EvidenceBook, SEP, bumpCell, legCountsOf, legEstimateOf, type CellStore } from "./evidence";
+import { chainCostPerTarget, costForwardLine, legBreakdown, valueBackwardLine } from "./funnels";
 import { buildLedger, type LedgerReport, type LedgerRun, type LedgerUnit } from "./ledger";
 import { prioritize, type PricedOption } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
 import { createRng, type Rng } from "./rng";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
 import { betaMean, betaVariance } from "./stats";
-import { StorageHouse, type PipeStorage, type StorageReport } from "./storage";
+import { StorageHouse, type LegStorage, type StorageReport } from "./storage";
 import { describeCondition, meetsAll, type Condition, type TacticValue } from "./tactics";
 import { covers, personOf, segmentMultiplier, type Campaign, type Person, type ScriptTruth, type WorldClient, type WorldSpec } from "./world";
 
@@ -39,7 +42,7 @@ export interface Unit extends LedgerUnit {
   brandId: string;
   campaignId: string | null;
   factory: string;
-  pipeId: string | null;
+  legId: string | null;
   scriptId: string | null;
   /** The Units it consumed, by Material. */
   materials: Record<OutcomeId, string>;
@@ -54,15 +57,15 @@ export interface Unit extends LedgerUnit {
   conditions?: Condition[];
 }
 
-/** One choice: at a point (consuming pipe x Material), for a subject, the option picked. */
+/** One choice: at a point (consuming leg x Material), for a subject, the option picked. */
 export interface Decision {
   id: number;
   point: string;
   option: string;
   campaignId: string;
   brandId: string;
-  /** The outcome this decision exists for: the end of its campaign's leg. */
-  legTarget: OutcomeId;
+  /** The outcome this decision exists for: the next lead state of its campaign's sales path (or its Target). */
+  stepEnd: OutcomeId;
   attemptId: number;
   day: number;
   credited: boolean;
@@ -106,7 +109,7 @@ export interface DaySnapshot {
   pushes: number;
 }
 
-/** A Unit a reactive Campaign pushed into its first pipe. */
+/** A Unit a reactive Campaign pushed into its first leg. */
 export interface PushRecord {
   day: number;
   campaignId: string;
@@ -137,7 +140,8 @@ export interface CampaignEconomics {
   measured: { value: number | null; low: number | null; high: number | null; targets: number; spendCents: number; cutoffDay: number };
   /** Expected return: value / cost per target on the decision estimates (censoring-corrected leg rates, measured costs). */
   expected: { value: number | null; low: number | null; high: number | null };
-  legs: { from: OutcomeId; to: OutcomeId; attempts: number; reached: number; yieldRate: number | null; costPerAttempt: number | null; label: "expected" | "measured" }[];
+  /** Each step of the sales path the tree runs today, from one lead state to the next. */
+  steps: StepEstimate[];
   targetValue: number;
   valueLabel: "stated" | "expected";
 }
@@ -146,19 +150,29 @@ export interface CampaignEconomics {
 // Internal state
 // ---------------------------------------------------------------------------
 
-/** A Unit a campaign took into one of its legs: the production it orders until the leg's end lands, or fails. */
+/** One step of a sales path as the decisions read it: from one lead state to the next. */
+export interface StepEstimate {
+  from: OutcomeId;
+  to: OutcomeId;
+  attempts: number;
+  reached: number;
+  yieldRate: number | null;
+  costPerAttempt: number | null;
+  label: "expected" | "measured";
+}
+
+/** A Unit a campaign took toward the next lead state: the production it orders until that state lands, or fails. */
 interface Attempt {
   id: number;
   campaign: Campaign;
   client: WorldClient;
-  legIndex: number;
   from: OutcomeId;
   to: OutcomeId;
   /** Raw record before identity, then the person. */
   subject: string | null;
   person: Person | null;
   recontact: boolean;
-  /** The Unit the leg starts from (pulled from the stock or pushed), none from Start. */
+  /** The Unit the step starts from (pulled from the stock or pushed), none from Start. */
   startUnit: string | null;
   choices: Map<string, string>;
   /** Decision id per point. */
@@ -178,6 +192,12 @@ interface Attempt {
   wakeTick: number;
 }
 
+/** Who consumes a Material: a leg running one of its scripts (the script's Bill of materials names the Material). */
+interface Consumer {
+  leg: Leg;
+  script: Script;
+}
+
 interface PendingLanding {
   tick: number;
   attempt: Attempt;
@@ -188,7 +208,7 @@ interface PendingLanding {
   flight: string;
 }
 
-/** Days from a choice to its leg's end: the mean, and the part of it that is certain (one tick per pipe). */
+/** Days from a choice to the next lead state: the mean, and the part of it that is certain (one tick per leg). */
 interface Rem {
   mean: number;
   fixed: number;
@@ -206,8 +226,14 @@ export function pointKey(consumer: string, material: OutcomeId): string {
   return `${consumer}|${material}`;
 }
 
-export function legConsumer(from: OutcomeId, to: OutcomeId): string {
-  return `leg:${from}>${to}`;
+/** The consumer of a step's end: the Campaign ordering the next lead state. */
+export function stepConsumer(from: OutcomeId, to: OutcomeId): string {
+  return `step:${from}>${to}`;
+}
+
+/** The key of a step of a sales path. */
+export function stepKey(from: OutcomeId, to: OutcomeId): string {
+  return `${from}>${to}`;
 }
 
 export function playPoint(from: OutcomeId, to: OutcomeId): string {
@@ -217,18 +243,18 @@ export function playPoint(from: OutcomeId, to: OutcomeId): string {
 /** The tactic a Unit carries from the ledger: its age in days. */
 export const UNIT_AGE = "age_days";
 
-/** Mean days a run takes to land, counting the tick it runs in (a Unit advances one pipe per tick, `ticksPerDay` ticks a day). */
+/** Mean days a run takes to land, counting the tick it runs in (a Unit advances one leg per tick, `ticksPerDay` ticks a day). */
 export function tickDelay(delayMeanDays: number, ticksPerDay = 1): number {
   return delayMeanDays + 1 / ticksPerDay / (1 + delayMeanDays);
 }
 
 // ---------------------------------------------------------------------------
-// Script business logic: generic, read off the script's tactics, kept in its pipe storage
+// Script business logic: generic, read off the script's tactics, kept in its leg storage
 // ---------------------------------------------------------------------------
 
-/** What a running script is handed: its own pipe's storage, the day, its tactics. Nothing else. */
+/** What a running script is handed: its own leg's storage, the day, its tactics. Nothing else. */
 export interface ScriptContext {
-  readonly storage: PipeStorage;
+  readonly storage: LegStorage;
   readonly day: number;
   readonly tactics: Readonly<Record<string, TacticValue>>;
 }
@@ -243,7 +269,7 @@ export interface MarketView {
 
 /**
  * Pick one person from the market: the script's own rule on reuse (its
- * "days before recontact" tactic) read against its pipe storage.
+ * "days before recontact" tactic) read against its leg storage.
  */
 export function pickFromMarket(ctx: ScriptContext, market: MarketView, tries = 60): { index: number; recontact: boolean } | null {
   const window = Number(ctx.tactics.recontact_days ?? 365);
@@ -270,7 +296,7 @@ export function scriptAccepts(ctx: ScriptContext, subject: string): boolean {
 
 /**
  * A script's rule on when to run (its "days since last message" tactic): it
- * keeps a reference to the Unit it waits on in its pipe storage and runs once
+ * keeps a reference to the Unit it waits on in its leg storage and runs once
  * that many days have passed since the Unit landed.
  */
 export function scriptReady(ctx: ScriptContext, subject: string, unit: { id: string; day: number }): boolean {
@@ -348,7 +374,7 @@ export class SimulationSession {
   private readonly budgetLeft = new Map<string, number>();
   private readonly subjectsByCampaign = new Map<string, { entryDay: number; spendCents: number; value: number }>();
   /** Webhook calls another factory will make: at a tick, about a Unit. */
-  private readonly webhookCalls: { tick: number; pipeId: string; about: string }[] = [];
+  private readonly webhookCalls: { tick: number; legId: string; about: string }[] = [];
   private tickIndex = 0;
   /** Our spend per campaign since the day started, cents. */
   private readonly spentToday = new Map<string, number>();
@@ -385,7 +411,7 @@ export class SimulationSession {
     return this.dayIndex;
   }
 
-  /** Ticks per simulated day: at each tick every campaign pulls or pushes, and a Unit advances one pipe. */
+  /** Ticks per simulated day: at each tick every campaign pulls or pushes, and a Unit advances one leg. */
   get ticksPerDay(): number {
     return Math.max(1, Math.round(this.world.settings.ticksPerDay ?? 1));
   }
@@ -406,9 +432,9 @@ export class SimulationSession {
     return this.world.clients.find((c) => c.campaigns.some((x) => x.id === campaignId));
   }
 
-  /** Read-only report of one pipe's storage (row counts and a sample): what the dashboard shows. */
-  storageReport(pipeId: string): StorageReport {
-    return this.storage.report(pipeId);
+  /** Read-only report of one leg's storage (row counts and a sample): what the dashboard shows. */
+  storageReport(legId: string): StorageReport {
+    return this.storage.report(legId);
   }
 
   unit(id: string): Unit | undefined {
@@ -448,17 +474,17 @@ export class SimulationSession {
     if (!this.brandIds.includes(c.brand.id)) this.brandIds.push(c.brand.id);
     const setupId = `run:setup:${c.brand.id}`;
     if (this.world.settings.setupCentsPerBrand > 0 && !this.runs.some((r) => r.id === setupId)) {
-      this.runs.push({ id: setupId, pipeId: null, target: null, day: this.dayIndex, spendCents: this.world.settings.setupCentsPerBrand, consumed: [], support: { kind: "brand_setup", reason: "first setup of the brand" }, factory: this.ourFactory(), subjects: 0, campaignId: c.campaigns[0]?.id });
+      this.runs.push({ id: setupId, legId: null, target: null, day: this.dayIndex, spendCents: this.world.settings.setupCentsPerBrand, consumed: [], support: { kind: "brand_setup", reason: "first setup of the brand" }, factory: this.ourFactory(), subjects: 0, campaignId: c.campaigns[0]?.id });
     }
     for (const s of c.seeds) {
       if (this.units.some((o) => o.brandId === c.brand.id && o.dynasty === s.dynasty && o.version === s.version)) continue;
       const script = this.catalogue.script(s.scriptId);
-      const pipe = script ? this.catalogue.pipe(script.pipeId) : undefined;
-      if (!script || !pipe) throw new Error(`seed Unit names unknown script "${s.scriptId}"`);
+      const leg = script ? this.catalogue.leg(script.legId) : undefined;
+      if (!script || !leg) throw new Error(`seed Unit names unknown script "${s.scriptId}"`);
       const cost = Math.round(this.truthOf(script, null).costCents);
-      const run = this.newRun(this.dayIndex, c.campaigns[0]?.id ?? null, pipe, script);
+      const run = this.newRun(this.dayIndex, c.campaigns[0]?.id ?? null, leg, script);
       run.spendCents += cost;
-      if (this.catalogue.isOurs(pipe) && c.campaigns[0]) this.spent.set(c.campaigns[0].id, (this.spent.get(c.campaigns[0].id) ?? 0) + cost);
+      if (this.catalogue.isOurs(leg) && c.campaigns[0]) this.spent.set(c.campaigns[0].id, (this.spent.get(c.campaigns[0].id) ?? 0) + cost);
       const u = this.makeUnit(run, s.outcome, `${c.brand.id}:${s.dynasty}:v${s.version}`, c.brand.id, null, {}, []);
       Object.assign(u, { dynasty: s.dynasty, version: s.version, name: s.name, text: s.text, ...(s.parentDynasty ? { parentDynasty: s.parentDynasty } : {}), ...(s.conditions ? { conditions: s.conditions } : {}) });
       this.addUnit(u);
@@ -508,9 +534,9 @@ export class SimulationSession {
 
   private newObject(from: Unit, v: { dynasty: string; version: number; text: string; name?: string; conditions?: Condition[]; parentDynasty?: string }): Unit {
     const script = from.scriptId ? this.catalogue.script(from.scriptId) : undefined;
-    const pipe = from.pipeId ? this.catalogue.pipe(from.pipeId) : undefined;
-    if (!script || !pipe) throw new Error("the previous version names no script");
-    const run = this.newRun(this.dayIndex, from.campaignId, pipe, script);
+    const leg = from.legId ? this.catalogue.leg(from.legId) : undefined;
+    if (!script || !leg) throw new Error("the previous version names no script");
+    const run = this.newRun(this.dayIndex, from.campaignId, leg, script);
     run.consumed.push(from.id);
     const u = this.makeUnit(run, from.outcome, `${from.brandId}:${v.dynasty}:v${v.version}`, from.brandId, from.campaignId, { [from.outcome]: from.id }, []);
     Object.assign(u, { dynasty: v.dynasty, version: v.version, name: v.name ?? from.name, text: v.text, ...(v.conditions ?? from.conditions ? { conditions: v.conditions ?? from.conditions } : {}), ...(v.parentDynasty ? { parentDynasty: v.parentDynasty } : {}) });
@@ -533,14 +559,14 @@ export class SimulationSession {
     c.dailyBudgetCents = Math.max(0, Math.round(dailyBudgetCents));
   }
 
-  /** Choose a campaign's strategy for one pipe (its play on that pipe). */
-  setCampaignStrategy(campaignId: string, pipeId: string, strategyId: string): void {
+  /** Choose a campaign's strategy for one leg (its play on that leg). */
+  setCampaignStrategy(campaignId: string, legId: string, strategyId: string): void {
     const c = this.campaign(campaignId);
     if (!c) throw new Error(`campaign "${campaignId}" not found`);
     const s = this.catalogue.strategy(strategyId);
-    if (!s || s.pipeId !== pipeId) throw new Error(`strategy "${strategyId}" is not a strategy of ${pipeId}`);
-    if (strategyId === defaultStrategyId(pipeId)) delete c.strategies[pipeId];
-    else c.strategies[pipeId] = strategyId;
+    if (!s || s.legId !== legId) throw new Error(`strategy "${strategyId}" is not a strategy of ${legId}`);
+    if (strategyId === defaultStrategyId(legId)) delete c.strategies[legId];
+    else c.strategies[legId] = strategyId;
   }
 
   // ---- the tick ---------------------------------------------------------------
@@ -562,8 +588,9 @@ export class SimulationSession {
       for (const c of this.campaigns()) this.budgetLeft.set(c.id, c.status === "running" ? Math.round((c.dailyBudgetCents * (t + 1)) / tpd) - (this.spentToday.get(c.id) ?? 0) : 0);
       this.deliver(day);
       this.webhooks(day, t === 0);
-      // All campaigns run each tick, each on its own budget.
+      // All campaigns run each tick, each on its own budget, each on the tree rebuilt for this tick.
       for (const campaign of order) {
+        this.rebuildTree(campaign);
         if (this.isProactive(campaign)) this.pull(campaign, day);
         else this.advanceOpen(campaign, day);
       }
@@ -584,27 +611,141 @@ export class SimulationSession {
     return out;
   }
 
+  // ---- the production tree ---------------------------------------------------------
+
   /**
-   * A proactive Campaign pulls on its target: the most advanced Units first
-   * (open legs nearest the target, then Units waiting in the stock at a lead
-   * state of its line), and only then new subjects from the market, with the
-   * budget left. Upstream makes nothing downstream did not ask for.
+   * The lead states a campaign's tree can pass through: its start, Start, the
+   * lead states its offer has, and its Target.
+   */
+  private treeNodes(campaign: Campaign): OutcomeId[] {
+    const offer = this.clientOf(campaign.id)?.offer;
+    const kept = new Set<OutcomeId>([campaign.start, campaign.target]);
+    for (const o of this.catalogue.outcomes) if (o.track && !o.retired && (offer?.outcomes ?? []).includes(o.id)) kept.add(o.id);
+    return [...kept];
+  }
+
+  /**
+   * The steps out of a lead state toward the Target: every next lead state a
+   * leg can make from it with the scripts the campaign's strategy allows.
+   */
+  stepsFrom(campaign: Campaign, from: OutcomeId): OutcomeId[] {
+    const k = `${campaign.id}${SEP}${from}${SEP}${this.dayIndex}`;
+    const hit = this.stepsCache.get(k);
+    if (hit) return hit;
+    const out = this.treeNodes(campaign).filter((to) => to !== from && to !== START && to !== campaign.start && this.playsFor(campaign, from, to).length > 0);
+    this.stepsCache.set(k, out);
+    return out;
+  }
+
+  private readonly stepsCache = new Map<string, OutcomeId[]>();
+
+  /** A step's figures for a campaign: its own cohorts, the fleet's while it has fewer than 20 attempts of its own. */
+  private stepCounts(campaign: Campaign, from: OutcomeId, to: OutcomeId): { successes: number; trials: number; costCents: number; attempts: number } {
+    const plays = this.playsFor(campaign, from, to);
+    const mean = Math.max(...plays.map((p) => this.legDelayMean(p, campaign)), 0);
+    const fixed = Math.max(...plays.map((p) => this.legFixedDays(p, campaign)), 0);
+    const own = legCountsOf(this.legCohorts.get(`${campaign.id}${SEP}${stepKey(from, to)}`), this.dayIndex, mean, fixed);
+    if (own.attempts >= 20) return own;
+    let acc = { successes: 0, trials: 0, costCents: 0, attempts: 0 };
+    for (const c of this.campaigns()) {
+      const x = legCountsOf(this.legCohorts.get(`${c.id}${SEP}${stepKey(from, to)}`), this.dayIndex, mean, fixed);
+      acc = { successes: acc.successes + x.successes, trials: acc.trials + x.trials, costCents: acc.costCents + x.costCents, attempts: acc.attempts + x.attempts };
+    }
+    return acc;
+  }
+
+  /**
+   * Rebuild a campaign's production tree for this tick. Pull starts from the
+   * Target and goes down, push starts from the start outcome and goes up; both
+   * read the same tree: from each lead state, the next one toward the Target
+   * that gives the most value per dollar (a step's yield and cost are drawn
+   * from their beliefs when several steps compete, so a step with little data
+   * gets tried). A lead state with a single way up is not drawn.
+   */
+  private rebuildTree(campaign: Campaign): void {
+    const next = new Map<OutcomeId, OutcomeId>();
+    const memo = new Map<OutcomeId, { p: number; k: number } | null>();
+    const visit = (x: OutcomeId, seen: Set<OutcomeId>): { p: number; k: number } | null => {
+      if (x === campaign.target) return { p: 1, k: 0 };
+      if (memo.has(x)) return memo.get(x)!;
+      if (seen.has(x)) return null;
+      seen.add(x);
+      let best: { p: number; k: number; to: OutcomeId } | null = null;
+      const outs = this.stepsFrom(campaign, x);
+      for (const to of outs) {
+        const up = visit(to, new Set(seen));
+        if (!up) continue;
+        const c = this.stepCounts(campaign, x, to);
+        const yieldMean = (c.successes + 1) / (c.trials + 2);
+        const y = outs.length > 1 ? this.treeRng.beta(c.successes + 1, Math.max(0, c.trials - c.successes) + 1) : yieldMean;
+        const cost = c.attempts > 0 ? c.costCents / 100 / c.attempts : 0.01;
+        const p = y * up.p;
+        const k = cost + y * up.k;
+        if (!best || p / Math.max(k, 1e-9) > best.p / Math.max(best.k, 1e-9)) best = { p, k, to };
+      }
+      const v = best ? { p: best.p, k: best.k } : null;
+      if (best) next.set(x, best.to);
+      memo.set(x, v);
+      return v;
+    };
+    for (const x of this.treeNodes(campaign)) visit(x, new Set());
+    if (this.isProactive(campaign)) visit(START, new Set());
+    this.trees.set(campaign.id, next);
+  }
+
+  private readonly trees = new Map<string, Map<OutcomeId, OutcomeId>>();
+  private readonly treeRng: Rng;
+
+  /** The next lead state toward the Target from a lead state, on this tick's tree (null at the Target or when none leads there). */
+  nextOf(campaign: Campaign, from: OutcomeId): OutcomeId | null {
+    if (!this.trees.has(campaign.id)) this.rebuildTree(campaign);
+    return this.trees.get(campaign.id)!.get(from) ?? null;
+  }
+
+  /** The sales path this tick's tree runs: the lead states from the start to the Target (a view). */
+  pathOf(campaign: Campaign): OutcomeId[] {
+    const line: OutcomeId[] = [];
+    let x: OutcomeId | null = campaign.start;
+    while (x && x !== campaign.target && line.length < 20) {
+      x = this.nextOf(campaign, x);
+      if (x) line.push(x);
+    }
+    return line[line.length - 1] === campaign.target ? line : [];
+  }
+
+  /** Steps from a lead state to the Target on this tick's tree (0 at the Target): the most advanced work is served first. */
+  private depthOf(campaign: Campaign, x: OutcomeId): number {
+    let n = 0;
+    for (let y: OutcomeId | null = x; y && y !== campaign.target && n < 20; n++) y = this.nextOf(campaign, y);
+    return n;
+  }
+
+  /**
+   * A proactive Campaign pulls on its Target, down its tree: the most advanced
+   * Units first (open work nearest the Target, then Units waiting in the stock
+   * at a lead state of the tree), and only then new subjects from the market,
+   * with the budget left. Upstream makes nothing downstream did not ask for.
    */
   private pull(campaign: Campaign, day: number): void {
     const client = this.clientOf(campaign.id)!;
     let blocked = false;
-    for (let k = campaign.line.length - 1; k >= 0; k--) {
-      for (const a of this.openAt(campaign, k)) if (this.advance(a, day) === "blocked") blocked = true;
-      if (k === 0 || blocked) continue;
-      // Units waiting in the stock at the start of leg k, oldest first.
-      const key = `${campaign.id}${SEP}${k}`;
-      const list = this.byBrand.get(`${campaign.brandId}${SEP}${campaign.line[k - 1]!}`) ?? [];
+    const nodes = this.treeNodes(campaign)
+      .filter((x) => x !== campaign.target && x !== START && this.nextOf(campaign, x))
+      .sort((x, y) => this.depthOf(campaign, x) - this.depthOf(campaign, y) || this.rankOf(y) - this.rankOf(x));
+    // Open work nearest the Target first.
+    for (const a of this.openOf(campaign)) if (this.advance(a, day) === "blocked") blocked = true;
+    if (blocked) return;
+    for (const x of nodes) {
+      const to = this.nextOf(campaign, x)!;
+      // Units waiting in the stock at this lead state, oldest first.
+      const key = `${campaign.id}${SEP}${x}`;
+      const list = this.byBrand.get(`${campaign.brandId}${SEP}${x}`) ?? [];
       let i = this.stockRead.get(key) ?? 0;
       for (; i < list.length; i++) {
         const u = list[i]!;
         const person = this.persons.get(u.subject);
-        if (!person || this.attemptOf.has(`${campaign.id}${SEP}${k}${SEP}${person.id}`) || this.reached.get(person.id)?.has(campaign.line[k]!)) continue;
-        const a = this.newAttempt(campaign, client, k, person, day, u.id);
+        if (!person || this.attemptFrom.has(`${campaign.id}${SEP}${x}${SEP}${person.id}`) || this.reached.get(person.id)?.has(to) || this.reached.get(person.id)?.has(campaign.target)) continue;
+        const a = this.newAttempt(campaign, client, x, to, person, day, u.id);
         if (this.advance(a, day) === "blocked") {
           blocked = true;
           i++;
@@ -612,12 +753,14 @@ export class SimulationSession {
         }
       }
       this.stockRead.set(key, i);
+      if (blocked) return;
     }
-    if (blocked) return;
     // New subjects from the market, with the budget left (and within the volume per period).
+    const first = this.nextOf(campaign, START);
+    if (!first) return;
     for (let guard = 0; guard < 20_000; guard++) {
       if ((this.budgetLeft.get(campaign.id) ?? 0) <= 0 || this.volumeReached(campaign, day)) break;
-      const a = this.newAttempt(campaign, client, 0, null, day);
+      const a = this.newAttempt(campaign, client, START, first, null, day);
       const made = this.madePerDay.get(campaign.id) ?? [];
       made[day] = (made[day] ?? 0) + 1;
       this.madePerDay.set(campaign.id, made);
@@ -625,16 +768,27 @@ export class SimulationSession {
     }
   }
 
-  /** A reactive Campaign moves what it pushed, most advanced first, as far as its budget allows. */
-  private advanceOpen(campaign: Campaign, day: number): void {
-    for (let k = campaign.line.length - 1; k >= 0; k--) for (const a of this.openAt(campaign, k)) this.advance(a, day);
+  private rankOf(o: OutcomeId): number {
+    return this.catalogue.outcome(o)?.track?.rank ?? 0;
   }
 
-  /** Open attempts of a campaign at a leg that can move today (none waiting on a landing), oldest first. */
-  private openAt(campaign: Campaign, legIndex: number): Attempt[] {
+  /** A reactive Campaign moves what it pushed, most advanced first, as far as its budget allows. */
+  private advanceOpen(campaign: Campaign, day: number): void {
+    for (const a of this.openOf(campaign)) this.advance(a, day);
+  }
+
+  /** Open attempts of a campaign that can move now (none waiting on a landing), nearest the Target first, oldest first. */
+  private openOf(campaign: Campaign): Attempt[] {
     const all = (this.open.get(campaign.id) ?? []).filter((a) => a.status === "open");
     this.open.set(campaign.id, all);
-    return all.filter((a) => a.legIndex === legIndex && a.pending.size === 0 && a.wakeTick <= this.tickIndex);
+    const ready = all.filter((a) => a.pending.size === 0 && a.wakeTick <= this.tickIndex);
+    const depth = new Map<OutcomeId, number>();
+    const d = (o: OutcomeId) => {
+      let v = depth.get(o);
+      if (v === undefined) depth.set(o, (v = o === campaign.target ? 0 : this.depthOf(campaign, o)));
+      return v;
+    };
+    return ready.map((a, i) => ({ a, i })).sort((x, y) => d(x.a.to) - d(y.a.to) || x.i - y.i).map((x) => x.a);
   }
 
   private volumeReached(campaign: Campaign, day: number): boolean {
@@ -653,30 +807,32 @@ export class SimulationSession {
   }
 
   /**
-   * A reactive Campaign's push: a Unit of its start outcome landed for its
-   * brand; it goes into the campaign's first pipe (moved this tick if the
-   * budget allows, kept open otherwise).
+   * A reactive Campaign's push: a Unit landed for its brand; it goes up the
+   * tree, into the step toward the Target from that outcome (moved this tick
+   * if the budget allows, kept open otherwise).
    */
   private push(campaign: Campaign, unit: Unit, day: number): void {
     const person = this.persons.get(unit.subject);
-    if (!person || this.reached.get(person.id)?.has(campaign.line[0]!)) return;
-    if (this.attemptOf.has(`${campaign.id}${SEP}0${SEP}${person.id}`) && this.attemptOf.get(`${campaign.id}${SEP}0${SEP}${person.id}`)!.status === "open") return;
-    this.newAttempt(campaign, this.clientOf(campaign.id)!, 0, person, day, unit.id);
+    if (!person || this.reached.get(person.id)?.has(campaign.target)) return;
+    const to = this.nextOf(campaign, unit.outcome);
+    if (!to || this.reached.get(person.id)?.has(to)) return;
+    const prior = this.attemptFrom.get(`${campaign.id}${SEP}${unit.outcome}${SEP}${person.id}`);
+    if (prior && prior.status === "open") return;
+    this.newAttempt(campaign, this.clientOf(campaign.id)!, unit.outcome, to, person, day, unit.id);
+    if (unit.outcome !== campaign.start) return;
     this.pushes.push({ day, campaignId: campaign.id, unitId: unit.id, subject: person.id });
     if (this.today) this.today.pushes++;
   }
 
   // ---- attempts ----------------------------------------------------------------
 
-  private newAttempt(campaign: Campaign, client: WorldClient, legIndex: number, person: Person | null, day: number, startUnit: string | null = null): Attempt {
-    const from = legIndex === 0 ? campaign.start : campaign.line[legIndex - 1]!;
+  private newAttempt(campaign: Campaign, client: WorldClient, from: OutcomeId, to: OutcomeId, person: Person | null, day: number, startUnit: string | null = null): Attempt {
     const a: Attempt = {
       id: this.attempts.length,
       campaign,
       client,
-      legIndex,
       from,
-      to: campaign.line[legIndex]!,
+      to,
       subject: person?.id ?? null,
       person,
       recontact: false,
@@ -702,31 +858,30 @@ export class SimulationSession {
       this.setPerson(a, person);
       this.enroll(person.id, campaign.id);
     }
-    bumpCell(this.legCohorts, `${campaign.id}${SEP}${legIndex}`, day, "t", 1);
+    bumpCell(this.legCohorts, `${campaign.id}${SEP}${stepKey(from, to)}`, day, "t", 1);
     if (this.today) this.today.attempts[campaign.id] = (this.today.attempts[campaign.id] ?? 0) + 1;
     return a;
   }
 
-  /** Move an attempt as far as it can go today. */
+  /** Move an attempt as far as it can go now. */
   private advance(a: Attempt, day: number): "done" | "wait" | "fail" | "blocked" {
     if (a.status !== "open") return a.status === "done" ? "done" : "fail";
     if (a.subject && this.reached.get(a.subject)?.has(a.to)) {
       this.finish(a, "done");
       return "done";
     }
-    const consumer = legConsumer(a.from, a.to);
-    // The play of the leg: which pipe produces its end.
-    let pipeId = a.choices.get(playPoint(a.from, a.to));
-    if (!pipeId) {
+    const consumer = stepConsumer(a.from, a.to);
+    // The play of the step: which leg makes its end, picked by the Supplier rating.
+    let legId = a.choices.get(playPoint(a.from, a.to));
+    if (!legId) {
       const plays = this.playsFor(a.campaign, a.from, a.to);
       if (plays.length === 0) return this.fail(a, "no play");
-      const pinned = a.campaign.pinned?.[a.legIndex];
-      const rem = plays.map((p) => addRem(this.pipeTicks(p), this.ticksBelow(p, a.from, a))).reduce((x, y) => (y.mean > x.mean ? y : x));
-      pipeId = pinned && plays.some((p) => p.id === pinned) ? pinned : this.decide(a, playPoint(a.from, a.to), plays.map((p) => p.id), day, rem, Math.ceil(rem.mean * 4));
-      a.choices.set(playPoint(a.from, a.to), pipeId);
+      const rem = plays.map((p) => addRem(this.legTicks(p), this.ticksBelow(p, a.from, a))).reduce((x, y) => (y.mean > x.mean ? y : x));
+      legId = this.decide(a, playPoint(a.from, a.to), plays.map((p) => p.id), day, rem, Math.ceil(rem.mean * 4));
+      a.choices.set(playPoint(a.from, a.to), legId);
     }
-    const pipe = this.catalogue.pipe(pipeId)!;
-    const scripts = this.allowedScripts(a.campaign, null, null, [pipe]);
+    const leg = this.catalogue.leg(legId)!;
+    const scripts = this.allowedScripts(a.campaign, null, null, [leg]).filter((s) => this.feasible(a.campaign, s, a.from));
     const r = this.produce(a, consumer, a.to, scripts, NO_REM, true, day);
     if (r.kind === "ok") {
       this.finish(a, "done");
@@ -750,7 +905,7 @@ export class SimulationSession {
       if (dec.credited) continue;
       this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "f", 1);
     }
-    if (status === "failed") bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${a.legIndex}`, a.startDay, "f", 1);
+    if (status === "failed") bumpCell(this.legCohorts, `${a.campaign.id}${SEP}${stepKey(a.from, a.to)}`, a.startDay, "f", 1);
     a.choices.clear();
     a.got.clear();
   }
@@ -760,24 +915,58 @@ export class SimulationSession {
     return campaign.start === START ? new Set() : new Set([campaign.start]);
   }
 
-  /** Live pipes producing a leg's end whose subject comes from the leg's start. */
-  playsFor(campaign: Campaign, from: OutcomeId, to: OutcomeId): Pipe[] {
+  /** Live legs making a step's end whose subject comes from the step's start, with a script the campaign's strategy allows on the way. */
+  playsFor(campaign: Campaign, from: OutcomeId, to: OutcomeId): Leg[] {
     const starts = this.startsOf(campaign);
     return this.catalogue
       .providersOf(to)
       .filter((p) => !p.webhook && this.catalogue.rootsOf(p, starts).has(from))
-      .filter((p) => this.catalogue.dynastiesOf(p.id).length > 0);
+      .filter((p) => this.allowedScripts(campaign, null, null, [p]).some((s) => this.feasible(campaign, s, from)));
   }
 
-  /** The campaign's strategy on a pipe (its play on that pipe). */
-  strategyOf(campaign: Campaign, pipeId: string): Strategy | null {
-    const id = campaign.strategies[pipeId];
-    return (id ? this.catalogue.strategy(id) : null) ?? this.catalogue.strategy(defaultStrategyId(pipeId)) ?? null;
+  /**
+   * Can a script make its Unit from a step's start: its subject Material is the
+   * start itself, or a producer its strategy allows can make it from there
+   * (down to Start for a script creating subjects).
+   */
+  feasible(campaign: Campaign, script: Script, from: OutcomeId, seen = new Set<string>()): boolean {
+    const k = `${campaign.id}${SEP}${script.id}${SEP}${from}${SEP}${this.dayIndex}`;
+    const hit = this.feasibleCache.get(k);
+    if (hit !== undefined) return hit;
+    if (seen.has(script.id)) return false;
+    seen.add(script.id);
+    const leg = this.catalogue.leg(script.legId)!;
+    const m = this.catalogue.subjectOf(script);
+    let v: boolean;
+    if (!m) v = from === START && this.catalogue.createsSubjects(leg);
+    else if (m === from) v = true;
+    else if (this.catalogue.outcome(m)?.track) v = false;
+    else {
+      const starts = this.startsOf(campaign);
+      const rooted = this.catalogue.providersOf(m).filter((p) => !p.webhook && this.catalogue.rootsOf(p, starts).has(from));
+      v = this.allowedScripts(campaign, { leg, script }, m, rooted).some((s) => this.feasible(campaign, s, from, new Set(seen)));
+    }
+    this.feasibleCache.set(k, v);
+    return v;
   }
 
-  /** The conditions a campaign's strategy states at one Material of a pipe: they enter its Specification. */
-  materialConditions(campaign: Campaign, pipe: Pipe, material: OutcomeId): Condition[] {
-    return (this.strategyOf(campaign, pipe.id)?.rules ?? []).filter((r) => r.material === material).flatMap((r) => r.conditions);
+  private readonly feasibleCache = new Map<string, boolean>();
+
+  /** The campaign's strategy on a leg (its play on that leg). */
+  strategyOf(campaign: Campaign, legId: string): Strategy | null {
+    const id = campaign.strategies[legId];
+    return (id ? this.catalogue.strategy(id) : null) ?? this.catalogue.strategy(defaultStrategyId(legId)) ?? null;
+  }
+
+  /**
+   * The conditions of one Material's Specification: those the consuming
+   * script declares in its Bill of materials, and those the campaign's play on
+   * the consuming leg states at that Material.
+   */
+  materialConditions(campaign: Campaign, consumer: Consumer, material: OutcomeId): Condition[] {
+    const own = consumer.script.materials.find((m) => m.outcome === material)?.conditions ?? [];
+    const play = (this.strategyOf(campaign, consumer.leg.id)?.rules ?? []).filter((r) => r.material === material).flatMap((r) => r.conditions);
+    return [...own, ...play];
   }
 
   /** The conditions of a list a script can be read against (tactics describing scripts). */
@@ -786,17 +975,21 @@ export class SimulationSession {
   }
 
   /**
-   * The scripts allowed at one Material: the producers' active dynasty heads,
-   * filtered by the consuming pipe's play (its strategy's conditions at this
-   * Material). `consumerPipe` null = the leg's own pipe, filtered by its rules
-   * without a Material.
+   * The scripts allowed to make a Material: the producers' active dynasty
+   * heads, filtered by the Specification's conditions (the consumer's Bill of
+   * materials and play at this Material) and by the campaign's strategy (on
+   * every script carrying its tactic). `consumer` null = the step's own play,
+   * filtered by its leg's rules without a Material.
    */
-  allowedScripts(campaign: Campaign, consumerPipe: Pipe | null, material: OutcomeId | null, providers: Pipe[]): Script[] {
+  allowedScripts(campaign: Campaign, consumer: Consumer | null, material: OutcomeId | null, providers: Leg[]): Script[] {
     let rules: Condition[] = [];
-    if (consumerPipe && material) rules = this.materialConditions(campaign, consumerPipe, material);
+    if (consumer && material) rules = this.materialConditions(campaign, consumer, material);
     else if (providers[0]) rules = (this.strategyOf(campaign, providers[0].id)?.rules ?? []).filter((r) => !r.material).flatMap((r) => r.conditions);
     const conds = this.scriptConditions(rules);
-    return providers.flatMap((p) => this.catalogue.dynastiesOf(p.id)).filter((s) => meetsAll(s.tactics, conds));
+    const campaignWide = this.scriptConditions(campaign.conditions ?? []);
+    return providers
+      .flatMap((p) => this.catalogue.dynastiesOf(p.id))
+      .filter((s) => meetsAll(s.tactics, conds) && campaignWide.every((c) => c.op === "notReached" || s.tactics[c.tactic] === undefined || meetsAll(s.tactics, [c])));
   }
 
   // ---- the stock and Specifications ------------------------------------------------
@@ -818,13 +1011,20 @@ export class SimulationSession {
     return out;
   }
 
-  /** The option a brand Unit stands for at a choice: its dynasty, else its producer script's dynasty. */
-  optionOf(u: Unit): string {
+  /** The candidate a brand Unit stands for at a choice: its dynasty, else its producer script's dynasty. */
+  candidateOf(u: Unit): string {
     return u.dynasty ?? (u.scriptId ? this.catalogue.script(u.scriptId)?.dynasty : undefined) ?? u.id;
   }
 
-  // ---- orchestration -------------------------------------------------------------
+  // ---- orchestration: the generic code of every leg ------------------------------------
 
+  /**
+   * A leg's pull for one Unit: pick the producer (a script of one of the legs
+   * making the outcome, rated by the Supplier rating and filtered by the
+   * strategy and the Specification), then serve that script its Bill of
+   * materials and run it. `consumer` names who asked (the step, or the
+   * consuming leg): the choice lives on the Material.
+   */
   private produce(a: Attempt, consumer: string, o: OutcomeId, scripts: Script[], remDelay: Rem, final: boolean, day: number): Obtained {
     const key = pointKey(consumer, o);
     const have = a.got.get(key);
@@ -833,24 +1033,25 @@ export class SimulationSession {
     let dynasty = a.choices.get(key);
     if (!dynasty) {
       if (scripts.length === 0) return { kind: "fail", reason: `no script at ${key}` };
-      // From this choice to the leg's end: what is left to run below it, its own pipe, then what is above.
-      const pipes = scripts.map((s) => this.catalogue.pipe(s.pipeId)!);
-      const longest = pipes.map((p) => addRem(this.pipeTicks(p), this.ticksBelow(p, a.from, a))).reduce((x, y) => (y.mean > x.mean ? y : x));
+      // From this choice to the next lead state: what is left to run below it, its own leg, then what is above.
+      const legs = scripts.map((s) => this.catalogue.leg(s.legId)!);
+      const longest = legs.map((p) => addRem(this.legTicks(p), this.ticksBelow(p, a.from, a))).reduce((x, y) => (y.mean > x.mean ? y : x));
       const rem = addRem(remDelay, longest);
-      const horizon = Math.max(...pipes.map((p) => p.maturity.horizonDays + 1)) + rem.mean * 3;
+      const horizon = Math.max(...legs.map((p) => p.maturity.horizonDays + 1)) + rem.mean * 3;
       dynasty = this.decide(a, key, scripts.map((s) => s.dynasty), day, rem, Math.ceil(horizon));
       a.choices.set(key, dynasty);
     }
     const script = this.catalogue.headOf(dynasty);
     if (!script) return { kind: "fail", reason: `dynasty ${dynasty} has no active version` };
-    const pipe = this.catalogue.pipe(script.pipeId)!;
-    const rem = addRem(remDelay, this.pipeTicks(pipe));
+    const leg = this.catalogue.leg(script.legId)!;
+    const me: Consumer = { leg, script };
+    const rem = addRem(remDelay, this.legTicks(leg));
 
     // The subject Material first: nothing else is asked for before the subject is there.
-    const subjectMaterial = this.catalogue.subjectMaterial(pipe);
+    const subjectMaterial = this.catalogue.subjectOf(script);
     const materials: Record<OutcomeId, string> = {};
     if (subjectMaterial) {
-      const r = this.obtain(a, pipe, subjectMaterial, rem, day);
+      const r = this.obtain(a, me, subjectMaterial, rem, day);
       if (r.kind !== "ok") return r;
       materials[subjectMaterial] = r.unit;
       if (a.person && !a.checkedSubject) {
@@ -859,37 +1060,40 @@ export class SimulationSession {
       }
       // The script decides when to run (a follow-up waits its days since the last message).
       const u = this.unitById.get(r.unit)!;
-      const ctx: ScriptContext = { storage: this.storage.forPipe(pipe.id), day, tactics: script.tactics };
+      const ctx: ScriptContext = { storage: this.storage.forLeg(leg.id), day, tactics: script.tactics };
       if (!scriptReady(ctx, a.person?.id ?? a.subject ?? u.subject, u)) {
         a.wakeTick = (u.day + Number(script.tactics.wait_days)) * this.ticksPerDay;
         return { kind: "wait" };
       }
     }
-    // The other Materials, asked for together.
+    // The other Materials of its Bill of materials, asked for together. A Material
+    // that takes time leaves the subject waiting; the next tick retries.
     let waiting = false;
-    for (const i of pipe.materials) {
+    for (const i of billOf(script)) {
       if (i === subjectMaterial) continue;
-      const r = this.obtain(a, pipe, i, rem, day);
+      const r = this.obtain(a, me, i, rem, day);
       if (r.kind === "fail" || r.kind === "blocked") return r;
       if (r.kind === "wait") waiting = true;
       else materials[i] = r.unit;
     }
     if (waiting) return { kind: "wait" };
-    return this.runScript(a, key, pipe, script, materials, o, final, day);
+    return this.runScript(a, key, leg, script, materials, o, final, day);
   }
 
   /**
-   * A pipe serves itself one Material: from the stock when a Unit conforms to
-   * its Specification, else it orders one from a producer it chooses.
+   * One Material of a script's Bill of materials: from the stock when a Unit
+   * conforms to its Specification (its subject, the conditions the script
+   * declares, the play's), else the OUTCOME is pulled: the best producer is
+   * picked and receives the Specification.
    */
-  private obtain(a: Attempt, consumer: Pipe, i: OutcomeId, rem: Rem, day: number): Obtained {
-    const key = pointKey(consumer.id, i);
+  private obtain(a: Attempt, consumer: Consumer, i: OutcomeId, rem: Rem, day: number): Obtained {
+    const key = pointKey(consumer.leg.id, i);
     const have = a.got.get(key);
     if (have) return { kind: "ok", unit: have };
     if (a.pending.has(key)) return { kind: "wait" };
     const out = this.catalogue.outcome(i);
     if (!out) return { kind: "fail", reason: `unknown Material ${i}` };
-    // The Unit the leg started from.
+    // The Unit the step started from.
     if (a.startUnit && i === a.from) {
       a.got.set(key, a.startUnit);
       return { kind: "ok", unit: a.startUnit };
@@ -913,24 +1117,25 @@ export class SimulationSession {
       }
       const starts = this.startsOf(a.campaign);
       const rooted = providers.filter((p) => this.catalogue.rootsOf(p, starts).has(a.from) || (a.from === START && this.catalogue.rootsOf(p).has(START)));
-      return this.produce(a, consumer.id, i, this.allowedScripts(a.campaign, consumer, i, rooted), rem, false, day);
+      const scripts = this.allowedScripts(a.campaign, consumer, i, rooted).filter((s) => out.subject !== "lead" || this.feasible(a.campaign, s, a.from));
+      return this.produce(a, consumer.leg.id, i, scripts, rem, false, day);
     }
     // A Unit about the run that asks for it (an LLM completion): never in the stock, always ordered.
-    if (out.subject === "run") return this.produce(a, consumer.id, i, this.allowedScripts(a.campaign, consumer, i, providers), rem, false, day);
+    if (out.subject === "run") return this.produce(a, consumer.leg.id, i, this.allowedScripts(a.campaign, consumer, i, providers), rem, false, day);
     // A brand Unit: chosen among the conforming ones in the stock, else ordered.
     const conformingUnits = this.stock({ outcome: i, subject: null, brandId, conditions, quantity: Number.MAX_SAFE_INTEGER }, day).reverse();
-    const options: string[] = [];
+    const held: string[] = [];
     for (const u of conformingUnits) {
-      const opt = this.optionOf(u);
-      if (!options.includes(opt)) options.push(opt);
+      const c = this.candidateOf(u);
+      if (!held.includes(c)) held.push(c);
     }
-    if (options.length > 0) {
+    if (held.length > 0) {
       let dynasty = a.choices.get(key);
-      if (!dynasty || !options.includes(dynasty)) {
-        dynasty = options.length > 1 ? this.decide(a, key, options, day, rem) : options[0]!;
+      if (!dynasty || !held.includes(dynasty)) {
+        dynasty = held.length > 1 ? this.decide(a, key, held, day, rem) : held[0]!;
         a.choices.set(key, dynasty);
       }
-      const u = this.latestOf(conformingUnits.filter((x) => this.optionOf(x) === dynasty));
+      const u = this.latestOf(conformingUnits.filter((x) => this.candidateOf(x) === dynasty));
       if (!u) return { kind: "fail", reason: `no Unit of ${dynasty}` };
       const dec = a.decisionAt.get(key);
       if (dec !== undefined && this.decisions[dec]!.option === dynasty) this.decisionObject.set(dec, u.id);
@@ -940,26 +1145,26 @@ export class SimulationSession {
       return { kind: "ok", unit: u.id };
     }
     if (this.inFlight.has(`${i}${SEP}${brandId}`)) return { kind: "wait" };
-    return this.produce(a, consumer.id, i, this.allowedScripts(a.campaign, consumer, i, providers), rem, false, day);
+    return this.produce(a, consumer.leg.id, i, this.allowedScripts(a.campaign, consumer, i, providers), rem, false, day);
   }
 
-  /** Ticks one run of a pipe takes (one at least), counting the tick its ordered Materials take to land (an LLM completion). */
-  pipeTicks(pipe: Pipe): Rem {
-    const ordered = pipe.materials.some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
+  /** Ticks one run of a leg takes (one at least), counting the tick its ordered Materials take to land (an LLM completion). */
+  legTicks(leg: Leg): Rem {
+    const ordered = this.catalogue.materialsOf(leg).some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
     const tick = 1 / this.ticksPerDay;
-    return { mean: tickDelay(pipe.maturity.delayMeanDays, this.ticksPerDay) + ordered * tick, fixed: (1 + ordered) * tick };
+    return { mean: tickDelay(leg.maturity.delayMeanDays, this.ticksPerDay) + ordered * tick, fixed: (1 + ordered) * tick };
   }
 
-  /** Ticks before a pipe has its subject Material in hand, from a leg's start (none once the attempt holds its subject there). */
-  ticksBelow(pipe: Pipe, from: OutcomeId, a: Attempt | null = null, seen = new Set<string>()): Rem {
-    const s = this.catalogue.subjectMaterial(pipe);
-    if (!s || s === from || this.catalogue.outcome(s)?.track || seen.has(pipe.id)) return NO_REM;
+  /** Ticks before a leg has its subject Material in hand, from a step's start (none once the attempt holds its subject there). */
+  ticksBelow(leg: Leg, from: OutcomeId, a: Attempt | null = null, seen = new Set<string>()): Rem {
+    const s = this.catalogue.subjectMaterial(leg);
+    if (!s || s === from || this.catalogue.outcome(s)?.track || seen.has(leg.id)) return NO_REM;
     if (a?.person && (this.bySubject.get(`${a.person.id}${SEP}${s}`)?.length ?? 0) > 0) return NO_REM;
-    seen.add(pipe.id);
+    seen.add(leg.id);
     let most = NO_REM;
     for (const p of this.catalogue.providersOf(s)) {
       if (p.webhook) continue;
-      const r = addRem(this.pipeTicks(p), this.ticksBelow(p, from, a, new Set(seen)));
+      const r = addRem(this.legTicks(p), this.ticksBelow(p, from, a, new Set(seen)));
       if (r.mean > most.mean) most = r;
     }
     return most;
@@ -976,7 +1181,7 @@ export class SimulationSession {
   objectDynasties(brandId: string, outcome: OutcomeId): string[] {
     const out: string[] = [];
     for (const o of this.brandUnits.get(`${brandId}${SEP}${outcome}`) ?? []) {
-      const opt = this.optionOf(o);
+      const opt = this.candidateOf(o);
       if (!out.includes(opt)) out.push(opt);
     }
     return out;
@@ -989,14 +1194,14 @@ export class SimulationSession {
 
   /** The head (latest version) of a brand dynasty. */
   objectHead(brandId: string, outcome: OutcomeId, dynasty: string): Unit | undefined {
-    return this.latestOf((this.brandUnits.get(`${brandId}${SEP}${outcome}`) ?? []).filter((o) => this.optionOf(o) === dynasty));
+    return this.latestOf((this.brandUnits.get(`${brandId}${SEP}${outcome}`) ?? []).filter((o) => this.candidateOf(o) === dynasty));
   }
 
   /** The play's conditions on its subject (lead tactics, end states reached). */
   private subjectAllowed(a: Attempt): boolean {
-    const pipeId = a.choices.get(playPoint(a.from, a.to));
-    if (!pipeId || !a.person) return true;
-    const cond = this.strategyOf(a.campaign, pipeId)?.subject ?? [];
+    const legId = a.choices.get(playPoint(a.from, a.to));
+    if (!legId || !a.person) return true;
+    const cond = this.strategyOf(a.campaign, legId)?.subject ?? [];
     if (cond.length === 0) return true;
     return meetsAll(a.person.values, cond, new Set(this.reached.get(a.person.id)?.keys() ?? []));
   }
@@ -1006,7 +1211,7 @@ export class SimulationSession {
   /**
    * Hidden: the chance a script creating subjects finds someone today for an
    * audience (its source's coverage, the audience, who it may not pick again
-   * yet). For grading only: a script never sees another pipe's storage.
+   * yet). For grading only: a script never sees another leg's storage.
    */
   pickChance(script: Script, brandId: string, conditions: readonly Condition[], tries = 60): number {
     const ck = `${this.dayIndex}|${script.id}|${brandId}|${JSON.stringify(conditions)}`;
@@ -1022,7 +1227,7 @@ export class SimulationSession {
   private computePickChance(script: Script, brandId: string, conditions: readonly Condition[], tries: number): number {
     const coverage = this.truthOf(script, null).coverage ?? 1;
     const window = Number(script.tactics.recontact_days ?? 365);
-    const store = this.storage.forPipe(script.pipeId);
+    const store = this.storage.forLeg(script.legId);
     const step = Math.max(1, Math.floor(this.world.settings.marketSize / 3000));
     let covered = 0;
     let ok = 0;
@@ -1063,33 +1268,33 @@ export class SimulationSession {
   }
 
   /** Open a Run: one script on one subject. */
-  private newRun(day: number, campaignId: string | null, pipe: Pipe, script: Script): Run {
-    const r: Run = { id: `run:${++this.runCounter}`, pipeId: pipe.id, target: pipe.output, day, spendCents: 0, consumed: [], inputs: 1, factory: pipe.factory, scriptId: script.id, subjects: 1, ...(campaignId ? { campaignId } : {}) };
+  private newRun(day: number, campaignId: string | null, leg: Leg, script: Script): Run {
+    const r: Run = { id: `run:${++this.runCounter}`, legId: leg.id, target: leg.output, day, spendCents: 0, consumed: [], inputs: 1, factory: leg.factory, scriptId: script.id, subjects: 1, ...(campaignId ? { campaignId } : {}) };
     this.runs.push(r);
     return r;
   }
 
   private makeUnit(run: Run, outcome: OutcomeId, subject: string, brandId: string, campaignId: string | null, materials: Record<OutcomeId, string>, trace: number[]): Unit {
-    return { id: `unit:${++this.unitCounter}`, outcome, subject, runId: run.id, day: run.day, brandId, campaignId, factory: run.factory, pipeId: run.pipeId, scriptId: run.scriptId ?? null, materials, trace };
+    return { id: `unit:${++this.unitCounter}`, outcome, subject, runId: run.id, day: run.day, brandId, campaignId, factory: run.factory, legId: run.legId, scriptId: run.scriptId ?? null, materials, trace };
   }
 
-  private runScript(a: Attempt, key: string, pipe: Pipe, script: Script, materials: Record<OutcomeId, string>, o: OutcomeId, final: boolean, day: number): Obtained {
-    const ctx: ScriptContext = Object.freeze({ storage: this.storage.forPipe(pipe.id), day, tactics: script.tactics });
+  private runScript(a: Attempt, key: string, leg: Leg, script: Script, materials: Record<OutcomeId, string>, o: OutcomeId, final: boolean, day: number): Obtained {
+    const ctx: ScriptContext = Object.freeze({ storage: this.storage.forLeg(leg.id), day, tactics: script.tactics });
     const truth = this.truthOf(script, key);
-    const ours = this.catalogue.isOurs(pipe);
-    const creates = this.catalogue.createsSubjects(pipe);
+    const ours = this.catalogue.isOurs(leg);
+    const creates = this.catalogue.createsSubjects(leg);
     const subjectKey = a.person?.id ?? a.subject ?? "";
     if (!creates && subjectKey && !scriptAccepts(ctx, subjectKey)) return { kind: "fail", reason: "the script does not retry yet" };
     const cost = Math.max(0, Math.round(truth.costCents * (0.85 + 0.3 * this.rng.next())));
     if (ours && cost > (this.budgetLeft.get(a.campaign.id) ?? 0)) return { kind: "blocked" };
 
-    const run = this.newRun(day, a.campaign.id, pipe, script);
+    const run = this.newRun(day, a.campaign.id, leg, script);
     run.spendCents += cost;
     for (const id of Object.values(materials)) run.consumed.push(id);
     this.charge(a, cost, ours);
 
-    const pt = this.world.truth.pipes[pipe.id] ?? { base: 1, delayMeanDays: 0, horizonDays: 0 };
-    // The trace: this choice, the choices made at this pipe's Materials, and what its Materials carried.
+    const pt = this.world.truth.legs[leg.id] ?? { base: 1, delayMeanDays: 0, horizonDays: 0 };
+    // The trace: this choice, the choices made at this leg's Materials, and what its Materials carried.
     const trace = new Set<number>();
     const own = a.decisionAt.get(key);
     if (own !== undefined) trace.add(own);
@@ -1097,8 +1302,8 @@ export class SimulationSession {
       const play = a.decisionAt.get(playPoint(a.from, a.to));
       if (play !== undefined) trace.add(play);
     }
-    for (const i of pipe.materials) {
-      const d = a.decisionAt.get(pointKey(pipe.id, i));
+    for (const i of leg.materials) {
+      const d = a.decisionAt.get(pointKey(leg.id, i));
       if (d !== undefined) trace.add(d);
       const u = this.unitById.get(materials[i]!);
       if (u) for (const t of u.trace) trace.add(t);
@@ -1108,8 +1313,8 @@ export class SimulationSession {
     let fact: boolean;
     let recall = truth.recall ?? 1;
     let fp = truth.falsePositive ?? 0;
-    for (const i of pipe.materials) {
-      const d = a.decisionAt.get(pointKey(pipe.id, i));
+    for (const i of leg.materials) {
+      const d = a.decisionAt.get(pointKey(leg.id, i));
       if (d === undefined) continue;
       const t = this.optionTruth(this.decisions[d]!.point, this.decisions[d]!.option);
       if (t.recall !== undefined) recall *= t.recall;
@@ -1136,7 +1341,7 @@ export class SimulationSession {
       if (pick) {
         subject = `${brandId}:r${++this.rawCounter}`;
         this.rawPerson.set(subject, pick.index);
-        this.rootFactory.set(subject, pipe.factory);
+        this.rootFactory.set(subject, leg.factory);
         a.subject = subject;
         a.recontact = pick.recontact;
         let p = pt.base * (truth.step ?? 1);
@@ -1150,7 +1355,7 @@ export class SimulationSession {
           // A subject created at the end of its leg is a person at once.
           const person = personOf(this.world, brandId, pick.index);
           this.persons.set(person.id, person);
-          if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, pipe.factory);
+          if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, leg.factory);
           this.setPerson(a, person);
           this.enroll(person.id, a.campaign.id);
           subject = person.id;
@@ -1169,11 +1374,11 @@ export class SimulationSession {
       }
       fact = p >= 1 || this.rng.next() < Math.min(0.97, p);
       if (raw && fact && kind === "lead") {
-        // Identity: the raw record becomes a person, the one id space every pipe shares.
+        // Identity: the raw record becomes a person, the one id space every leg shares.
         const index = this.rawPerson.get(raw)!;
         const person = personOf(this.world, a.client.brand.id, index);
         this.persons.set(person.id, person);
-        if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, this.rootFactory.get(raw) ?? pipe.factory);
+        if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, this.rootFactory.get(raw) ?? leg.factory);
         this.setPerson(a, person);
         this.enroll(person.id, a.campaign.id);
         subject = person.id;
@@ -1183,16 +1388,16 @@ export class SimulationSession {
       else if (a.person) subject = a.person.id;
     }
     const attested = fact ? this.rng.next() < recall : this.rng.next() < fp;
-    if (final && fact && a.person && this.catalogue.outcome(o)?.referencePipe) this.truePositive.set(a.person.id, day);
-    if (this.catalogue.outcome(o)?.referencePipe && a.person) {
-      this.attestations.push({ producer: pipe.id, outcome: o, brandId: a.client.brand.id, subject: a.person.id, attested });
+    if (final && fact && a.person && this.catalogue.outcome(o)?.referenceLeg) this.truePositive.set(a.person.id, day);
+    if (this.catalogue.outcome(o)?.referenceLeg && a.person) {
+      this.attestations.push({ producer: leg.id, outcome: o, brandId: a.client.brand.id, subject: a.person.id, attested });
       this.attestations.push({ producer: script.id, outcome: o, brandId: a.client.brand.id, subject: a.person.id, attested });
     }
     if (kind !== "run" && subjectKey) scriptRecords(ctx, subjectKey, attested);
-    if (!attested) return { kind: "fail", reason: `no outcome at ${pipe.id}` };
+    if (!attested) return { kind: "fail", reason: `no outcome at ${leg.id}` };
 
     const u = this.makeUnit(run, o, subject, a.client.brand.id, a.campaign.id, materials, [...trace].sort((x, y) => x - y));
-    // A Unit advances one pipe per tick: it lands at the next tick at the earliest.
+    // A Unit advances one leg per tick: it lands at the next tick at the earliest.
     const delay = this.delayTicks(pt.delayMeanDays, pt.horizonDays);
     const flight = `${o}${SEP}${kind === "brand" ? a.client.brand.id : subject}`;
     if (kind === "brand" || kind === "company") this.inFlight.add(flight);
@@ -1301,14 +1506,14 @@ export class SimulationSession {
       if (list) list.push(u);
       else this.bySubject.set(k, [u]);
     }
-    for (const p of this.catalogue.pipes) {
-      const on = this.world.truth.pipes[p.id]?.webhook?.on;
-      if (!p.webhook || on !== u.outcome || !this.catalogue.isPipeLive(p)) continue;
+    for (const p of this.catalogue.legs) {
+      const on = this.world.truth.legs[p.id]?.webhook?.on;
+      if (!p.webhook || on !== u.outcome || !this.catalogue.isLegLive(p)) continue;
       const client = this.world.clients.find((c) => c.brand.id === u.brandId);
       if (!client?.connected.includes(p.id)) continue;
-      const pt = this.world.truth.pipes[p.id]!;
+      const pt = this.world.truth.legs[p.id]!;
       if (this.rng.next() >= pt.base) continue;
-      this.webhookCalls.push({ tick: this.tickIndex + this.delayTicks(pt.delayMeanDays, pt.horizonDays), pipeId: p.id, about: u.id });
+      this.webhookCalls.push({ tick: this.tickIndex + this.delayTicks(pt.delayMeanDays, pt.horizonDays), legId: p.id, about: u.id });
     }
     if (out?.subject !== "lead") return;
     const bk = `${u.brandId}${SEP}${u.outcome}`;
@@ -1332,7 +1537,7 @@ export class SimulationSession {
       this.evidence.bump(dec.point, dec.option, dec.brandId, dec.day, "s", 1);
     }
 
-    // Reactive campaigns starting from this outcome: the Unit is pushed into their first pipe.
+    // Reactive campaigns starting from this outcome: the Unit is pushed into their first leg.
     for (const c of this.campaigns()) if (c.status === "running" && c.start === u.outcome && c.brandId === u.brandId) this.push(c, u, day);
 
     if (!first) return;
@@ -1401,26 +1606,26 @@ export class SimulationSession {
 
   // ---- the Supplier rating, webhooks ---------------------------------------------------
 
-  /** The outcome Supplier rating pipes make (content type "rating"). */
+  /** The outcome Supplier rating legs make (content type "rating"). */
   ratingOutcome(): OutcomeId | null {
     return this.catalogue.outcomes.find((o) => o.contentType === "rating" && !o.retired)?.id ?? null;
   }
 
   /**
-   * The Supplier rating, an auxiliary cost center: at each tick its pipe reads
+   * The Supplier rating, an auxiliary cost center: at each tick its leg reads
    * the ledger and the traceability and makes today's Rating for each brand
-   * with a running campaign. Every choosing pipe takes it as a Material; its
-   * cost goes to the pipes that consume it.
+   * with a running campaign. Every choosing leg takes it as a Material; its
+   * cost goes to the legs that consume it.
    */
   private rate(day: number): void {
     const outcome = this.ratingOutcome();
     if (!outcome) return;
-    const pipe = this.catalogue.providersOf(outcome).find((p) => !p.webhook);
-    const script = pipe ? this.catalogue.dynastiesOf(pipe.id)[0] : undefined;
-    if (!pipe || !script) return;
+    const leg = this.catalogue.providersOf(outcome).find((p) => !p.webhook);
+    const script = leg ? this.catalogue.dynastiesOf(leg.id)[0] : undefined;
+    if (!leg || !script) return;
     for (const brandId of this.brandIds) {
       if (!this.campaigns().some((c) => c.brandId === brandId && c.status === "running")) continue;
-      const run = this.newRun(day, null, pipe, script);
+      const run = this.newRun(day, null, leg, script);
       run.spendCents += Math.round(this.truthOf(script, null).costCents);
       this.land(this.makeUnit(run, outcome, brandId, brandId, null, {}, []), day);
     }
@@ -1435,7 +1640,7 @@ export class SimulationSession {
   }
 
   /**
-   * Webhooks: pipes of other factories with no internal Material, run when the
+   * Webhooks: legs of other factories with no internal Material, run when the
    * other factory calls them. The organic market brings leads; the client's CRM
    * attests what it saw; the mailbox reports a message sent. Their Units land
    * in the stock, available to every campaign.
@@ -1447,49 +1652,49 @@ export class SimulationSession {
       this.webhookCalls.length = 0;
       this.webhookCalls.push(...rest);
       for (const c of calls) {
-        const pipe = this.catalogue.pipe(c.pipeId)!;
-        const script = this.catalogue.dynastiesOf(pipe.id)[0];
+        const leg = this.catalogue.leg(c.legId)!;
+        const script = this.catalogue.dynastiesOf(leg.id)[0];
         const about = this.unitById.get(c.about);
         if (!script || !about) continue;
-        const run = this.newRun(day, null, pipe, script);
+        const run = this.newRun(day, null, leg, script);
         // The call names the Unit it reports on: the new Unit carries its traceability.
-        this.land(this.makeUnit(run, pipe.output, about.subject, about.brandId, null, {}, about.trace), day);
+        this.land(this.makeUnit(run, leg.output, about.subject, about.brandId, null, {}, about.trace), day);
       }
     }
     if (!firstTick) return;
-    for (const pipe of this.catalogue.pipes) {
-      if (!pipe.webhook || !this.catalogue.isPipeLive(pipe)) continue;
-      const wh = this.world.truth.pipes[pipe.id]?.webhook;
+    for (const leg of this.catalogue.legs) {
+      if (!leg.webhook || !this.catalogue.isLegLive(leg)) continue;
+      const wh = this.world.truth.legs[leg.id]?.webhook;
       if (!wh || wh.on) continue;
-      const script = this.catalogue.dynastiesOf(pipe.id)[0];
+      const script = this.catalogue.dynastiesOf(leg.id)[0];
       if (!script) continue;
       const truth = this.truthOf(script, null);
-      const pt = this.world.truth.pipes[pipe.id]!;
+      const pt = this.world.truth.legs[leg.id]!;
       for (const client of this.world.clients) {
         if (wh.creates) {
           const n = this.rng.binomial(Math.round(client.organicPerDay * 4), 0.25);
           for (let i = 0; i < n; i++) {
             const index = this.rng.int(this.world.settings.marketSize);
             const person = personOf(this.world, client.brand.id, index);
-            if (this.reached.get(person.id)?.has(pipe.output)) continue;
+            if (this.reached.get(person.id)?.has(leg.output)) continue;
             this.persons.set(person.id, person);
-            if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, pipe.factory);
-            const run = this.newRun(day, null, pipe, script);
-            this.land(this.makeUnit(run, pipe.output, person.id, client.brand.id, null, {}, []), day);
+            if (!this.rootFactory.has(person.id)) this.rootFactory.set(person.id, leg.factory);
+            const run = this.newRun(day, null, leg, script);
+            this.land(this.makeUnit(run, leg.output, person.id, client.brand.id, null, {}, []), day);
           }
           continue;
         }
-        if (!wh.attests || !client.connected.includes(pipe.id)) continue;
+        if (!wh.attests || !client.connected.includes(leg.id)) continue;
         // An attesting webhook: the other factory reports the facts it sees, with its own recall.
         for (const [personId, factDay] of this.truePositive) {
           if (factDay + pt.delayMeanDays !== day) continue;
           const person = this.persons.get(personId);
           if (!person || person.brandId !== client.brand.id) continue;
           const attested = this.rng.next() < (truth.recall ?? 1);
-          this.attestations.push({ producer: pipe.id, outcome: pipe.output, brandId: client.brand.id, subject: personId, attested });
+          this.attestations.push({ producer: leg.id, outcome: leg.output, brandId: client.brand.id, subject: personId, attested });
           if (!attested) continue;
-          const run = this.newRun(day, null, pipe, script);
-          this.land(this.makeUnit(run, pipe.output, personId, client.brand.id, null, {}, []), day);
+          const run = this.newRun(day, null, leg, script);
+          this.land(this.makeUnit(run, leg.output, personId, client.brand.id, null, {}, []), day);
         }
       }
     }
@@ -1593,7 +1798,7 @@ export class SimulationSession {
     return this.catalogue.peekSalesPath(campaign.start, campaign.line);
   }
 
-  /** The pipe playing each leg of a campaign today: its pinned play, else the play picked most over the last 7 days. */
+  /** The leg playing each leg of a campaign today: its pinned play, else the play picked most over the last 7 days. */
   playsToday(campaign: Campaign): (string | null)[] {
     return campaign.line.map((to, k) => {
       const from = k === 0 ? campaign.start : campaign.line[k - 1]!;
@@ -1625,11 +1830,11 @@ export class SimulationSession {
   }
 
   /**
-   * Every pipe a leg runs through, in the order they run: the pipe providing
+   * Every leg a leg runs through, in the order they run: the leg providing
    * each Material of the leg's play (the script picked most at that Material
    * over the last 7 days, else the first allowed), down to the leg's start,
    * then the play itself. `main` marks the chain that carries the subject; the
-   * others feed a Material of a pipe on it (a research, a model call).
+   * others feed a Material of a leg on it (a research, a model call).
    * `campaign` null reads the picks of every campaign (a funnel not launched yet).
    */
   legPipes(play: string, from: OutcomeId, campaign: Campaign | null): LegPipe[] {
@@ -1637,24 +1842,24 @@ export class SimulationSession {
     const seen = new Set<string>();
     const strategic = campaign ?? ({ strategies: {}, start: from } as unknown as Campaign);
     const starts = this.startsOf(strategic);
-    const visit = (pipeId: string, feeds: { pipe: string; material: OutcomeId } | null, main: boolean) => {
-      if (seen.has(pipeId)) return;
-      seen.add(pipeId);
-      const pipe = this.catalogue.pipe(pipeId);
-      if (!pipe) return;
-      const subject = this.catalogue.subjectMaterial(pipe);
-      const order = subject ? [subject, ...pipe.materials.filter((i) => i !== subject)] : [...pipe.materials];
+    const visit = (legId: string, feeds: { leg: string; material: OutcomeId } | null, main: boolean) => {
+      if (seen.has(legId)) return;
+      seen.add(legId);
+      const leg = this.catalogue.leg(legId);
+      if (!leg) return;
+      const subject = this.catalogue.subjectMaterial(leg);
+      const order = subject ? [subject, ...leg.materials.filter((i) => i !== subject)] : [...leg.materials];
       for (const i of order) {
         const o = this.catalogue.outcome(i);
         if (!o || o.track || i === from || o.contentType === "rating") continue;
         const providers = this.catalogue.providersOf(i).filter((p) => !p.webhook);
-        const series = this.pickSeries(pointKey(pipe.id, i), campaign?.id);
-        let candidates: Pipe[];
+        const series = this.pickSeries(pointKey(leg.id, i), campaign?.id);
+        let candidates: Leg[];
         if (o.subject === "brand") candidates = providers.filter((p) => this.catalogue.dynastiesOf(p.id).some((s) => series.has(s.dynasty)));
         else if (o.subject === "run") candidates = providers;
         else candidates = providers.filter((p) => this.catalogue.rootsOf(p, starts).has(from) || this.catalogue.rootsOf(p).has(START));
         if (candidates.length === 0) continue;
-        const scripts = this.allowedScripts(strategic, pipe, i, candidates);
+        const scripts = this.allowedScripts(strategic, leg, i, candidates);
         let best = scripts[0]?.dynasty ?? null;
         let bestN = 0;
         for (const [opt, arr] of series) {
@@ -1664,16 +1869,16 @@ export class SimulationSession {
             bestN = n;
           }
         }
-        const provider = (best ? this.catalogue.headOf(best)?.pipeId : undefined) ?? candidates[0]?.id;
-        if (provider) visit(provider, { pipe: pipe.id, material: i }, main && i === subject);
+        const provider = (best ? this.catalogue.headOf(best)?.legId : undefined) ?? candidates[0]?.id;
+        if (provider) visit(provider, { leg: leg.id, material: i }, main && i === subject);
       }
-      out.push({ pipeId, output: pipe.output, feeds, main });
+      out.push({ legId, output: leg.output, feeds, main });
     };
     visit(play, null, true);
     return out;
   }
 
-  /** Every pipe each leg of a campaign runs through today (see `legPipes`), leg by leg. */
+  /** Every leg each leg of a campaign runs through today (see `legPipes`), leg by leg. */
   campaignPipes(campaign: Campaign): LegPipe[][] {
     const plays = this.playsToday(campaign);
     return campaign.line.map((_, k) => {
@@ -1710,24 +1915,24 @@ export class SimulationSession {
     });
   }
 
-  /** Mean delay from a leg's start to its end through a pipe (the longest chain of subject Materials, a tick per pipe). */
-  legDelayMean(pipe: Pipe, campaign: Campaign | null = null, seen = new Set<string>()): number {
-    if (seen.has(pipe.id)) return 0;
-    seen.add(pipe.id);
-    const ordered = pipe.materials.some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
-    const own = tickDelay(this.world.truth.pipes[pipe.id]?.delayMeanDays ?? pipe.maturity.delayMeanDays, this.ticksPerDay) + ordered / this.ticksPerDay;
-    const s = this.catalogue.subjectMaterial(pipe);
+  /** Mean delay from a leg's start to its end through a leg (the longest chain of subject Materials, a tick per leg). */
+  legDelayMean(leg: Leg, campaign: Campaign | null = null, seen = new Set<string>()): number {
+    if (seen.has(leg.id)) return 0;
+    seen.add(leg.id);
+    const ordered = leg.materials.some((m) => this.catalogue.outcome(m)?.subject === "run") ? 1 : 0;
+    const own = tickDelay(this.world.truth.legs[leg.id]?.delayMeanDays ?? leg.maturity.delayMeanDays, this.ticksPerDay) + ordered / this.ticksPerDay;
+    const s = this.catalogue.subjectMaterial(leg);
     const out = s ? this.catalogue.outcome(s) : undefined;
     if (!s || out?.track || (campaign && s === campaign.start)) return own;
     return own + Math.max(0, ...this.catalogue.providersOf(s).filter((p) => !p.webhook).map((p) => this.legDelayMean(p, campaign, new Set(seen))));
   }
 
-  /** Days certain from a leg's start to its end through a pipe: one per pipe on its longest chain, and one per ordered Material. */
-  legFixedDays(pipe: Pipe, campaign: Campaign | null = null, seen = new Set<string>()): number {
-    if (seen.has(pipe.id)) return 0;
-    seen.add(pipe.id);
-    const own = this.pipeTicks(pipe).fixed;
-    const s = this.catalogue.subjectMaterial(pipe);
+  /** Days certain from a leg's start to its end through a leg: one per leg on its longest chain, and one per ordered Material. */
+  legFixedDays(leg: Leg, campaign: Campaign | null = null, seen = new Set<string>()): number {
+    if (seen.has(leg.id)) return 0;
+    seen.add(leg.id);
+    const own = this.pipeTicks(leg).fixed;
+    const s = this.catalogue.subjectMaterial(leg);
     const out = s ? this.catalogue.outcome(s) : undefined;
     if (!s || out?.track || (campaign && s === campaign.start)) return own;
     return own + Math.max(0, ...this.catalogue.providersOf(s).filter((p) => !p.webhook).map((p) => this.legFixedDays(p, campaign, new Set(seen))));
@@ -1896,10 +2101,10 @@ export class SimulationSession {
       const key = JSON.stringify(conditions);
       if (this.units.some((o) => o.brandId === brandId && o.outcome === audience && JSON.stringify(o.conditions ?? []) === key)) continue;
       const finder = this.catalogue.script(this.world.settings.icpFinderScript);
-      const pipe = finder ? this.catalogue.pipe(finder.pipeId) : undefined;
-      if (!finder || !pipe) continue;
+      const leg = finder ? this.catalogue.leg(finder.legId) : undefined;
+      if (!finder || !leg) continue;
       const cost = Math.round(this.truthOf(finder, null).costCents);
-      const run = this.newRun(day, campaign.id, pipe, finder);
+      const run = this.newRun(day, campaign.id, leg, finder);
       run.spendCents += cost;
       run.consumed.push(parent.id);
       this.spent.set(campaign.id, (this.spent.get(campaign.id) ?? 0) + cost);
@@ -1915,7 +2120,7 @@ export class SimulationSession {
       if (play) {
         const sid = `${play.id}#proposed-${brandId}-${day}`;
         if (!this.catalogue.strategy(sid)) {
-          this.catalogue.add("strategies", { id: sid, name: `Serve: ${study.proposal.conditions.map((c) => describeCondition(c, this.catalogue)).join(", ")}`, pipeId: play.id, rules: [], subject: study.proposal.conditions, proposed: { day, reason: `split on ${records.length} mature leads` } });
+          this.catalogue.add("strategies", { id: sid, name: `Serve: ${study.proposal.conditions.map((c) => describeCondition(c, this.catalogue)).join(", ")}`, legId: play.id, rules: [], subject: study.proposal.conditions, proposed: { day, reason: `split on ${records.length} mature leads` } });
           this.proposals.push({ day, kind: "strategy", brandId, campaignId: campaign.id, point: null, conditions: study.proposal.conditions, text: "", createdId: sid, study });
         }
       }
@@ -1923,7 +2128,7 @@ export class SimulationSession {
     // Splits on scripts: per point, the tactic values of the option chosen.
     for (const point of this.evidence.pointOptions.keys()) {
       const [consumer, material] = point.split("|") as [string, string];
-      const consumerPipe = this.catalogue.pipe(consumer);
+      const consumerPipe = this.catalogue.leg(consumer);
       if (!consumerPipe || !material) continue;
       const scriptTactics = this.catalogue.tactics.filter((t) => t.describes.includes("script"));
       const records: SplitRecord[] = [];
@@ -1940,7 +2145,7 @@ export class SimulationSession {
       this.catalogue.add("strategies", {
         id: sid,
         name: `At ${this.catalogue.outcome(material)?.label ?? material}: ${study.proposal.conditions.map((c) => describeCondition(c, this.catalogue)).join(", ")}`,
-        pipeId: consumer,
+        legId: consumer,
         rules: [{ material, conditions: study.proposal.conditions }],
         proposed: { day, reason: `split on ${records.length} decisions` },
       });
@@ -1962,9 +2167,9 @@ export class SimulationSession {
     const reference: Record<string, string> = {};
     const covered: Record<string, Set<string>> = {};
     for (const o of this.catalogue.outcomes) {
-      if (!o.referencePipe) continue;
-      reference[o.id] = o.referencePipe;
-      covered[o.id] = new Set(this.world.clients.filter((c) => c.connected.includes(o.referencePipe!)).map((c) => c.brand.id));
+      if (!o.referenceLeg) continue;
+      reference[o.id] = o.referenceLeg;
+      covered[o.id] = new Set(this.world.clients.filter((c) => c.connected.includes(o.referenceLeg!)).map((c) => c.brand.id));
     }
     return measureReliability(this.attestations, reference, covered);
   }
@@ -2011,11 +2216,11 @@ export class SimulationSession {
   }
 }
 
-/** One pipe a leg runs through: what it makes, and the Material of the pipe it feeds (null for the leg's play). */
+/** One leg a leg runs through: what it makes, and the Material of the leg it feeds (null for the leg's play). */
 export interface LegPipe {
-  pipeId: string;
+  legId: string;
   output: OutcomeId;
-  feeds: { pipe: string; material: OutcomeId } | null;
+  feeds: { leg: string; material: OutcomeId } | null;
   /** On the chain that carries the leg's subject from its start to its end. */
   main: boolean;
 }

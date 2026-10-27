@@ -2,7 +2,7 @@
  * Sales funnels and the two calculations.
  *
  * A sales funnel is a straight line of lead states from a start outcome (Start,
- * the market, or any outcome) to a target, one play per leg. A leg A -> B is served by any pipe
+ * the market, or any outcome) to a target, one play per leg. A leg A -> B is served by any leg
  * producing B whose subject comes from A.
  *
  * Cost flows FORWARD from Start: C(to) = (C(from) + c) / y.
@@ -11,7 +11,7 @@
  * returns value / T per dollar.
  */
 
-import { START, type Catalogue, type OutcomeId, type Pipe } from "./catalogue";
+import { START, type Catalogue, type OutcomeId, type Leg } from "./catalogue";
 
 /** What a decision reads about a leg: cost per attempt and the share of attempts reaching its end. */
 export interface LegEstimate {
@@ -24,7 +24,7 @@ export interface LegEstimate {
 export interface LegEdge {
   from: OutcomeId;
   to: OutcomeId;
-  pipeId: string;
+  legId: string;
 }
 
 /**
@@ -34,11 +34,11 @@ export interface LegEdge {
 export function legEdges(catalogue: Catalogue, offerOutcomes: readonly OutcomeId[], start: OutcomeId = START): LegEdge[] {
   const kept = new Set([start, ...offerOutcomes]);
   const edges: LegEdge[] = [];
-  for (const p of catalogue.pipes) {
-    if (!catalogue.isPipeLive(p) || p.webhook) continue;
+  for (const p of catalogue.legs) {
+    if (!catalogue.isLegLive(p) || p.webhook) continue;
     const out = catalogue.outcome(p.output);
     if (!out?.track || !kept.has(p.output)) continue;
-    for (const r of catalogue.rootsOf(p, new Set([start]))) if (kept.has(r) && r !== p.output) edges.push({ from: r, to: p.output, pipeId: p.id });
+    for (const r of catalogue.rootsOf(p, new Set([start]))) if (kept.has(r) && r !== p.output) edges.push({ from: r, to: p.output, legId: p.id });
   }
   return edges;
 }
@@ -60,7 +60,7 @@ export interface RankedFunnel {
   label: "expected" | "measured";
 }
 
-export type LegEstimator = (edge: LegEdge, pipe: Pipe) => LegEstimate | null;
+export type LegEstimator = (edge: LegEdge, leg: Leg) => LegEstimate | null;
 
 /**
  * Lazily enumerate funnels start -> target, cheapest per target first: a
@@ -97,8 +97,8 @@ export function* enumerateFunnels(
     }
     for (const e of into.get(s.at) ?? []) {
       if (s.legs.some((l) => l.edge.from === e.from || l.edge.to === e.from)) continue;
-      const pipe = catalogue.pipe(e.pipeId)!;
-      const est = estimator(e, pipe);
+      const leg = catalogue.leg(e.legId)!;
+      const est = estimator(e, leg);
       if (!est || !(est.yieldRate > 0)) continue;
       const reach = s.reach * est.yieldRate;
       heap.push({ at: e.from, reach, cost: s.cost + est.costPerAttempt / reach, legs: [{ edge: e, estimate: est }, ...s.legs] });

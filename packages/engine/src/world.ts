@@ -37,11 +37,13 @@ export interface Offer {
 }
 
 /**
- * The Campaign orders production: a target outcome, a daily budget (and an
- * optional volume per period), and a start outcome. Started from Start (the
- * market) it is proactive: at each tick it pulls on its target. Started from
- * any other outcome it is reactive: each Unit of that outcome landing for its
- * brand is pushed into its first pipe, as far as its budget allows.
+ * The Campaign orders production. It fixes only its Target, its budget (a
+ * daily budget and an optional volume per period), its start and its
+ * strategy; the production tree is rebuilt at every tick from performance.
+ * Started from Start (the market) it is proactive: at each tick it pulls on its
+ * Target. Started from any other outcome it is reactive: each Unit of that
+ * outcome landing for its brand is pushed up toward the Target, as far as its
+ * budget allows.
  */
 export interface Campaign {
   id: string;
@@ -50,22 +52,26 @@ export interface Campaign {
   name: string;
   /** START (the market: proactive), or the outcome whose Units it pushes (reactive). */
   start: OutcomeId;
-  /** The lead states of its sales funnel after the start; the last one is the target. */
-  line: OutcomeId[];
+  /** The outcome it orders. */
+  target: OutcomeId;
   dailyBudgetCents: number;
   /** At most this many new subjects per period. */
   volume?: { units: number; periodDays: number };
   status: "running" | "paused";
-  /** The strategy chosen per pipe (a play = pipe x strategy). A pipe left out plays its default. */
+  /**
+   * Its strategy: conditions every script it runs meets, wherever the script
+   * carries the tactic ("Channel is cold email"). A script that does not carry
+   * the tactic is not concerned.
+   */
+  conditions?: Condition[];
+  /** Its play per leg (a play = leg x strategy). A leg left out plays its default. */
   strategies: Record<string, string>;
-  /** A play pinned per leg (leg index -> pipe id). Unset: the prioritizer picks. */
-  pinned?: Record<number, string>;
 }
 
 /** A Unit in the stock before the campaign runs: the client's ICP, a template. */
 export interface SeedUnit {
   outcome: OutcomeId;
-  /** The script producing it (its pipe and factory follow). */
+  /** The script producing it (its leg and factory follow). */
   scriptId: string;
   /** Brand Units have dynasties too: a template is a version of its template dynasty. */
   dynasty: string;
@@ -77,7 +83,7 @@ export interface SeedUnit {
   text: string;
   /** For an ICP: who it describes, as conditions on lead tactics (what a judge would read from the sentence). */
   conditions?: Condition[];
-  /** Hidden: how much this Unit changes the end of the leg it serves. */
+  /** Hidden: how much this Unit changes the next lead state its consumer leads to. */
   truthEnd?: number;
 }
 
@@ -110,40 +116,40 @@ export interface MarketAttribute {
 export interface ScriptTruth {
   /** True cost of one run on one subject, cents (each run varies around it). */
   costCents: number;
-  /** Multiplies its own pipe's yield. */
+  /** Multiplies its own leg's yield. */
   step?: number;
-  /** Multiplies the fact at the end of the leg its decision serves. */
+  /** Multiplies the fact at the next lead state its decision serves. */
   end?: number;
-  /** For an attesting pipe: share of true facts it attests, and of non-facts it attests anyway. */
+  /** For an attesting leg: share of true facts it attests, and of non-facts it attests anyway. */
   recall?: number;
   falsePositive?: number;
   /** For a script creating subjects: the share of the market its source covers. */
   coverage?: number;
 }
 
-export interface PipeTruth {
-  /** Base yield of the pipe (the fact rate before every multiplier). */
+export interface LegTruth {
+  /** Base yield of the leg (the fact rate before every multiplier). */
   base: number;
   delayMeanDays: number;
   horizonDays: number;
-  /** For a pipe whose subject Material may be a false attestation: yield multiplier then. */
+  /** For a leg whose subject Material may be a false attestation: yield multiplier then. */
   onFalseInput?: number;
   /**
    * For a webhook: when the other factory calls it. `creates`: it brings new
    * leads (the organic market, at the client's organic rate); `attests`: it
    * reports the true facts of its output it sees (a CRM import, at its
    * script's recall); `on`: it reports on each Unit of that outcome landing
-   * (a mailbox reporting a message sent), with the pipe's base rate and delay.
+   * (a mailbox reporting a message sent), with the leg's base rate and delay.
    */
   webhook?: { creates?: boolean; attests?: boolean; on?: OutcomeId };
 }
 
 export interface WorldTruth {
-  pipes: Record<string, PipeTruth>;
+  legs: Record<string, LegTruth>;
   scripts: Record<string, ScriptTruth>;
   /** Per Material (point key "consumer|material"), the effects that differ there. */
   at: Record<string, Record<string, Partial<ScriptTruth>>>;
-  /** Lead tactics that change the first leg's fact. */
+  /** Lead tactics that change the fact of the first step from Start. */
   segments: { when: Condition[]; mult: number }[];
   /** Fact multiplier for a person picked again after an earlier pick. */
   recontactMult: number;
@@ -170,7 +176,7 @@ export interface WorldSettings {
   clientGroupTactic: string;
   /** Half-life of evidence, days: older decisions weigh less (0 = never fade). */
   memoryHalfLifeDays?: number;
-  /** Ticks per day (default 1): at each tick every campaign pulls or pushes and a Unit advances one pipe. */
+  /** Ticks per day (default 1): at each tick every campaign pulls or pushes and a Unit advances one leg. */
   ticksPerDay?: number;
 }
 
@@ -231,7 +237,7 @@ export function covers(world: WorldSpec, dynasty: string, brandId: string, index
   return unit(world.seed, "cover", dynasty, brandId, index) < coverage;
 }
 
-/** The hidden multiplier of a person on the first leg's fact. */
+/** The hidden multiplier of a person on the fact of the first step from Start. */
 export function segmentMultiplier(world: WorldSpec, values: Readonly<Record<string, TacticValue>>): number {
   let m = 1;
   for (const s of world.truth.segments) if (meetsAll(values, s.when)) m *= s.mult;
@@ -250,9 +256,9 @@ export function marketSample(world: WorldSpec, brandId: string, n = 3000): Perso
 // Loading a world from data
 // ---------------------------------------------------------------------------
 
-/** A pinned menu entry: an outcome, a pipe, a sales path or a sales funnel given its own page (configuration, no code). */
+/** A pinned menu entry: an outcome, a leg, a sales path or a sales funnel given its own page (configuration, no code). */
 export interface Pin {
-  kind: "outcome" | "pipe" | "path" | "funnel";
+  kind: "outcome" | "leg" | "path" | "funnel";
   id: string;
   label: string;
   icon?: string;

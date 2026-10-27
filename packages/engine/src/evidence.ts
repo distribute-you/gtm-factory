@@ -239,7 +239,7 @@ export class EvidenceBook {
       .filter(([k]) => catalogue.tactic(k)?.type.kind !== "number")
       .map(([k, v]) => `${k}=${String(v)}`)
       .sort();
-    return `${s.pipeId}|${s.kind}|${parts.join(",")}`;
+    return `${s.legId}|${s.kind}|${parts.join(",")}`;
   }
 
   /** How much better than its points' average an option does everywhere it is offered (its overall level). */

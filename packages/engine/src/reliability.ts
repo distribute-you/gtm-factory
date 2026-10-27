@@ -1,8 +1,8 @@
 /**
- * Reliability: the third measured property of a pipe's or a script's output,
- * beside yield and cost. Whoever attests an outcome is a pipe (an AI judge
+ * Reliability: the third measured property of a leg's or a script's output,
+ * beside yield and cost. Whoever attests an outcome is a leg (an AI judge
  * reading a reply, a CRM import, a website tracker). A producer's reliability
- * on an outcome is its agreement with the outcome's reference pipe on the same
+ * on an outcome is its agreement with the outcome's reference leg on the same
  * subjects. A client counts in an outcome's figures only where a reliable
  * producer covers it; the others are left out, never counted as zero.
  */
@@ -11,7 +11,7 @@ import { betaMean, type BetaPosterior } from "./stats";
 
 /** One subject a producer looked at for an outcome, and whether it attested it. */
 export interface Attestation {
-  /** A pipe id or a script id. */
+  /** A leg id or a script id. */
   producer: string;
   outcome: string;
   brandId: string;

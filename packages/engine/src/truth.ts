@@ -6,7 +6,7 @@
  * Research page, the convergence test), never by the engine's choices.
  */
 
-import { START, type OutcomeId, type Pipe, type Script } from "./catalogue";
+import { START, type OutcomeId, type Leg, type Script } from "./catalogue";
 import { legConsumer, playPoint, pointKey, type SimulationSession } from "./simulator";
 import { meetsAll, type Condition } from "./tactics";
 import { marketSample, segmentMultiplier, type Campaign } from "./world";
@@ -44,34 +44,34 @@ function planProduce(c: Ctx, consumer: string, o: OutcomeId, scripts: Script[], 
   const dyn = assigned && options.includes(assigned) ? assigned : options[0]!;
   const script = headScript(c.session, dyn);
   if (!script) return false;
-  const pipe = c.session.catalogue.pipe(script.pipeId)!;
+  const leg = c.session.catalogue.leg(script.legId)!;
   const truth = c.session.scriptTruth(script, point);
   c.ends *= truth.end ?? 1;
   let recall = truth.recall ?? 1;
   let fp = truth.falsePositive ?? 0;
-  const subj = c.session.catalogue.subjectMaterial(pipe);
-  const order = subj ? [subj, ...pipe.materials.filter((i) => i !== subj)] : [...pipe.materials];
+  const subj = c.session.catalogue.subjectMaterial(leg);
+  const order = subj ? [subj, ...leg.materials.filter((i) => i !== subj)] : [...leg.materials];
   for (const i of order) {
     const before = c.steps.length;
-    if (!planObtain(c, pipe, i)) return false;
-    // Recall at an attesting pipe comes from the scripts chosen at its Materials.
+    if (!planObtain(c, leg, i)) return false;
+    // Recall at an attesting leg comes from the scripts chosen at its Materials.
     for (const st of c.steps.slice(before)) {
-      if (st.kind !== "decide" || st.point !== pointKey(pipe.id, i)) continue;
+      if (st.kind !== "decide" || st.point !== pointKey(leg.id, i)) continue;
       const opt = c.assign.get(st.point) ?? st.options[0]!;
       const t = c.session.optionTruthAt(st.point, opt);
       if (t.recall !== undefined) recall *= t.recall;
       if (t.falsePositive !== undefined) fp = Math.max(fp, t.falsePositive);
     }
   }
-  const pt = c.session.world.truth.pipes[pipe.id] ?? { base: 1, delayMeanDays: 0, horizonDays: 0 };
+  const pt = c.session.world.truth.legs[leg.id] ?? { base: 1, delayMeanDays: 0, horizonDays: 0 };
   // A script creating subjects finds someone only while its reserve lasts.
-  const pick = c.session.catalogue.createsSubjects(pipe) ? c.session.pickChance(script, c.brandId, c.audience) : 1;
+  const pick = c.session.catalogue.createsSubjects(leg) ? c.session.pickChance(script, c.brandId, c.audience) : 1;
   c.produced.add(o);
   c.steps.push({ kind: "run", point, yieldRate: Math.min(1, pt.base * (truth.step ?? 1) * pick), costCents: truth.costCents, end: 1, recall, falsePositive: fp, final, segment: c.segment });
   return true;
 }
 
-function planObtain(c: Ctx, consumer: Pipe, i: OutcomeId): boolean {
+function planObtain(c: Ctx, consumer: Leg, i: OutcomeId): boolean {
   const s = c.session;
   const out = s.catalogue.outcome(i);
   if (!out) return false;
@@ -129,9 +129,9 @@ function plan(s: SimulationSession, campaign: Campaign, legIndex: number, assign
   if (plays.length === 0) return null;
   const pp = playPoint(from, to);
   if (plays.length > 1) c.steps.push({ kind: "decide", point: pp, options: plays.map((p) => p.id) });
-  const pipeId = assign.get(pp) ?? plays[0]!.id;
-  const pipe = s.catalogue.pipe(pipeId)!;
-  if (!planProduce(c, legConsumer(from, to), to, s.allowedScripts(campaign, null, null, [pipe]), true)) return null;
+  const legId = assign.get(pp) ?? plays[0]!.id;
+  const leg = s.catalogue.leg(legId)!;
+  if (!planProduce(c, legConsumer(from, to), to, s.allowedScripts(campaign, null, null, [leg]), true)) return null;
   return c;
 }
 

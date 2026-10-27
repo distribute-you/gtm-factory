@@ -24,7 +24,7 @@
  *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another factory)
  *   GET  /objects?outcome=              -> ApiObjectDynasty[]
  *   POST /objects         ApiNewObjectVersion -> ApiObjectDynasty (upgrade, fork or new dynasty)
- *   GET  /scripts?pipeId=               -> ApiScriptStats[]
+ *   GET  /scripts?legId=               -> ApiScriptStats[]
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
  *   GET  /research                      -> ApiChoicePoint[]
  *   GET  /choices?campaignId=&leadId=   -> ApiChoice[]
@@ -78,9 +78,9 @@ export interface ApiNewBrand {
 export interface ApiFunnelLeg {
   from: OutcomeId;
   to: OutcomeId;
-  pipeId: string;
-  /** Every pipe the leg runs through, in the order they run. */
-  pipes: string[];
+  legId: string;
+  /** Every leg the leg runs through, in the order they run. */
+  legs: string[];
   costPerAttemptCents: number;
   yieldRate: number;
   leadsNeeded: number;
@@ -111,7 +111,7 @@ export interface ApiNewCampaign {
   volume?: { units: number; periodDays: number } | null;
   /** Hard daily cap: no run starts once today's spend would pass it. */
   dailyBudgetCents: number;
-  /** Strategy id per pipe; a pipe left out plays its default strategy. */
+  /** Strategy id per leg; a leg left out plays its default strategy. */
   strategies?: Record<string, string>;
 }
 
@@ -167,9 +167,9 @@ export interface ApiOption {
 }
 
 export interface ApiChoicePoint {
-  /** `pipeId|material` (the consuming pipe and the Material), or `pipeId` for the pipe's own script. */
+  /** `legId|material` (the consuming leg and the Material), or `legId` for the leg's own script. */
   id: string;
-  pipeId: string;
+  legId: string;
   material: OutcomeId | null;
   label: string;
   options: ApiOption[];
@@ -198,7 +198,7 @@ export interface ApiRun {
   at: string;
   campaignId: string | null;
   brandId: string | null;
-  pipeId: string;
+  legId: string;
   scriptId: string;
   scriptName: string;
   leadId: string | null;
@@ -224,7 +224,7 @@ export interface ApiOverview {
   scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
   /**
    * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=),
-   * a pipe pin its scripts (GET /scripts?pipeId=). The factory ships its own (Templates, LLMs).
+   * a leg pin its scripts (GET /scripts?legId=). The factory ships its own (Templates, LLMs).
    */
   pins?: Pin[];
 }
@@ -311,7 +311,7 @@ export interface ApiScriptStats {
   id: string;
   dynasty: string;
   version: number;
-  pipeId: string;
+  legId: string;
   name: string;
   kind: "rules" | "ai" | "human";
   status: "active" | "retired";
@@ -327,7 +327,7 @@ export interface ApiScriptStats {
 export interface ApiLedger {
   totalCents: number;
   byDay: { day: string; cents: number }[];
-  byPipe: { pipeId: string; runs: number; spentCents: number; outputs: number }[];
+  byLeg: { legId: string; runs: number; spentCents: number; outputs: number }[];
   byScript: { scriptId: string; name: string; runs: number; spentCents: number }[];
   byVendor: { vendor: string; item: string; quantity: number; cents: number }[];
   byCampaign: { campaignId: string; name: string; spentCents: number }[];
