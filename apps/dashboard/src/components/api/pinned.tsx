@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { ApiNewObjectVersion, ApiObjectDynasty, ApiObjectVersion, ApiScriptStats } from "@gtm-factory/engine";
+import type { ApiNewObjectVersion, ApiObjectDynasty, ApiObjectVersion, ApiScriptStats } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { Drawer, EmptyNote, Page, PageHeader, TD, TDN, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";
 import { outcomeName, legTitle } from "@/lib/api/labels";
 import { useSearchParams } from "next/navigation";
-import type { Pin } from "@gtm-factory/engine";
+import type { Pin } from "@gtm-factory/core";
 import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
 import { Field, Read, ShimmerRows, formatTime } from "./common";
 

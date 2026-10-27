@@ -4,7 +4,7 @@
  * data; a visitor's pins are kept in this browser. No page knows an outcome or a leg by name.
  */
 
-import type { Pin } from "@gtm-factory/engine";
+import type { Pin } from "@gtm-factory/core";
 import { WORLD } from "./world";
 
 export type { Pin };

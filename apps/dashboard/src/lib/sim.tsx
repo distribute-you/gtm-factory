@@ -7,7 +7,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { SimulationSession, WorldSpec } from "@gtm-factory/engine";
+import type { SimulationSession, WorldSpec } from "@gtm-factory/core";
 import { buildModel, type Model } from "./model";
 import { SCENARIOS, applyAction, replay, scenarioData, type LoggedAction, type ScenarioId, type SimAction } from "./world";
 import { DEFAULT_PINS, readPins, writePins, type Pin } from "./pins";

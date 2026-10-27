@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
-import type { ApiCampaign, ApiChoice, ApiChoicePoint, ApiRun, CatalogueData, OutcomeId } from "@gtm-factory/engine";
+import type { ApiCampaign, ApiChoice, ApiChoicePoint, ApiRun, CatalogueData, OutcomeId } from "@gtm-factory/core";
 import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, type ApiRead } from "@/lib/api/client";

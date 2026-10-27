@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PushPinIcon, PushPinSlashIcon } from "@phosphor-icons/react";
-import { defaultStrategyId, describeCondition, describeTacticType, type Leg, type Script } from "@gtm-factory/engine";
+import { defaultStrategyId, describeCondition, describeTacticType, type Leg, type Script } from "@gtm-factory/core";
 import { BillOfMaterials, ProviderLogo, ScriptCard, tacticValueText } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, Drawer, EmptyNote, Page, PageHeader, SectionTitle, Tabs, TD, TDN, TH, TopBar } from "@/components/ui";

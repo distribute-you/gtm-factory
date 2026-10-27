@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { START, describeCondition, type Campaign, type OutcomeId, type RankedFunnel } from "@gtm-factory/engine";
+import { START, describeCondition, type Campaign, type OutcomeId, type RankedFunnel } from "@gtm-factory/core";
 import { Mark } from "./mark";
 import { HoverScroll } from "./ui";
 import { outcomeLabel, type Model } from "@/lib/model";
@@ -100,7 +100,7 @@ function BillPopover({ model, part, anchor, onClose }: { model: Model; part: Pic
   );
 }
 
-function MaterialRow({ model, material, supplier, conditions }: { model: Model; material: OutcomeId; supplier: string | null; conditions: import("@gtm-factory/engine").Condition[] }) {
+function MaterialRow({ model, material, supplier, conditions }: { model: Model; material: OutcomeId; supplier: string | null; conditions: import("@gtm-factory/core").Condition[] }) {
   const leg = supplier ? model.catalogue.leg(supplier) : undefined;
   const o = model.catalogue.outcome(material);
   return (

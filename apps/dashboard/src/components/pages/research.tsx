@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { CheckIcon } from "@phosphor-icons/react";
-import { describeCondition } from "@gtm-factory/engine";
+import { describeCondition } from "@gtm-factory/core";
 import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";

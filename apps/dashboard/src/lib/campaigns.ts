@@ -3,7 +3,7 @@
  * choice points serves, and its steps with leads needed. Read off the catalogue and the engine.
  */
 
-import { hiddenTruth, stepBreakdown, type Campaign, type OutcomeId, type Leg, type WorldClient } from "@gtm-factory/engine";
+import { hiddenTruth, stepBreakdown, type Campaign, type OutcomeId, type Leg, type WorldClient } from "@gtm-factory/core";
 import { campaignLine, lineLegs } from "./funnels";
 import type { Model } from "./model";
 

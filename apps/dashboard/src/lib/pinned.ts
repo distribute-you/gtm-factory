@@ -4,7 +4,7 @@
  * its scripts, the Materials it is plugged at with the best script at each, and its leg storage.
  */
 
-import type { Campaign, ContentType, SalesFunnel, SalesPath, StorageReport } from "@gtm-factory/engine";
+import type { Campaign, ContentType, SalesFunnel, SalesPath, StorageReport } from "@gtm-factory/core";
 import { campaignsRunning } from "./funnels";
 import { objectDynasties, outcomeLabel, legLine, pluggedAt, type Model, type ObjectDynasty, type PluggedInput } from "./model";
 import type { Pin } from "./pins";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiChoicePoint } from "@gtm-factory/engine";
+import type { ApiChoicePoint } from "@gtm-factory/core";
 import { Page, PageHeader, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";

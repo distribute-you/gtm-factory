@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { confidenceOf, type Unit, type TacticValue } from "@gtm-factory/engine";
+import { confidenceOf, type Unit, type TacticValue } from "@gtm-factory/core";
 import { ProviderLogo } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Initials, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";

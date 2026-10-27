@@ -3,7 +3,7 @@
 /** The overview, polled once for the whole app in api mode: the sidebar and every page read it. */
 
 import { createContext, useContext } from "react";
-import type { ApiOverview } from "@gtm-factory/engine";
+import type { ApiOverview } from "@gtm-factory/core";
 import { useApi, type ApiRead } from "./client";
 
 const FactoryContext = createContext<ApiRead<ApiOverview> | null>(null);

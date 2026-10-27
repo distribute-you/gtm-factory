@@ -7,7 +7,7 @@
  * read this one model, so they always describe the same legs.
  */
 
-import { START, type Campaign, type StepLeg, type OutcomeId, type Leg, type RankedFunnel, type SalesFunnel, type SalesPath } from "@gtm-factory/engine";
+import { START, type Campaign, type StepLeg, type OutcomeId, type Leg, type RankedFunnel, type SalesFunnel, type SalesPath } from "@gtm-factory/core";
 import type { Model } from "./model";
 
 export interface LinePart {

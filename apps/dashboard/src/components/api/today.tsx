@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ApiOverview } from "@gtm-factory/engine";
+import type { ApiOverview } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useFactory } from "@/lib/api/factory";

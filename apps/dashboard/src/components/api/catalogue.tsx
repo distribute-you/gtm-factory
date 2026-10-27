@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { describeCondition, describeTacticType, Catalogue, type CatalogueData } from "@gtm-factory/engine";
+import { describeCondition, describeTacticType, Catalogue, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { CardTable, Page, PageHeader, TD, TDN, TH, Tabs, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";

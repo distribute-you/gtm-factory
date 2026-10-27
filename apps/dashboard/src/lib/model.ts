@@ -26,7 +26,7 @@ import {
   type SimulationSession,
   type WorldClient,
   type WorldSpec,
-} from "@gtm-factory/engine";
+} from "@gtm-factory/core";
 import { humanize } from "./format";
 
 export interface LeadStateDef {

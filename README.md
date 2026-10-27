@@ -22,7 +22,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 
 | Path | What |
 |---|---|
-| `packages/engine` | The framework's code: catalogue, pull and push, ledger, Supplier rating, simulator. TypeScript, zero runtime dependencies, pure and deterministic. |
+| `packages/core` | The framework's code: catalogue, pull and push, ledger, Supplier rating, simulator. TypeScript, zero runtime dependencies, pure and deterministic. |
 | `seed/fictional-world.json` | The fictional world: catalogue, clients, market and hidden truth. Every scenario number lives here. |
 | `seed/distribute-catalogue.json`, `seed/distribute-world.json` | distribute.you's public catalogue (no production figure, no price) and the "distribute.you catalogue" scenario built on it, fictional clients and numbers. |
 | `packages/scenarios` | The translation of distribute.you's public catalogue into the model (a channel is a tactic, each channel's script carries its own Bill of materials) and the scenario builder. |
@@ -40,7 +40,7 @@ pnpm -r test
 
 ```ts
 import { readFileSync } from "node:fs";
-import { SimulationSession, convergence, shareOnBest, worldFromData } from "@gtm-factory/engine";
+import { SimulationSession, convergence, shareOnBest, worldFromData } from "@gtm-factory/core";
 
 const world = worldFromData(JSON.parse(readFileSync("seed/fictional-world.json", "utf8")));
 const session = new SimulationSession(world);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/engine";
+import type { ApiChoice, ApiLead, ApiLeadDetail, ApiUnit, CatalogueData } from "@gtm-factory/core";
 import { Initials, CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TH, ToneDot, TopBar, SelectItem } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { apiSend, useApi } from "@/lib/api/client";

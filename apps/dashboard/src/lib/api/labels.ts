@@ -1,6 +1,6 @@
 /** Words for catalogue ids, read off the catalogue the factory serves. Nothing here knows an id by name. */
 
-import { START, type CatalogueData, type OutcomeId } from "@gtm-factory/engine";
+import { START, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
 import { humanize } from "@/lib/format";
 
 export function outcomeName(c: CatalogueData | null | undefined, id: OutcomeId): string {

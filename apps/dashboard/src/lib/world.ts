@@ -5,7 +5,7 @@
  * byte for byte. No scenario number lives here: tuning is the world's data.
  */
 
-import { SimulationSession, worldFromData, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/engine";
+import { SimulationSession, worldFromData, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/core";
 import worldJson from "../../../../seed/fictional-world.json";
 import distributeJson from "../../../../seed/distribute-world.json";
 

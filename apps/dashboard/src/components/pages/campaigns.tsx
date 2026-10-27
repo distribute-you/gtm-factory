@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
-import { START, defaultStrategyId, describeCondition, type Campaign, type Leg } from "@gtm-factory/engine";
+import { START, defaultStrategyId, describeCondition, type Campaign, type Leg } from "@gtm-factory/core";
 import { FunnelLine, FunnelName, MaterialsBadge, OutcomeChip } from "@/components/funnel-line";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, StateDot, TD, TDN, TH, TopBar, SelectItem } from "@/components/ui";

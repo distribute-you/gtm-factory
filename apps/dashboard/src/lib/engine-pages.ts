@@ -3,7 +3,7 @@
  * nothing. Nothing here knows an outcome, a leg or a script by name.
  */
 
-import type { PointConvergence } from "@gtm-factory/engine";
+import type { PointConvergence } from "@gtm-factory/core";
 import { convergenceOf, pluggedAt, pointInfo, type Model, type PluggedInput, type PointInfo } from "./model";
 
 export interface PointGroup {

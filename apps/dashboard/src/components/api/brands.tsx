@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { ApiBrand, ApiNewBrand } from "@gtm-factory/engine";
+import type { ApiBrand, ApiNewBrand } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, TD, TDN, TH, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";

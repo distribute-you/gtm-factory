@@ -13,7 +13,7 @@
     "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
-    "@gtm-factory/engine": "workspace:*",
+    "@gtm-factory/core": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "next": "^16.4.2",
     "react": "^19.2.4",

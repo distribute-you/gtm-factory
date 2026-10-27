@@ -5,7 +5,7 @@ The dashboard reads one of two data sources, chosen at build time:
 - **simulator** (default): the fictional world, computed in the browser. This is the GitHub Pages build.
 - **api**: a running factory. The dashboard reads and writes a factory backend over JSON: brands, campaigns (start, Target, strategy, launch, pause, daily cap, volume; their steps and production tree), leads and their Units with their traceability, brand dynasties (templates), scripts (LLMs), the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
 
-The contract is [`packages/engine/src/factory-api.ts`](../packages/engine/src/factory-api.ts): every endpoint and every shape, typed. A factory implements it under one base URL. Every figure is computed by the factory; the dashboard divides nothing. Pins (the sidebar's pinned outcomes and legs) are the factory's data too (`ApiOverview.pins`).
+The contract is [`packages/core/src/factory-api.ts`](../packages/core/src/factory-api.ts): every endpoint and every shape, typed. A factory implements it under one base URL. Every figure is computed by the factory; the dashboard divides nothing. Pins (the sidebar's pinned outcomes and legs) are the factory's data too (`ApiOverview.pins`).
 
 ## Build it
 

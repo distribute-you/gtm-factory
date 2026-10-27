@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Catalogue, START, describeCondition, type ApiCampaign, type ApiCampaignDetail, type CatalogueData } from "@gtm-factory/engine";
+import { Catalogue, START, describeCondition, type ApiCampaign, type ApiCampaignDetail, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";

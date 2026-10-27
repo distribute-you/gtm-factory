@@ -1,6 +1,6 @@
 "use client";
 
-import { describeCondition, type Proposal, type Split } from "@gtm-factory/engine";
+import { describeCondition, type Proposal, type Split } from "@gtm-factory/core";
 import { ContentView } from "@/components/catalogue-bits";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Page, PageHeader, SectionTitle, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";

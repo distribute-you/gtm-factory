@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiLedger, CatalogueData } from "@gtm-factory/engine";
+import type { ApiLedger, CatalogueData } from "@gtm-factory/core";
 import { BarSpark, CardTable, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useFactory } from "@/lib/api/factory";

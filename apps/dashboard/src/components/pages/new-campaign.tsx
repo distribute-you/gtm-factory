@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
-import { START, defaultStrategyId, describeCondition, type Campaign, type RankedFunnel, type WorldClient } from "@gtm-factory/engine";
+import { START, defaultStrategyId, describeCondition, type Campaign, type RankedFunnel, type WorldClient } from "@gtm-factory/core";
 import { FunnelLine, FunnelName, OutcomeChip } from "@/components/funnel-line";
 import { lineLegs, rankedLine } from "@/lib/funnels";
 import { Mark } from "@/components/mark";

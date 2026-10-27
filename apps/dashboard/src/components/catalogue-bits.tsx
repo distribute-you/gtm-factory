@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { describeCondition, type Catalogue, type ContentType, type Leg, type Unit, type Script } from "@gtm-factory/engine";
+import { describeCondition, type Catalogue, type ContentType, type Leg, type Unit, type Script } from "@gtm-factory/core";
 import { Mark } from "./mark";
 import { SelectItem } from "./ui";
 import { billOfMaterials, diffWords, headScript, scriptFigures, variablesOf, type Model } from "@/lib/model";
