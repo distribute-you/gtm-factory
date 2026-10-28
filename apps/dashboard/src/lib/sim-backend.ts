@@ -21,6 +21,7 @@ import {
   type ApiCampaignDetail,
   type ApiCandidate,
   type ApiCandidates,
+  CONNECT_CHANNELS,
   type ApiConnectedAccount,
   type ApiLead,
   type ApiLeadDetail,
@@ -108,6 +109,7 @@ export function simRoute(host: SimBackendHost, method: string, rawPath: string, 
     if (p[0] === "picks") return picksOf(model, new Set(model.campaigns.filter((c) => !q("campaignId") || c.id === q("campaignId")).map((c) => c.id)), 50);
     if (p[0] === "tasks") return tasksOf(model, q("brandId"));
     if (p[0] === "accounts") return accountsOf(model, q("brandId") ?? fail(400, "Name a brand."));
+    if (p[0] === "connect" && p[1] === "channels") return CONNECT_CHANNELS.map((c) => ({ ...c, available: false, unavailableReason: "The demo shows example data. Connect your own accounts on your own GTM Factory." }));
     if (p[0] === "ledger") return ledgerOf(model);
   }
   if (method === "POST" || method === "PATCH") {
@@ -137,7 +139,7 @@ export function simRoute(host: SimBackendHost, method: string, rawPath: string, 
       act({ type: "accountRole", brandId, accountId: p[1]!, role: String(b.role) });
       return { ok: true };
     }
-    if (p[0] === "accounts" && p[1] === "connect") fail(501, "In the demo, the accounts come with the fictional brand. A running GTM Factory opens its own page to connect yours.");
+    if (p[0] === "accounts" && p[1] === "connect") fail(501, "The demo shows example data. Connect your own accounts on your own GTM Factory.");
     if (p[0] === "brands" && p.length === 1) {
       const tracked = model.tracks.flatMap((t) => t.states.map((x) => x.outcome));
       const client = newClient(model, { name: String(b.name ?? "New client"), audienceText: String(b.icp ?? ""), offerOutcomes: tracked, ...(b.lifetimeValueCents ? { lifetimeRevenue: Number(b.lifetimeValueCents) / 100 } : {}) });

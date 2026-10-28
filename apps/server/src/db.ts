@@ -298,6 +298,27 @@ const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE TABLE IF NOT EXISTS vendor_presence (vendor text PRIMARY KEY, last_seen_at timestamptz NOT NULL);
     `,
   },
+  {
+    // Connect an account for real (owner 2026-10-28, "rien de fake sur factory"): the mocked
+    // mailboxes and the fictional demo accounts leave the factory (the fictional world lives in
+    // the GitHub demo's fixed database only). An account now carries how it connects, its sealed
+    // credentials, the step a page shows while it connects, and what was read from it.
+    id: "010_connect_accounts",
+    sql: `
+      DELETE FROM accounts WHERE address LIKE '%.invalid' OR brand_id = 'northwind';
+      ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_status_check;
+      ALTER TABLE accounts ADD CONSTRAINT accounts_status_check CHECK (status IN ('connecting','connected','to_reconnect','failed'));
+      ALTER TABLE accounts ADD COLUMN connector text, ADD COLUMN credentials text, ADD COLUMN meta jsonb NOT NULL DEFAULT '{}',
+        ADD COLUMN shown jsonb, ADD COLUMN error text, ADD COLUMN last_read_at timestamptz;
+      CREATE INDEX IF NOT EXISTS accounts_state ON accounts ((meta->>'state')) WHERE status = 'connecting';
+      CREATE TABLE IF NOT EXISTS account_items (
+        id bigserial PRIMARY KEY, account_id text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, external_id text NOT NULL,
+        kind text NOT NULL, direction text NOT NULL CHECK (direction IN ('in','out','event')), at timestamptz NOT NULL,
+        data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (account_id, external_id)
+      );
+      CREATE INDEX IF NOT EXISTS account_items_recent ON account_items (account_id, at);
+    `,
+  },
 ];
 
 /** The v5 legs whose storage schemas the v4 migration (002) still reads on a database created before it. */
