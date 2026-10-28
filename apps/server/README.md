@@ -2,7 +2,7 @@
 
 A hosted GTM Factory: the core of this repository running for real, with its own database (the ledger, the common stock of every Unit) and its scheduler. It serves https://factory.distribute.you.
 
-**One real vendor runs: the client's own Claude** (`src/vendors/claude-local.ts`). A script runs only when every vendor its code calls has a real adapter; the others are test stand-ins (`src/mock-vendor.ts`, registered by the tests only), so no full chain runs here yet. It shows the demo brand (Northwind Analytics, seeded paused) and the host's own test brands.
+**One real vendor runs: the client's own Claude** (`src/vendors/claude-local.ts`). A script runs only when every vendor its code calls has a real adapter; the others are test stand-ins (`src/mock-vendor.ts`, registered by the tests only), so no full chain runs here yet. It shows real brands only; `SEED_DEMO=on` also seeds the fictional demo brand (Northwind Analytics, paused) for a local try.
 
 | Path | What |
 |---|---|
