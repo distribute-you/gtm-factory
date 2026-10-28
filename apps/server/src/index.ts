@@ -13,6 +13,7 @@ import { seedAccounts, seedDemo } from "./demo";
 import { handle } from "./api";
 import { startScheduler } from "./scheduler";
 import { registerProductionVendors } from "./vendors/claude-local";
+import { startReading } from "./connect";
 
 async function main(): Promise<void> {
   await migrate(SEED_CATALOGUE.outcomes.map((o) => o.id));
@@ -23,10 +24,11 @@ async function main(): Promise<void> {
   const demo = await seedDemo();
   await seedTemplates();
   const accounts = await seedAccounts();
-  console.log(`[boot] code: ${code} new versions; ${retired} pre-v7 scripts retired; demo brand ${demo ? "seeded" : "present"}; ${accounts} accounts connected`);
+  console.log(`[boot] code: ${code} new versions; ${retired} pre-v7 scripts retired; demo brand ${demo ? "seeded" : "present"}; ${accounts} demo campaigns added`);
   const port = Number(process.env.PORT ?? 8080);
   createServer((req, res) => void handle(req, res)).listen(port, () => console.log(`[boot] listening on ${port}`));
   if (process.env.SCHEDULER !== "off") startScheduler();
+  if (process.env.READER !== "off") startReading();
 }
 
 process.on("unhandledRejection", (e) => console.error("[unhandledRejection]", e));

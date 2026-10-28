@@ -27,3 +27,4 @@ export * from "./factory-api";
 export * from "./release";
 export * from "./replay";
 export * from "./research";
+export * from "./connect";

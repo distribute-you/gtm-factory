@@ -35,7 +35,11 @@
  *   GET  /tasks?brandId=&status=        -> ApiTask[] (work the Plan ordered from the client's team)
  *   GET  /accounts?brandId=              -> ApiConnectedAccount[] (the brand's accounts, their role and counts)
  *   PATCH /accounts/:id  { role }         -> ApiConnectedAccount
- *   POST /accounts/connect { brandId, channel, role } -> { url } (the host's own page that connects an account)
+ *   GET  /connect/channels               -> ApiConnectChannel[] (what can be connected here, and how)
+ *   POST /accounts/connect ApiConnectStart -> ApiConnectAttempt (a new account, connecting)
+ *   GET  /accounts/:id/connect             -> ApiConnectAttempt (poll: the next code, a question, done)
+ *   POST /accounts/:id/connect/input { values } -> ApiConnectAttempt (answer the question the account asks)
+ *   DELETE /accounts/:id                   -> { ok } (disconnect: stop reading it, forget its credentials)
  *   POST /tasks/:id/answer ApiTaskAnswer -> ApiTask (the answer becomes the Unit's content)
  *   GET  /ledger                        -> ApiLedger
  *
@@ -546,10 +550,74 @@ export interface ApiConnectedAccount {
   address: string;
   /** Personal, Pro, AI agent... (values of the "Account role" tactic). */
   role: string;
-  status: "connected" | "to_reconnect";
+  status: ApiAccountStatus;
   sentToday: number;
   sentWeek: number;
   readWeek: number;
+  /** Why it failed or needs reconnecting, in plain words. */
+  error?: string | null;
+  /** The last time GTM Factory read it. */
+  lastReadAt?: string | null;
+}
+
+export type ApiAccountStatus = "connecting" | "connected" | "to_reconnect" | "failed";
+
+/** One field a connection asks the person for (a host, a password, a token). */
+export interface ApiConnectField {
+  id: string;
+  label: string;
+  /** Where to find it, in the person's words. */
+  help?: string;
+  placeholder?: string;
+  /** Masked, never shown back. */
+  secret?: boolean;
+  /** A closed choice, shown as a picker. */
+  options?: { value: string; label: string }[];
+  optional?: boolean;
+}
+
+/** Something a brand can connect, and how. */
+export interface ApiConnectChannel {
+  /** gmail, imap, whatsapp, telegram, linkedin, gohighlevel, posthog, stripe, clerk... */
+  id: string;
+  label: string;
+  /** The account's channel once connected (Email, WhatsApp, CRM...). */
+  accountChannel: string;
+  /** One line: what connecting it gives. */
+  blurb: string;
+  /** oauth: a sign-in page; fields: a form; bridge: a code to scan or a login, on the person's phone. */
+  kind: "oauth" | "fields" | "bridge";
+  /** For a bridge: the ways to log in, first preferred. */
+  methods?: ("qr" | "phone" | "password" | "cookies")[];
+  /** For a form: what it asks. */
+  fields?: ApiConnectField[];
+  /** False when this host has not set it up yet; the reason says so in plain words. */
+  available: boolean;
+  unavailableReason?: string | null;
+}
+
+export interface ApiConnectStart {
+  brandId: string;
+  /** An ApiConnectChannel id. */
+  channel: string;
+  role: string;
+  method?: "qr" | "phone" | "password" | "cookies";
+  /** For a form: the values, by field id. */
+  values?: Record<string, string>;
+}
+
+/** Where a connection stands: what to show the person next. */
+export interface ApiConnectAttempt {
+  accountId: string;
+  status: ApiAccountStatus;
+  step:
+    | { type: "redirect"; url: string }
+    /** `data`: the code to scan, as an image (a data URL). */
+    | { type: "qr"; data: string; instructions?: string }
+    | { type: "code"; data: string; instructions?: string }
+    | { type: "input"; fields: ApiConnectField[]; instructions?: string }
+    | null;
+  error?: string | null;
 }
 
 /** Spend, Units and value per UTC day, oldest first: what the Today charts draw. The page divides nothing a backend would not. */

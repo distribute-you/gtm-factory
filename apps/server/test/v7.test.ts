@@ -148,6 +148,10 @@ describe.runIf(!!url)("GTM Factory v7", () => {
   it("v10: lists the brand's connected accounts with their role; a sending script picks its account among those with its role", async () => {
     type Account = { id: string; channel: string; role: string; status: string; sentWeek: number };
     const list = async () => (await api("GET", "/api/accounts?brandId=northwind")).body as unknown as Account[];
+    // No account is seeded any more (owner 2026-10-28, nothing fake on factory): the fictional
+    // world's seven stand here for seven accounts a person connected.
+    const { WORLD } = await import("../src/catalogue-seed");
+    for (const a of WORLD.clients[0]!.accounts ?? []) await q(`INSERT INTO accounts (id, brand_id, channel, address, role, status, connector) VALUES ($1,'northwind',$2,$3,$4,'connected','imap')`, [`northwind:${a.id}`, a.channel, a.address, a.role]);
     const accounts = await list();
     expect(accounts).toHaveLength(7);
     expect(new Set(accounts.map((a) => a.role))).toEqual(new Set(["Personal", "Pro", "AI agent"]));
@@ -172,12 +176,12 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     // A Unit that left from an account counts on it.
     await q(`INSERT INTO units (id, outcome, subject_kind, subject_id, brand_id, factory, content) VALUES ('v10-sent', 'message_queued', 'lead', 'northwind:p1', 'northwind', 'ours', $1)`, [JSON.stringify({ account: agents[1], via: "sent" })]);
     expect((await list()).find((a) => a.id === agents[1])!.sentWeek).toBe(1);
-    // The role is edited in place; an unknown role is refused; connecting says plainly it is not open yet.
+    // The role is edited in place; an unknown role is refused; an unknown channel is refused in words.
     expect((await api("PATCH", `/api/accounts/${encodeURIComponent(agents[0]!)}`, { role: "Pro" })).status).toBe(200);
     expect((await list()).find((a) => a.id === agents[0])!.role).toBe("Pro");
     expect((await api("PATCH", `/api/accounts/${encodeURIComponent(agents[0]!)}`, { role: "Boss" })).status).toBe(400);
     expect((await api("PATCH", `/api/accounts/${encodeURIComponent(agents[0]!)}`, { role: "AI agent" })).status).toBe(200);
-    expect((await api("POST", "/api/accounts/connect", { brandId: "northwind", channel: "Email", role: "AI agent" })).status).toBe(501);
+    expect((await api("POST", "/api/accounts/connect", { brandId: "northwind", channel: "Email", role: "AI agent" })).status).toBe(400);
   });
 
   it("v10: serves what the Today charts, the Companies page and the ICPs page read", async () => {

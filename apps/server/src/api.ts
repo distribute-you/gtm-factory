@@ -5,7 +5,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { PERFORMED_BY, START, type ApiCapacity, type ApiNewBrand, type ApiNewCampaign, type ApiNewObjectVersion, type ApiObjectDynasty, type ApiScriptStats, type ApiTaskAnswer } from "@gtm-factory/core";
+import { PERFORMED_BY, START, type ApiCapacity, type ApiNewBrand, type ApiNewCampaign, type ApiNewObjectVersion, type ApiObjectDynasty, type ApiScriptStats, type ApiTaskAnswer, type ApiConnectStart } from "@gtm-factory/core";
 import { one, q } from "./db";
 import { OUTCOMES, FACTORIES, PERFORMERS, performerOfRow } from "./catalogue-seed";
 import { loadCatalogue, newId, planOf, produce, milestoneLine, saveCatalogue, type Brand, type CampaignRow, type Unit } from "./factory";
@@ -15,6 +15,9 @@ import { answerTask, tasksOut } from "./tasks";
 import { forkFromCode, sourceOf, upgradeFromCode } from "./code";
 import { IMPORT_ON, shownBrand, shownBrandRow } from "./visibility";
 import { accountsOut, setAccountRole } from "./accounts";
+import { answerConnect, channels as connectChannels, connectState, disconnect, startConnect } from "./connect";
+import { finishGoogle } from "./connect/google";
+import { accountRow, type ConnectRow } from "./connect/store";
 import { companiesOut, objectFigures, proposalsOut, seriesOut } from "./views";
 import { WAITING, anyAdapter } from "./vendors";
 import { isTicking, tickNow, TICK_SECONDS } from "./scheduler";
@@ -473,9 +476,53 @@ route("PATCH", "/api/accounts/:id", async (req, [id]) => {
   return a;
 });
 
-/** Connecting a real account needs its own page (a mailbox login, a WhatsApp link): not open yet here. */
-route("POST", "/api/accounts/connect", async () => {
-  throw new HttpError(501, "Connecting a new account opens soon. Your accounts are listed below.");
+/** What can be connected on this host, and how. */
+route("GET", "/api/connect/channels", async () => connectChannels());
+
+async function roleOr400(role: unknown): Promise<string> {
+  const tactic = (await loadCatalogue()).tactic("account_role");
+  const roles = tactic && tactic.type.kind === "list" ? tactic.type.values.map(String) : [];
+  if (typeof role !== "string" || !roles.includes(role)) throw new HttpError(400, `role must be one of: ${roles.join(", ")}.`);
+  return role;
+}
+
+/** Start connecting an account: it exists at once, "connecting", and says what to show next (a sign-in page, a code, a question). */
+route("POST", "/api/accounts/connect", async (req) => {
+  const b = await body<ApiConnectStart>(req);
+  await brandOr404(text(b.brandId, "brandId"));
+  const role = await roleOr400(b.role);
+  try {
+    return connectState(await startConnect({ ...b, role }));
+  } catch (e) {
+    throw new HttpError(400, e instanceof Error ? e.message : String(e));
+  }
+});
+
+async function accountOr404(id: string): Promise<ConnectRow> {
+  const row = await accountRow(id);
+  if (!row || !(await one(`SELECT id FROM brands b WHERE id = $1 AND ${shownBrandRow("b")}`, [row.brand_id]))) throw new HttpError(404, "No such account.");
+  return row;
+}
+
+/** Where a connection stands: poll it while a code is on screen. */
+route("GET", "/api/accounts/:id/connect", async (_req, [id]) => connectState(await accountOr404(id!)));
+
+/** Answer what the account asks (a pairing code, a login): the next step comes back. */
+route("POST", "/api/accounts/:id/connect/input", async (req, [id]) => {
+  const row = await accountOr404(id!);
+  const b = await body<{ values?: Record<string, string> }>(req);
+  if (!b.values || typeof b.values !== "object") throw new HttpError(400, "values is required.");
+  try {
+    return connectState(await answerConnect(row, b.values));
+  } catch (e) {
+    throw new HttpError(400, e instanceof Error ? e.message : String(e));
+  }
+});
+
+/** Disconnect: stop reading it and forget its credentials. */
+route("DELETE", "/api/accounts/:id", async (_req, [id]) => {
+  await disconnect(await accountOr404(id!));
+  return { ok: true };
 });
 
 /** A script version's code, as stored (immutable). */
@@ -557,6 +604,17 @@ route("GET", "/api/connector", async () =>
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", "http://localhost");
   if (url.pathname === "/health") return send(res, 200, { ok: true });
+  // Google comes back here after the sign-in: finish the connection, then back to the page.
+  if (req.method === "GET" && url.pathname === "/api/connect/google/callback") {
+    try {
+      const id = await finishGoogle(url.searchParams.get("state") ?? "", url.searchParams.get("code"), url.searchParams.get("error"));
+      res.writeHead(302, { location: `/accounts/${id ? `?account=${encodeURIComponent(id)}` : "?connect=expired"}` });
+    } catch (e) {
+      console.error(`[api] google callback: ${e instanceof Error ? e.message : String(e)}`);
+      res.writeHead(302, { location: "/accounts/?connect=failed" });
+    }
+    return void res.end();
+  }
   for (const r of routes) {
     if (r.method !== req.method) continue;
     const m = r.re.exec(url.pathname);

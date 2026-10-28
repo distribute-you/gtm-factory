@@ -30,7 +30,7 @@ function generate(): Map<string, unknown> {
     return out.get(key) as T;
   };
   const o = get<ApiOverview>("/overview");
-  for (const p of ["/catalogue", "/brands", "/campaigns", "/research", "/ledger", "/scripts", "/picks", "/leads", "/series", "/companies", "/proposals"]) get(p);
+  for (const p of ["/connect/channels", "/catalogue", "/brands", "/campaigns", "/research", "/ledger", "/scripts", "/picks", "/leads", "/series", "/companies", "/proposals"]) get(p);
   for (const b of o.brands) {
     for (const p of [`/brands/${b.id}/plans`, `/series?brandId=${b.id}`, `/companies?brandId=${b.id}`, `/proposals?brandId=${b.id}`, `/accounts?brandId=${b.id}`, `/tasks?brandId=${b.id}&status=open`]) get(p);
   }
