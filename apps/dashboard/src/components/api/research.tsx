@@ -1,11 +1,12 @@
 "use client";
 
 import type { ApiCandidates } from "@gtm-factory/core";
-import { Page, PageHeader, TopBar } from "@/components/ui";
+import { DayChart } from "@/components/charts";
+import { ChartNote, Page, PageHeader, SectionTitle, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
-import { plural } from "@/lib/format";
-import { PointsList, Read, recentOnBest } from "./common";
+import { formatUsd, plural } from "@/lib/format";
+import { CLEAR_WINNER, PointsList, Read, topChance } from "./common";
 
 export function ApiResearchPage() {
   const read = useApi<ApiCandidates[]>("/research");
@@ -16,25 +17,40 @@ export function ApiResearchPage() {
       <Page>
         <Read read={read} rows={8}>
           {(points) => {
-            // The simulator knows its world's hidden best at each place: say how many places the Rating found it at.
-            const judged = points.filter((p) => p.onBest && p.onBest.reduce((x, d) => x + d.picks, 0) >= 200);
-            const found = judged.filter((p) => (recentOnBest(p) ?? 0) >= 0.8).length;
+            // Only places where scripts compete can have a winner.
+            const contested = points.filter((p) => p.candidates.length > 1);
+            const clear = contested.filter((p) => topChance(p) >= CLEAR_WINNER).length;
             return (
-            <>
-              <PageHeader
-                title={judged.length > 0 ? `${found} of ${plural(judged.length, "candidate place backs", "candidate places back")} the hidden best` : plural(points.length, "candidate place", "candidate places")}
-                sub={
-                  judged.length > 0
-                    ? "The world hides the true best candidate at each place. Belief is what the Supplier rating reads today; truth is what the world really does, never read by any pick."
-                    : "At every Material where several candidates compete, the belief the Supplier rating holds about each one. The picking script picks by value per dollar, with one Thompson draw."
-                }
-              />
-              <PointsList points={points} catalogue={o?.catalogue} />
-            </>
+              <>
+                <PageHeader
+                  title={`${clear} of ${plural(contested.length, "place has", "places have")} a clear winner`}
+                  sub="A clear winner is a script the Rating believes is the best with a chance over 90%. Every figure here comes from its own estimates."
+                />
+                <EstimatedRegret points={points} />
+                <PointsList points={points} catalogue={o?.catalogue} />
+              </>
             );
           }}
         </Read>
       </Page>
     </>
+  );
+}
+
+/** Value lost each day to picks the Rating believed weaker than its best, every place together. */
+function EstimatedRegret({ points }: { points: ApiCandidates[] }) {
+  const byDay = new Map<string, number>();
+  for (const p of points) for (const d of p.daily) byDay.set(d.day.slice(0, 10), (byDay.get(d.day.slice(0, 10)) ?? 0) + d.regretCents);
+  const days = [...byDay.keys()].sort();
+  if (days.length < 2) return null;
+  const lines = [{ key: "r", label: "Value lost to weaker picks, per day", values: days.map((d) => byDay.get(d)! / 100), color: "var(--accent)" }];
+  return (
+    <section className="mb-6">
+      <SectionTitle>Value lost to weaker picks</SectionTitle>
+      <div className="k-card px-4 pb-3 pt-3">
+        <DayChart series={lines} days={days} format={formatUsd} height={160} />
+        <ChartNote>Dollars spent each day on scripts the Rating then believed weaker than its best. It falls as the Rating learns.</ChartNote>
+      </div>
+    </section>
   );
 }

@@ -5,9 +5,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CaretDownIcon, CheckIcon, XIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
 import { OURS, type ApiCampaign, type ApiPick, type ApiCandidates, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
-import { CardTable, EmptyNote, Meter, Shimmer, SparkLine, TD, TDN, TH, ToneDot } from "@/components/ui";
+import { CardTable, ChartNote, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
+import { DayChart } from "@/components/charts";
 import { Mark } from "@/components/mark";
 import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
@@ -255,7 +256,7 @@ export function RunsTable({ runs, catalogue, empty = "No run yet." }: { runs: Ap
   const [openId, setOpenId] = useState<string | null>(null);
   if (runs.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
-    <CardTable footer={`${formatCount(runs.length)} runs`}>
+    <CardTable note="Each run, what happened, and what it cost." footer={`${formatCount(runs.length)} runs`}>
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
@@ -328,7 +329,7 @@ export function PicksTable({ picks, empty = "No pick made yet." }: { picks: ApiP
   const [openId, setOpenId] = useState<string | null>(null);
   if (picks.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
-    <CardTable footer={`${formatCount(picks.length)} picks`}>
+    <CardTable note="Each pick the Rating made, and why it made it." footer={`${formatCount(picks.length)} picks`}>
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
@@ -392,87 +393,80 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
 }
 
 /** Each candidate place and its candidates' beliefs, under a uniform title. Rows keep the served order. */
-/** Share of a place's picks on the hidden best over its last `days` days (null without picks). Simulator only. */
-export function recentOnBest(p: ApiCandidates, days = 7): number | null {
-  const tail = (p.onBest ?? []).slice(-days);
-  const picks = tail.reduce((x, d) => x + d.picks, 0);
-  return picks > 0 ? tail.reduce((x, d) => x + d.onBest, 0) / picks : null;
+/** The chance the Rating's favourite is the best here, from its beliefs. */
+export function topChance(p: ApiCandidates): number {
+  return Math.max(0, ...p.candidates.map((o) => o.chanceBest));
 }
+
+/** A place has a clear winner when one candidate is the best with a chance over 90%. */
+export const CLEAR_WINNER = 0.9;
+
+const LINE_COLORS = ["var(--accent)", "var(--data-teal)", "var(--data-amber)", "var(--data-rose)", "var(--run)", "var(--fg-3)"];
 
 export function PointsList({ points, catalogue, empty = "No candidate place yet." }: { points: ApiCandidates[]; catalogue?: CatalogueData | null; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
-        // The world's hidden truth, when the backend knows it (the simulator): never read by any pick.
-        const truth = p.candidates.some((o) => o.truth);
-        const onBest = recentOnBest(p);
-        const footer = (
-          <span className="flex items-center justify-between gap-3">
-            <span>{formatCount(p.candidates.length)} scripts compete here</span>
-            {p.onBest && (
-              <span className="inline-flex items-center gap-2">
-                <span>Picks on the hidden best, last 7 days</span>
-                <span className="w-16">
-                  <SparkLine className="h-5" values={p.onBest.map((d) => (d.picks > 0 ? d.onBest / d.picks : 0))} color={onBest != null && onBest >= 0.8 ? "var(--run)" : "var(--accent)"} />
-                </span>
-                <span className={`tabular-nums ${onBest != null && onBest >= 0.8 ? "text-[var(--run)]" : ""}`}>{formatRatePct(onBest)}</span>
-              </span>
-            )}
-          </span>
-        );
+        const days = p.daily.map((d) => d.day);
+        const shareLines = p.candidates.map((o, i) => ({ key: `s${i}`, label: o.label, values: p.daily.map((d) => (d.picks > 0 ? (d.shares[o.id] ?? 0) : null)), color: LINE_COLORS[i % LINE_COLORS.length]! }));
+        const marginLine = [{ key: "m", label: "Margin on the favourite's rate", values: p.daily.map((d) => d.bestMargin), color: "var(--accent)" }];
+        const learned = p.daily.length > 1;
         return (
-          <CardTable key={p.id} footer={footer}>
+          <CardTable key={p.id} note="The Rating's estimate for each script, its margin, and the chance it is the best here." footer={`${formatCount(p.candidates.length)} scripts compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`} colSpan={truth ? 8 : 7}>
+                <th className={`${TH} w-full`} colSpan={8}>
                   <ApiPointTitle point={p} catalogue={catalogue} />
                 </th>
               </tr>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Script</th>
                 <th className={`${TH} text-right`}>Share this week</th>
-                <th className={`${TH} text-right`}>$ per outcome</th>
                 <th className={`${TH} text-right`}>% reach the next milestone</th>
+                <th className={`${TH} text-right`}>$ per outcome</th>
+                <th className={`${TH} text-right`}>Chance to be the best</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
-                {truth && (
-                  <th className={`${TH} text-right`} title="Outcomes per dollar, as the world really does, never read by any pick">
-                    True per $
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
                   <td className={`${TD} w-full max-w-0`}>
-                    <span className="flex items-center gap-2">
-                      <span className="truncate">{o.label}</span>
-                      {o.hiddenBest && (
-                        <span className="k-chip inline-flex shrink-0 items-center gap-1 text-[var(--run)]">
-                          <CheckIcon size={11} weight="bold" /> Hidden best
-                        </span>
-                      )}
-                    </span>
+                    <span className="truncate">{o.label}</span>
                     <InputsLine inputs={o.inputs.map((i) => ({ label: i.label, versions: i.versions.map((v) => ({ label: v.label, share: v.share })) }))} className="mt-0.5" />
                   </td>
                   <td className={TDN}>{formatRatePct(o.share)}</td>
                   <td className={TDN}>
-                    {o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}
-                    {o.truth && <span className="k-fg3 block text-[11px]">true {o.truth.rate > 0 ? formatCents(Math.round(o.truth.costCents / o.truth.rate)) : "none"}</span>}
+                    {formatRatePct(o.rateMean)} <span className="k-fg3">± {formatRatePct(o.rateSd)}</span>
                   </td>
-                  <td className={TDN}>
-                    {formatRatePct(o.rateMean)}
-                    {o.truth && <span className="k-fg3 block text-[11px]">true {formatRatePct(o.truth.rate)}</span>}
-                  </td>
+                  <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
+                  <td className={`${TDN} ${o.chanceBest >= CLEAR_WINNER ? "text-[var(--run)]" : ""}`}>{formatRatePct(o.chanceBest)}</td>
                   <td className={TDN}>{formatCount(o.picks)}</td>
                   <td className={TDN}>{formatCount(o.successes)}</td>
                   <td className={TDN}>{formatCents(o.spentCents)}</td>
-                  {truth && <td className={`${TDN} ${o.hiddenBest ? "text-[var(--run)]" : ""}`}>{o.truth ? o.truth.perDollar.toFixed(3) : <span className="k-fg4">—</span>}</td>}
                 </tr>
               ))}
+              {learned && (
+                <tr>
+                  <td colSpan={8} className="px-4 pb-3 pt-3">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="k-label mb-1">Share of picks over time</p>
+                        <DayChart series={shareLines} days={days} format={(v) => formatRatePct(v)} height={120} />
+                        <ChartNote>How the picks moved toward the script the Rating trusts most.</ChartNote>
+                      </div>
+                      <div>
+                        <p className="k-label mb-1">Margin on the favourite</p>
+                        <DayChart series={marginLine} days={days} format={(v) => formatRatePct(v)} height={120} />
+                        <ChartNote>How unsure the Rating was about its favourite. It narrows as results come in.</ChartNote>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </CardTable>
         );

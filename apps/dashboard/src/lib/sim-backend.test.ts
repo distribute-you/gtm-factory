@@ -35,11 +35,14 @@ describe("the simulator answers the factory API", () => {
     const companies = get<ApiCompany[]>("/companies");
     expect(companies.length).toBeGreaterThan(10);
     expect(companies.every((c) => c.leads > 0 && c.name.length > 0)).toBe(true);
-    // The hidden truth is the simulator's alone: optional fields, one hidden best per place that has one.
+    // Research reads the beliefs only: a chance to be the best per candidate, and the estimated regret day by day.
     const research = get<ApiCandidates[]>("/research");
-    expect(research.some((p) => p.candidates.some((o) => o.truth))).toBe(true);
-    for (const p of research) expect(p.candidates.filter((o) => o.hiddenBest).length).toBeLessThanOrEqual(1);
-    expect(research.some((p) => (p.onBest ?? []).some((d) => d.picks > 0))).toBe(true);
+    for (const p of research) {
+      expect(p.candidates.reduce((x, o) => x + o.chanceBest, 0)).toBeCloseTo(1, 6);
+      for (const o of p.candidates) expect(o.rateSd).toBeGreaterThanOrEqual(0);
+    }
+    expect(research.some((p) => p.daily.some((d) => d.regretCents > 0))).toBe(true);
+    expect(JSON.stringify(research)).not.toMatch(/"(truth|hiddenBest|onBest)"/);
     expect(() => get("/proposals")).not.toThrow();
   });
 
@@ -54,22 +57,24 @@ describe("the simulator answers the factory API", () => {
   });
 });
 
-describe("one UI", () => {
-  it("no page reads the simulator directly: every page reads the factory API", () => {
-    const root = join(__dirname, "../components");
+describe("one UI, nothing fake in the browser", () => {
+  it("no page reads the simulator: every page reads the factory API, the demo from its example files", () => {
     const files: string[] = [];
     const walk = (d: string) => {
       for (const f of readdirSync(d)) {
         const p = join(d, f);
         if (statSync(p).isDirectory()) walk(p);
-        else if (f.endsWith(".tsx")) files.push(p);
+        else if (/\.tsx?$/.test(f) && !f.endsWith(".test.ts")) files.push(p);
       }
     };
-    walk(root);
+    walk(join(__dirname, "../components"));
+    walk(join(__dirname, "../app"));
+    walk(join(__dirname, "api"));
     for (const f of files) {
-      if (f.endsWith("sim-bar.tsx")) continue;
       const text = readFileSync(f, "utf8");
-      expect(text, f).not.toMatch(/@\/lib\/(sim|model|world|plan|campaigns)"/);
+      expect(text, f).not.toMatch(/@\/lib\/(sim|sim-backend|model|world|plan|campaigns)"/);
+      // No hidden truth on any page: every figure comes from the Rating's own beliefs.
+      expect(text, f).not.toMatch(/hidden best|\btruth\b|onBest|hiddenBest/i);
     }
   });
 });

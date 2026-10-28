@@ -264,13 +264,10 @@ export interface ApiCandidate {
   spentCents: number;
   /** The brand inputs (ICPs, templates) whose versions compete inside this script's runs, and the share of each version. */
   inputs: ApiScriptInput[];
-  /**
-   * What the world really does with this candidate, never read by any pick. Only a simulator
-   * knows it (the hidden truth of its fictional world); a running backend leaves it out.
-   */
-  truth?: { rate: number; costCents: number; perDollar: number };
-  /** The simulator's hidden best at this place (absent on a running backend). */
-  hiddenBest?: boolean;
+  /** The margin of the belief about its rate (one standard deviation): it narrows as decisions come in. */
+  rateSd: number;
+  /** The chance it is the best here by value per dollar, from the beliefs (0 to 1). */
+  chanceBest: number;
 }
 
 /**
@@ -288,8 +285,12 @@ export interface ApiCandidates {
   candidates: ApiCandidate[];
   /** The campaign these picks are made for, when the place is read per campaign. */
   campaignId?: string;
-  /** Simulator only: picks per day and how many went to the hidden best, oldest first. */
-  onBest?: { day: string; picks: number; onBest: number }[];
+  /**
+   * Day by day, as the Rating believed it then: the picks and each candidate's share of them,
+   * the value lost on candidates it believed weaker than its best (estimated regret, cents), and
+   * the margin on its best. Oldest first.
+   */
+  daily: { day: string; picks: number; shares: Record<string, number>; regretCents: number; bestMargin: number | null }[];
 }
 
 /** One pick: the candidate the Rating's draw took, for one subject, at one place. */
@@ -344,8 +345,11 @@ export interface ApiOverview {
   totals: { spentTodayCents: number; spentTotalCents: number; counts: ApiOutcomeCounts };
   recentPicks: ApiPick[];
   recentRuns: ApiRun[];
-  /** The scheduler: last tick and whether it is running. */
-  scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean };
+  /**
+   * The scheduler: last tick and whether it is running. `waiting` says, in plain words, why
+   * nothing runs yet (no real vendor connected); null when scripts run.
+   */
+  scheduler: { lastTickAt: string | null; tickEverySeconds: number; running: boolean; waiting?: string | null };
   /**
    * Sidebar pins, as data: an outcome pin lists its brand dynasties (GET /objects?outcome=)
    * or its Engine's scripts (GET /scripts?outcome=). The backend ships its own (Templates, LLMs).

@@ -5,8 +5,9 @@ import { useState } from "react";
 import type { ApiOverview, ApiSeries } from "@gtm-factory/core";
 import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
-import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
+import { BarSpark, CardTable, ChartNote, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
+import { IS_API } from "@/lib/data-source";
 import { useOverview, useScope } from "@/lib/api/overview";
 import { outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
@@ -38,7 +39,11 @@ function Today({ o }: { o: ApiOverview }) {
         title={`${live} of ${plural(o.campaigns.length, "campaign", "campaigns")} live`}
         sub="Each pick and each cent is below."
         right={
-          o.scheduler.running ? (
+          !IS_API ? (
+            <span>Example data, as of {new Date(o.now).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+          ) : o.scheduler.waiting ? (
+            <span>{o.scheduler.waiting}</span>
+          ) : o.scheduler.running ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="k-dot-pulse h-1.5 w-1.5 rounded-full bg-[var(--run)] text-[var(--run)]" />
               Last tick {timeAgo(o.scheduler.lastTickAt)}
@@ -67,6 +72,8 @@ function Today({ o }: { o: ApiOverview }) {
         ))}
       </div>
 
+      <ChartNote>Each small chart shows its figure building up, day by day.</ChartNote>
+
       {series && (
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <CostPerOutcomeCard o={o} series={series} />
@@ -85,7 +92,7 @@ function Today({ o }: { o: ApiOverview }) {
             </EmptyNote>
           </div>
         ) : (
-          <CardTable>
+          <CardTable note="Each campaign, its daily cap, and how much of today's cap it used.">
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Campaign</th>
@@ -182,6 +189,7 @@ function CostPerOutcomeCard({ o, series }: { o: ApiOverview; series: ApiSeries }
           </div>
         </div>
         <div className="mt-3">{measured.some((x) => x != null) ? <DayChart series={lines} days={series.days} format={formatUsd} /> : <EmptyNote>No outcome yet.</EmptyNote>}</div>
+        <ChartNote>What one result has cost so far, day by day. Lower is better.</ChartNote>
         <Legend series={lines} />
       </div>
     </section>
@@ -207,6 +215,7 @@ function ReturnCard({ series }: { series: ApiSeries }) {
         <div className="mt-3">
           {value ? <DayChart series={lines} days={series.days} format={(v) => formatRoi(v)} reference={{ y: 1, label: "Break-even" }} /> : <EmptyNote>No value measured yet. A paid client's value comes in once its lifetime value is known.</EmptyNote>}
         </div>
+        <ChartNote>Dollars won for each dollar spent so far. Above 1, the campaigns pay for themselves.</ChartNote>
         <Legend series={lines} />
       </div>
     </section>

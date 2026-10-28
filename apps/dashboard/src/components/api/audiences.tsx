@@ -148,7 +148,7 @@ const VERDICT = { conclusion: "Conclusion", signal: "Signal", noise: "Noise" } a
 function SplitTable({ splits }: { splits: ApiSplit[] }) {
   const rate = (s: number, t: number) => (t > 0 ? s / t : null);
   return (
-    <CardTable>
+    <CardTable note="Each way of cutting the leads in two, and whether one side did better.">
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>Split</th>

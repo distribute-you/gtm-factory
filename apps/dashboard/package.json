@@ -2,7 +2,7 @@
   "name": "dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "The GTM Factory live dashboard: the whole product on a simulated world, in the browser.",
+  "description": "The GTM Factory dashboard: every page reads the factory API; the demo reads a fixed example database.",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "demo-data": "DEMO_WRITE=1 vitest run src/lib/demo-data.test.ts"
   },
   "dependencies": {
     "@gtm-factory/core": "workspace:*",
