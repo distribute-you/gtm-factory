@@ -23,7 +23,7 @@ export function ApiResearchPage() {
             return (
               <>
                 <PageHeader
-                  title={`${clear} of ${plural(contested.length, "place has", "places have")} a clear winner`}
+                  title={contested.length === 0 ? "No scripts have competed yet" : `${clear} of ${plural(contested.length, "place has", "places have")} a clear winner`}
                   sub="A clear winner is a script the Rating believes is the best with a chance over 90%. Every figure here comes from its own estimates."
                 />
                 <EstimatedRegret points={points} />
