@@ -24,10 +24,11 @@ import { Mark } from "@/components/mark";
 import { OverviewProvider, useOverview, useScope } from "@/lib/api/overview";
 import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
+import { IS_API } from "@/lib/data-source";
 import { timeAgo } from "./common";
 
-/** The one frame: Keel's canvas and sidebar, every page in one inset panel; in the demo, the simulator bar above it. */
-export function ApiShell({ children, top }: { children: React.ReactNode; top?: React.ReactNode }) {
+/** The one frame: Keel's canvas and sidebar, every page in one inset panel; a plain line above it when nothing runs. */
+export function ApiShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
@@ -45,8 +46,8 @@ export function ApiShell({ children, top }: { children: React.ReactNode; top?: R
               <Sidebar />
             </Suspense>
           </div>
-          <div className={`flex min-w-0 flex-1 flex-col ${top ? "" : "pt-2"}`}>
-            {top}
+          <div className="flex min-w-0 flex-1 flex-col pt-2">
+            <WaitingLine />
             <main className="k-panel k-scroll relative mb-2 ml-2 mr-2 min-w-0 flex-1 overflow-y-auto lg:ml-0">{children}</main>
           </div>
           <div id="portal" />
@@ -54,6 +55,13 @@ export function ApiShell({ children, top }: { children: React.ReactNode; top?: R
       </NavContext.Provider>
     </OverviewProvider>
   );
+}
+
+/** Says plainly why nothing runs (no real vendor connected yet), when the backend says so. */
+function WaitingLine() {
+  const { data } = useOverview();
+  if (!data?.scheduler.waiting) return null;
+  return <p className="k-inset mb-2 ml-2 mr-2 rounded-[8px] px-3 py-2 text-[13px] lg:ml-0">{data.scheduler.waiting}</p>;
 }
 
 const pinKey = (p: { kind: string; id: string }) => `${p.kind}:${p.id}`;
@@ -101,7 +109,7 @@ function Sidebar() {
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
-        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory ${RELEASE} · ${error ? "server unreachable" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
+        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory ${RELEASE} · ${!IS_API ? "example data, fictional brand" : error ? "server unreachable" : data?.scheduler.waiting ? "nothing runs yet" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
         <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
           <PlusIcon size={14} weight="bold" />
           New campaign

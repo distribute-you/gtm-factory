@@ -289,6 +289,8 @@ export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: im
         </div>
       </div>
       {s.places.length > 0 && (
+        <>
+        <p className="k-fg3 k-line-subtle border-t px-4 py-2 text-[12px]">Where this script competes, and how the Rating rates it at each place.</p>
         <div className="k-scroll overflow-x-auto"><table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="k-line-subtle border-b border-t">
@@ -311,6 +313,7 @@ export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: im
             ))}
           </tbody>
         </table></div>
+        </>
       )}
     </div>
   );

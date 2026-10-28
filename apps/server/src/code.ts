@@ -8,6 +8,7 @@
 
 import { Catalogue, type Script } from "@gtm-factory/core";
 import { one, q } from "./db";
+import { adaptersFor, vendorsOf } from "./vendors";
 import { APP_SOURCES, PUBLIC_DIR, codeKey } from "./catalogue-seed";
 import { CompiledScript, validateSource } from "./sandbox";
 
@@ -17,7 +18,8 @@ async function publicSources(): Promise<Record<string, string>> {
   return mod.SOURCES;
 }
 
-let keys: Set<string> = new Set();
+/** The code keys the database holds, each with the vendors its code calls. */
+let keys: Map<string, string[]> = new Map();
 const compiled = new Map<string, CompiledScript>();
 
 /** Seed the code once (a key already stored is never touched), then load the keys held. */
@@ -33,12 +35,12 @@ export async function seedCode(): Promise<number> {
 }
 
 export async function refreshKeys(): Promise<void> {
-  setKnownCode((await q<{ key: string }>(`SELECT key FROM script_code`)).map((r) => r.key));
+  keys = new Map((await q<{ key: string; source: string }>(`SELECT key, source FROM script_code`)).map((r) => [r.key, vendorsOf(r.source)]));
 }
 
-/** The code keys the database holds (loaded at boot; tests set them directly). */
+/** The code keys the database holds (loaded at boot; tests set them directly, calling no vendor). */
 export function setKnownCode(list: Iterable<string>): void {
-  keys = new Set(list);
+  keys = new Map([...list].map((k) => [k, []]));
 }
 
 /** Every seed version's code key and text: the public scripts/ files and this app's own. */
@@ -48,6 +50,9 @@ export async function seedSources(): Promise<Record<string, string>> {
 
 /** Does the database hold this script's code (so this app can run it)? */
 export const hasCode = (s: Pick<Script, "code">): boolean => keys.has(s.code);
+
+/** Can this script run now: its code is here and every vendor it calls has a real adapter. */
+export const canRun = (s: Pick<Script, "code">): boolean => keys.has(s.code) && adaptersFor(keys.get(s.code)!);
 
 export async function sourceOf(key: string): Promise<string | null> {
   return (await one<{ source: string }>(`SELECT source FROM script_code WHERE key = $1`, [key]))?.source ?? null;
@@ -68,7 +73,7 @@ export async function compiledOf(key: string): Promise<CompiledScript | null> {
 async function storeCode(key: string, source: string): Promise<void> {
   const r = await q(`INSERT INTO script_code (key, source) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING RETURNING key`, [key, source]);
   if (r.length === 0) throw new Error(`code ${key} already exists: a change is a new version`);
-  keys.add(key);
+  keys.set(key, vendorsOf(source));
 }
 
 /**

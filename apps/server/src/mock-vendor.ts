@@ -1,13 +1,13 @@
 /**
- * The vendors, MOCKED (GTM Factory v7: a test, like the public preview, that costs nothing).
- * Every call a script makes (`ctx.vendor.call(name, args)`) is answered here, deterministically,
- * at $0, from the public fictional world's hidden truth: a script succeeds at the rate the world
- * gives it, and the market is the world's fictional people. Nothing leaves this process: no
- * email, no API call, no spend. A real vendor adapter replaces this file call by call later.
+ * A TEST stand-in for the vendors, never registered in production (owner 2026-10-28: nothing fake
+ * on factory). Tests register it (registerMockVendors) to exercise the runner: every call a
+ * script makes is answered deterministically, at $0, from the public fictional world's hidden
+ * truth. Nothing leaves the process. Real vendor adapters register in vendors.ts.
  */
 
 import { Catalogue, loadWorld, meetsAll, personOf, type Condition, type Script, type TacticValue, type WorldSpec } from "@gtm-factory/core";
 import { WORLD } from "./catalogue-seed";
+import { registerVendor, vendorsOf } from "./vendors";
 
 let world: WorldSpec | null = null;
 function theWorld(): WorldSpec {
@@ -97,4 +97,9 @@ export function answer(c: MockCall): MockAnswer {
       };
     }
   }
+}
+
+/** Tests only: answer every vendor the given code calls with this stand-in. */
+export function registerMockVendors(sources: Iterable<string>): void {
+  for (const source of sources) for (const name of vendorsOf(source)) registerVendor(name, answer);
 }

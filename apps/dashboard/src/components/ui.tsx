@@ -408,10 +408,11 @@ export function Drawer({ title, onClose, children, width = 440 }: { title: React
   );
 }
 
-/** A card table, Keel style. */
-export function CardTable({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
+/** A card table, Keel style. `note`: one plain sentence above the columns, what the table tells the reader. */
+export function CardTable({ children, footer, note }: { children: React.ReactNode; footer?: React.ReactNode; note?: React.ReactNode }) {
   return (
     <div className="k-card overflow-hidden">
+      {note && <p className="k-fg3 k-line-subtle border-b px-4 py-2 text-[12px]">{note}</p>}
       <div className="k-scroll overflow-x-auto">
         <table className="w-full border-collapse text-[13px]">{children}</table>
       </div>
@@ -427,4 +428,9 @@ export const TDN = "px-3 py-2 first:pl-4 last:pr-4 align-middle text-right tabul
 /** A small "Learning" tag beside a figure the data has not settled yet. */
 export function LearningTag() {
   return <span className="k-chip">Learning</span>;
+}
+
+/** One plain sentence under a chart: what it tells the reader. */
+export function ChartNote({ children }: { children: React.ReactNode }) {
+  return <p className="k-fg3 mt-1 text-[12px]">{children}</p>;
 }

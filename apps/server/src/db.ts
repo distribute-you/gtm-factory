@@ -253,6 +253,36 @@ const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS units_account ON units ((content->>'account')) WHERE content ? 'account';
     `,
   },
+  {
+    // Owner 2026-10-28, nothing fake on factory: the runs made on mocked vendors, and what they
+    // made (Units, picks, the people they drew), are kept but flagged, and every read leaves them
+    // out. Each table moves to <table>_all with a "mocked" flag; <table> becomes the view of the
+    // rows that are not, so every query and insert reads and writes it as before. A later
+    // migration that alters one of these tables alters <table>_all and recreates its view.
+    id: "008_v10_no_fake_runs",
+    sql: `
+      ALTER TABLE runs ADD COLUMN mocked boolean NOT NULL DEFAULT false;
+      ALTER TABLE units ADD COLUMN mocked boolean NOT NULL DEFAULT false;
+      ALTER TABLE choices ADD COLUMN mocked boolean NOT NULL DEFAULT false;
+      ALTER TABLE leads ADD COLUMN mocked boolean NOT NULL DEFAULT false;
+      ALTER TABLE tasks ADD COLUMN mocked boolean NOT NULL DEFAULT false;
+      UPDATE runs SET mocked = true WHERE source_ref IS NULL;
+      UPDATE units SET mocked = true WHERE run_id IN (SELECT id FROM runs WHERE mocked);
+      UPDATE choices SET mocked = true WHERE brand_id IN (SELECT id FROM brands WHERE factory <> 'distribute_you');
+      UPDATE leads SET mocked = true WHERE source = 'test_market';
+      UPDATE tasks SET mocked = true;
+      ALTER TABLE runs RENAME TO runs_all;
+      ALTER TABLE units RENAME TO units_all;
+      ALTER TABLE choices RENAME TO choices_all;
+      ALTER TABLE leads RENAME TO leads_all;
+      ALTER TABLE tasks RENAME TO tasks_all;
+      CREATE VIEW runs AS SELECT * FROM runs_all WHERE NOT mocked;
+      CREATE VIEW units AS SELECT * FROM units_all WHERE NOT mocked;
+      CREATE VIEW choices AS SELECT * FROM choices_all WHERE NOT mocked;
+      CREATE VIEW leads AS SELECT * FROM leads_all WHERE NOT mocked;
+      CREATE VIEW tasks AS SELECT * FROM tasks_all WHERE NOT mocked;
+    `,
+  },
 ];
 
 /** The v5 legs whose storage schemas the v4 migration (002) still reads on a database created before it. */

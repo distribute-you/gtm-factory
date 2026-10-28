@@ -6,8 +6,8 @@
  * its Providers for what it needs (`ctx.get`): the stock first (this subject's latest Unit, the
  * brand's Unit of its picked dynasty, today's Rating), else the Provider orders a new piece from
  * that outcome's Engine (a run of its picked script, nested). A piece that only another milestone
- * can bring stops the run: it waits for that milestone. Vendors are mocked (mock-vendor.ts): every
- * run costs nothing.
+ * can bring stops the run: it waits for that milestone. A script runs only when every vendor its
+ * code calls has a real adapter (vendors.ts); until then the Plan is computed and nothing runs.
  *
  * A script the client's team performs is never run here: the Plan's order becomes a task the
  * person answers (tasks.ts), whose answer becomes the Unit.
@@ -17,8 +17,9 @@ import { PERFORMED_BY, START, meetsAll, type Catalogue, type Script, type Tactic
 import { one, q } from "./db";
 import { OUTCOMES, PERFORMERS, rowOfPerformer, WORLD } from "./catalogue-seed";
 import { allowedScripts, choose, dayOf, enginesOf, newId, onSideOf, planOf, produce, milestoneLine, saveCatalogue, startRun, finishRun, todaysRating, type Brand, type CampaignRow, type EvidenceState, type Lead, type PlanNode, type RunHandle, type Unit } from "./factory";
-import { compiledOf, hasCode } from "./code";
-import { answer, personOfKey, unitHash } from "./mock-vendor";
+import { canRun, compiledOf } from "./code";
+import { personOfKey, unitHash } from "./mock-vendor";
+import { adapterOf, anyAdapter } from "./vendors";
 import type { BridgeAnswer, BridgeOp } from "./sandbox";
 import { openTask } from "./tasks";
 import { storageFor } from "./storage";
@@ -53,12 +54,16 @@ const isTeam = (s: Script) => performerOf(s) === PERFORMERS.clientTeam;
 
 /** The webhooks that report on an outcome once its Unit lands (the mailbox reporting a send), from the world the vendors mock. */
 function reportersOn(catalogue: Catalogue, outcome: string): Script[] {
-  return catalogue.scripts.filter((s) => s.status === "active" && s.webhook && hasCode(s) && WORLD.truth.scripts[s.id]?.webhook?.on === outcome);
+  return catalogue.scripts.filter((s) => s.status === "active" && s.webhook && canRun(s) && WORLD.truth.scripts[s.id]?.webhook?.on === outcome);
 }
 
-/** The scripts of an Engine this campaign may order: kept by the brief, on its side, with code here (or performed by the client's team: a task). */
+/**
+ * The scripts of an Engine this campaign may order: kept by the brief, on its side, whose code is
+ * here with a real adapter for every vendor it calls (or performed by the client's team: a task).
+ * None of them: nothing runs and no pick is made there.
+ */
 function orderable(ctx: CampaignCtx, engine: string): Script[] {
-  return allowedScripts(ctx.catalogue, engine, ctx.campaign).filter((s) => !s.webhook && onSideOf(ctx.campaign, s) && (hasCode(s) || isTeam(s)));
+  return allowedScripts(ctx.catalogue, engine, ctx.campaign).filter((s) => !s.webhook && onSideOf(ctx.campaign, s) && (canRun(s) || isTeam(s)));
 }
 
 /** Recompute the campaign's Plan for this tick and keep it. */
@@ -84,6 +89,8 @@ function callers(plan: PlanNode): Map<string, string> {
 /** One tick of one campaign: its Plan, then each Engine of it, the most advanced first. */
 export async function runCampaign(ctx: CampaignCtx): Promise<void> {
   const plan = await replan(ctx);
+  // No real vendor connected: the Plan is computed and kept, and nothing runs (no pick, no run).
+  if (!anyAdapter()) return;
   const caller = callers(plan);
   for (const engine of enginesOf(plan)) {
     const kind = ctx.catalogue.outcome(engine)?.subject;
@@ -282,8 +289,10 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
           return { stop: "need" };
         }
         case "vendor": {
-          const a = answer({ script, name: String(args[0]), args: (args[1] ?? null) as Record<string, unknown> | null, subject, brandId: ctx.brand.id, day, draw: draw++, unit: (id) => [...served.values()].find((u) => u.id === id), providedList: list, brand: ctx.brand });
-          return { v: a };
+          const name = String(args[0]);
+          const adapter = adapterOf(name);
+          if (!adapter) throw new NoOption(`no adapter for the vendor ${name}`);
+          return { v: adapter({ script, name, args: (args[1] ?? null) as Record<string, unknown> | null, subject, brandId: ctx.brand.id, day, draw: draw++, unit: (id) => [...served.values()].find((u) => u.id === id), providedList: list, brand: ctx.brand }) };
         }
         case "accounts":
           return { v: accounts.filter((a) => a.channel === String(args[0]) && a.role === String(args[1])) };

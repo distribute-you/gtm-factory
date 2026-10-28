@@ -30,7 +30,7 @@ export function ApiCompaniesPage() {
             return (
               <>
                 <PageHeader title={plural(rows.length, "company", "companies")} sub="Every person found belongs to one company. One research of a company serves everyone who works there." />
-                <CardTable
+                <CardTable note="Companies your leads work at, and how far the best of them went."
                   footer={
                     <span className="flex items-center justify-between">
                       <span>

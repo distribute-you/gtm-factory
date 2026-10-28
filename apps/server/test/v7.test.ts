@@ -105,7 +105,31 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     expect(await q(`SELECT id FROM runs WHERE brand_id = 'dy_b' OR campaign_id = 'dy_c'`)).toEqual([]);
   });
 
-  it("runs a launched campaign on the scripts' code, vendors mocked: Units land, nothing is spent", async () => {
+  it("v10: nothing runs while no real vendor is connected: the Plan is computed, no pick, no run, and the pages say so", async () => {
+    expect((await api("POST", "/api/campaigns/northwind-outbound/launch")).status).toBe(200);
+    const before = { runs: (await q(`SELECT count(*)::int AS n FROM runs_all`))[0]!.n, choices: (await q(`SELECT count(*)::int AS n FROM choices_all`))[0]!.n };
+    for (let i = 0; i < 3; i++) await tickNow();
+    expect((await q(`SELECT count(*)::int AS n FROM runs_all`))[0]!.n).toBe(before.runs);
+    expect((await q(`SELECT count(*)::int AS n FROM choices_all`))[0]!.n).toBe(before.choices);
+    expect((await q(`SELECT plan FROM campaigns WHERE id = 'northwind-outbound'`))[0]!.plan).not.toBeNull();
+    expect(((await api("GET", "/api/overview")).body.scheduler as { waiting: string }).waiting).toBe("Nothing runs until real vendors are connected.");
+    expect((await api("POST", "/api/campaigns/northwind-outbound/pause")).status).toBe(200);
+    // From here on, the tests stand the fictional world in for the vendors (never done in production).
+    const { registerMockVendors } = await import("../src/mock-vendor");
+    registerMockVendors((await q(`SELECT source FROM script_code`)).map((r) => String(r.source)));
+    expect(((await api("GET", "/api/overview")).body.scheduler as { waiting: string | null }).waiting).toBeNull();
+  });
+
+  it("v10: a run made on mocked vendors is kept but flagged, and left out of every read", async () => {
+    await q(`INSERT INTO runs_all (id, pipe_id, script_id, campaign_id, brand_id, status, note, mocked) VALUES ('run_mock', 'lead_found', 'src_filters', 'northwind-outbound', 'northwind', 'ok', 'mocked', true)`);
+    await q(`INSERT INTO units_all (id, outcome, subject_kind, subject_id, brand_id, run_id, factory, mocked) VALUES ('unit_mock', 'lead_found', 'lead', 'x', 'northwind', 'run_mock', 'ours', true)`);
+    expect(await q(`SELECT id FROM runs WHERE id = 'run_mock'`)).toEqual([]);
+    expect(await q(`SELECT id FROM units WHERE id = 'unit_mock'`)).toEqual([]);
+    expect(((await api("GET", "/api/ledger")).body.runs as { id: string }[]).some((r) => r.id === "run_mock")).toBe(false);
+    expect((await q(`SELECT mocked FROM runs_all WHERE id = 'run_mock'`))[0]!.mocked).toBe(true);
+  });
+
+  it("runs a launched campaign on the scripts' code, the test stand-in answering for the vendors: Units land, nothing is spent", async () => {
     expect((await api("POST", "/api/campaigns/northwind-outbound/launch")).status).toBe(200);
     for (let i = 0; i < 6; i++) await tickNow();
     const runs = await q(`SELECT engine, status, spend_micro FROM runs WHERE campaign_id = 'northwind-outbound'`);
@@ -170,6 +194,12 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     expect(companies.reduce((x, c) => x + c.leads, 0)).toBe(leads);
     for (const c of companies) expect(c.id.startsWith("co:") && c.name.length > 0 && !!c.leadId).toBe(true);
     expect((await api("GET", "/api/proposals")).body).toEqual([]);
+    // Research reads the beliefs only: the chance each script is the best, and its picks day by day with the estimated regret.
+    const research = (await api("GET", "/api/research")).body as unknown as { candidates: { chanceBest: number; rateSd: number }[]; daily: { regretCents: number; bestMargin: number | null }[] }[];
+    expect(research.length).toBeGreaterThan(0);
+    for (const p of research) if (p.candidates.length > 0) expect(p.candidates.reduce((x, c) => x + c.chanceBest, 0)).toBeCloseTo(1, 6);
+    expect(research.some((p) => p.daily.some((d) => d.bestMargin !== null))).toBe(true);
+    expect(JSON.stringify(research)).not.toMatch(/"(truth|hiddenBest|onBest)"/);
     const icps = (await api("GET", "/api/objects?outcome=audience_built")).body as unknown as { picks?: number; share?: number }[];
     expect(icps.length).toBeGreaterThan(0);
     for (const d of icps) expect(typeof d.picks === "number" && typeof d.share === "number").toBe(true);

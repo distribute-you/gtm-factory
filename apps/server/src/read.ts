@@ -8,7 +8,10 @@ import {
   PERFORMED_BY,
   START,
   betaMean,
+  betaVariance,
   buildLedger,
+  chanceOfBest,
+  estimatedRegret,
   chainCostPerTarget,
   costForwardLine,
   targetBreakdown,
@@ -593,6 +596,7 @@ export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, bran
   const recentRuns = await q<RunLite>(`SELECT id, script_id, engine, lead_id, spend_micro::bigint AS spend_micro, consumed FROM runs WHERE created_at > now() - interval '7 days' AND (brand_id IS NULL OR ${shownBrand("brand_id")})${brandFilter ? " AND brand_id = $1" : ""}`, brandFilter ? [brandFilter] : []);
   const inputIds = [...new Set(recentRuns.flatMap((r) => r.consumed))];
   const inputUnits = new Map((inputIds.length > 0 ? await q<UnitLite>(`SELECT id, outcome, subject_kind, run_id, dynasty, name FROM units WHERE id = ANY($1) AND subject_kind = 'brand'`, [inputIds]) : []).map((u) => [u.id, u]));
+  const daily = await researchDaily();
   const points: ApiCandidates[] = [];
   for (const [point, held] of e.book.pointCandidates) {
     // A brand input's versions compete inside each script's row, never as a place of their own.
@@ -612,6 +616,8 @@ export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, bran
           id,
           label: candidateLabel(catalogue, id, objectNames),
           rateMean: rate,
+          rateSd: Math.sqrt(betaVariance(b.posterior)),
+          chanceBest: 0,
           costMeanCents: b.cost.mean * 100,
           meanScore: (rate * value) / Math.max(b.cost.mean, 1e-6),
           share: (() => {
@@ -625,9 +631,40 @@ export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, bran
           inputs: inputsOf(catalogue, recentRuns.filter((r) => catalogue.script(r.script_id)?.dynasty === id || r.script_id === id), inputUnits),
         };
       }),
+      daily: daily.get(point) ?? [],
     });
   }
+  for (const p of points) {
+    const chance = chanceOfBest(p.candidates.map((c) => ({ id: c.id, rate: c.rateMean, rateSd: c.rateSd, cost: c.costMeanCents / 100 })));
+    for (const c of p.candidates) c.chanceBest = chance[c.id] ?? 0;
+  }
   return points.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Each place's picks day by day, as the Rating believed it then (the options stored with each
+ * pick): the shares, the value lost to candidates it believed weaker than its best, and the
+ * margin on its best. A pick stored without its belief (before this was recorded) counts no regret.
+ */
+async function researchDaily(): Promise<Map<string, ApiCandidates["daily"]>> {
+  const counts = await q<{ point: string; day: string; chosen: string; n: number }>(
+    `SELECT point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, chosen, count(*)::int AS n FROM choices WHERE ${shownBrand("brand_id")} GROUP BY 1, 2, 3`,
+  );
+  const beliefs = await q<{ point: string; day: string; options: { id: string; meanScore?: number; rate?: number; rateSd?: number; costCents?: number }[] }>(
+    `SELECT DISTINCT ON (point, 2) point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, options FROM choices WHERE ${shownBrand("brand_id")} ORDER BY point, 2, created_at DESC`,
+  );
+  const out = new Map<string, ApiCandidates["daily"]>();
+  for (const b of beliefs) {
+    const here = counts.filter((c) => c.point === b.point && c.day === b.day);
+    const picks = here.reduce((x, c) => x + c.n, 0);
+    const opts = Array.isArray(b.options) ? b.options : [];
+    const r = estimatedRegret({ candidates: opts.map((o) => ({ id: o.id, picks: here.find((c) => c.chosen === o.id)?.n ?? 0, meanScore: o.meanScore ?? 0, costCents: o.costCents ?? 0, rate: o.rate ?? 0, rateSd: o.rateSd ?? 0 })) });
+    const known = opts.some((o) => o.rateSd !== undefined);
+    const day = { day: `${b.day}T00:00:00.000Z`, picks, shares: Object.fromEntries(here.map((c) => [c.chosen, picks > 0 ? c.n / picks : 0])), regretCents: r.regretCents, bestMargin: known ? r.bestMargin : null };
+    out.set(b.point, [...(out.get(b.point) ?? []), day]);
+  }
+  for (const v of out.values()) v.sort((a, b) => (a.day < b.day ? -1 : 1));
+  return out;
 }
 
 // ---------------------------------------------------------------------------

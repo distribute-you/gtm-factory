@@ -43,7 +43,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         ]}
       />
       {tab === "outcomes" && (
-        <CardTable>
+        <CardTable note="The results a campaign can ask for, and the track each one belongs to.">
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Outcome</th>
@@ -71,7 +71,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         </CardTable>
       )}
       {tab === "engines" && (
-        <CardTable>
+        <CardTable note="Each Engine makes one result, and who does its work.">
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Engine</th>
@@ -107,7 +107,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         </CardTable>
       )}
       {tab === "scripts" && (
-        <CardTable>
+        <CardTable note="Every script, the result it makes, and what it calls to do it.">
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Script</th>
@@ -149,7 +149,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         </CardTable>
       )}
       {tab === "tactics" && (
-        <CardTable>
+        <CardTable note="The traits a script or a lead can carry, used to compare them.">
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Tactic</th>
@@ -176,7 +176,7 @@ function CatalogueView({ c }: { c: CatalogueData }) {
         </CardTable>
       )}
       {tab === "strategies" && (
-        <CardTable>
+        <CardTable note="Rules a brief can ask for, each one a filter on the scripts.">
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={TH}>Strategy</th>

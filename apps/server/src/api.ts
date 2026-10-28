@@ -16,6 +16,7 @@ import { forkFromCode, sourceOf, upgradeFromCode } from "./code";
 import { IMPORT_ON, shownBrand, shownBrandRow } from "./visibility";
 import { accountsOut, setAccountRole } from "./accounts";
 import { companiesOut, objectFigures, proposalsOut, seriesOut } from "./views";
+import { WAITING, anyAdapter } from "./vendors";
 import { isTicking, tickNow, TICK_SECONDS } from "./scheduler";
 import { storageReport } from "./storage";
 
@@ -92,7 +93,7 @@ route("GET", "/api/overview", async () => {
       { kind: "outcome", id: OUTCOMES.template, label: "Templates" },
       { kind: "outcome", id: OUTCOMES.llm, label: "LLMs" },
     ],
-    scheduler: { lastTickAt: sched?.last_tick_at ? new Date(sched.last_tick_at).toISOString() : null, tickEverySeconds: TICK_SECONDS, running: isTicking() },
+    scheduler: { lastTickAt: sched?.last_tick_at ? new Date(sched.last_tick_at).toISOString() : null, tickEverySeconds: TICK_SECONDS, running: isTicking(), waiting: anyAdapter() ? null : WAITING },
   };
 });
 

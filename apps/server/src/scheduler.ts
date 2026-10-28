@@ -7,6 +7,7 @@
 
 import { one, q } from "./db";
 import { loadCatalogue, loadEvidence, todayUtc, todaysRating, type Brand, type CampaignRow } from "./factory";
+import { anyAdapter } from "./vendors";
 import { CapReached, runCampaign, type CampaignCtx } from "./runner";
 
 export const TICK_SECONDS = 60;
@@ -59,7 +60,8 @@ async function runTick(): Promise<void> {
         if (!brand) continue;
         const ctx: CampaignCtx = { catalogue, ev, campaign: c, brand, log: [] };
         try {
-          await todaysRating(brand.id);
+          // The Rating's daily run only when scripts can run (a real vendor connected): no run otherwise.
+          if (anyAdapter()) await todaysRating(brand.id);
           await runCampaign(ctx);
           if (c.cap_reached_on && c.cap_reached_on !== todayUtc()) await q(`UPDATE campaigns SET cap_reached_on = NULL WHERE id = $1`, [c.id]);
         } catch (e) {

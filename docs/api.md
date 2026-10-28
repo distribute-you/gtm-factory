@@ -2,7 +2,7 @@
 
 The dashboard reads one of two data sources, picked at build time:
 
-- **simulator** (default): the fictional world, computed in the browser. This is the GitHub Pages build.
+- **demo** (default): a fixed example database, the fictional brand's 30 days, generated once by the simulator (`pnpm --filter dashboard demo-data`) and read as files. Nothing is computed in the browser and nothing can be changed. This is the GitHub Pages build.
 - **api**: a running GTM Factory. The dashboard reads and writes its backend over JSON: brands, campaigns (start, Target, brief, launch, pause, daily cap, volume; their Plan, milestones and what their subjects went through), leads and their Units with their traceability, brand dynasties (templates, ICPs), scripts with their code, materials and capacity, the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
 
 The contract is [`packages/core/src/factory-api.ts`](../packages/core/src/factory-api.ts): every endpoint and every shape, typed. A running GTM Factory implements it under one base URL. Every figure is computed by the backend; the dashboard divides nothing. Money is integer cents, times are ISO strings. Pins (the sidebar's pinned outcomes) are the backend's data too (`ApiOverview.pins`).
@@ -11,7 +11,7 @@ The contract is [`packages/core/src/factory-api.ts`](../packages/core/src/factor
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_DATA_SOURCE` | `api` (anything else: the simulator) |
+| `NEXT_PUBLIC_DATA_SOURCE` | `api` (anything else: the demo's example database) |
 | `NEXT_PUBLIC_FACTORY_API_URL` | base URL of the API, default `/api` (same origin) |
 | `NEXT_OUTPUT` | `standalone` for a Node server; default is the static export |
 | `NEXT_PUBLIC_BASE_PATH` | `""` to serve from the root |
@@ -42,7 +42,7 @@ Put the API on the same origin under `/api` (a reverse proxy sending `/api/*` to
 | GET | `/scripts?outcome=` | `ApiScriptStats[]`: the scripts of one Engine, with their code, materials and capacity |
 | POST | `/scripts/:id/retire`, `/scripts/:id/restore` | `ApiScriptStats` |
 | POST | `/scripts/:id/capacity` | `ApiCapacity` (`perDay`, `daysPerUnit`, null for no limit), typed by a person for a script a person performs; answers `ApiScriptStats` |
-| GET | `/research` | `ApiCandidates[]`: at each place an Engine calls an outcome, the scripts that compete, with the Rating's belief about each and, on each script, the versions of the brand inputs (ICPs, templates) it used |
+| GET | `/research` | `ApiCandidates[]`: at each place an Engine calls an outcome, the scripts that compete, with the Rating's belief about each (rate and margin, cost, chance to be the best) and, on each script, the versions of the brand inputs (ICPs, templates) it used; `daily`: picks, shares, estimated regret and the favourite's margin, day by day |
 | GET | `/series?brandId=` | `ApiSeries`: spend, Units per outcome and value won, per UTC day (the Today charts) |
 | GET | `/companies?brandId=` | `ApiCompany[]`: the companies the leads belong to, their values, the furthest milestone and when they were researched |
 | GET | `/proposals?brandId=` | `ApiProposal[]`: what the splits proposed (a finer ICP, a strategy), with every split looked at |
@@ -73,5 +73,5 @@ A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashb
 
 ## One dashboard, two data sources
 
-Every page of the dashboard reads this API and nothing else. The public demo answers the same routes in the browser from the simulator (`apps/dashboard/src/lib/sim-backend.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. Fields only a simulator can know (the hidden truth behind each candidate: `truth`, `hiddenBest`, `onBest`) are optional and shown only when served: the Research page then says how many places back the hidden best.
+Every page of the dashboard reads this API and nothing else. The demo reads the same answers from files the simulator wrote once (`apps/dashboard/src/lib/demo-data.test.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. No answer carries a hidden truth: Research shows the Rating's estimates, their margins, the chance each candidate is the best (`chanceBest`) and the value lost to weaker picks (`daily[].regretCents`), all from the beliefs. When nothing runs (no real vendor connected), `scheduler.waiting` says so in plain words and every page shows it.
 

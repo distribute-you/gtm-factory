@@ -13,6 +13,7 @@ import {
   PERFORMED_BY,
   START,
   betaMean,
+  betaVariance,
   createRng,
   isOurs,
   meetsAll,
@@ -632,7 +633,11 @@ export async function choose(
   const [consumer, material] = args.point.split("|") as [string, string];
   await q(
     `INSERT INTO choices (id, campaign_id, brand_id, lead_id, point, pipe_id, material, chosen, options, reason, day) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [id, args.campaign.id, args.brand.id, args.leadId, args.point, consumer, material, result.pickedId, JSON.stringify(result.candidates.map((o) => ({ ...o, label: label(o.id) }))), reason, ev.day],
+    [id, args.campaign.id, args.brand.id, args.leadId, args.point, consumer, material, result.pickedId, JSON.stringify(result.candidates.map((o) => {
+      // The belief each candidate was picked on: its rate, the margin on it and its cost (what Research's estimated regret reads).
+      const p = priced.find((x) => x.id === o.id)!;
+      return { ...o, label: label(o.id), rate: betaMean(p.posterior), rateSd: Math.sqrt(betaVariance(p.posterior)), costCents: p.cost.mean * 100 };
+    })), reason, ev.day],
   );
   return { choiceId: id, chosen: result.pickedId };
 }
