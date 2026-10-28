@@ -123,7 +123,7 @@ export function simRoute(host: SimBackendHost, method: string, rawPath: string, 
       act({ type: "accountRole", brandId, accountId: p[1]!, role: String(b.role) });
       return { ok: true };
     }
-    if (p[0] === "accounts" && p[1] === "connect") return { url: "#connect" };
+    if (p[0] === "accounts" && p[1] === "connect") fail(501, "In the demo, the accounts come with the fictional brand. A running GTM Factory opens its own page to connect yours.");
     if (p[0] === "brands" && p.length === 1) {
       const tracked = model.tracks.flatMap((t) => t.states.map((x) => x.outcome));
       const client = newClient(model, { name: String(b.name ?? "New client"), audienceText: String(b.icp ?? ""), offerOutcomes: tracked, ...(b.lifetimeValueCents ? { lifetimeRevenue: Number(b.lifetimeValueCents) / 100 } : {}) });

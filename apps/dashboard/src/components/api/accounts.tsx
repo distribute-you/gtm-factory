@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { PlusIcon } from "@phosphor-icons/react";
 import type { ApiConnectedAccount } from "@gtm-factory/core";
 import { AccountsTable } from "@/components/accounts-table";
@@ -16,9 +17,15 @@ export function ApiAccountsPage() {
   const read = useApi<ApiConnectedAccount[]>(scope.brandId ? `/accounts?brandId=${encodeURIComponent(scope.brandId)}` : null);
   const tactic = o?.catalogue.tactics.find((t) => t.id === "account_role");
   const roles = tactic && tactic.type.kind === "list" ? tactic.type.values.map(String) : [];
+  const [connectError, setConnectError] = useState<string | null>(null);
   const connect = async () => {
-    const { url } = await apiSend<{ url: string }>("POST", "/accounts/connect", { brandId: scope.brandId, role: roles[roles.length - 1] ?? null });
-    window.location.href = url;
+    setConnectError(null);
+    try {
+      const { url } = await apiSend<{ url: string }>("POST", "/accounts/connect", { brandId: scope.brandId, role: roles[roles.length - 1] ?? null });
+      window.location.href = url;
+    } catch (e) {
+      setConnectError(e instanceof Error ? e.message : String(e));
+    }
   };
   return (
     <>
@@ -40,6 +47,7 @@ export function ApiAccountsPage() {
                     </button>
                   }
                 />
+                {connectError && <p className="mb-3 text-[13px] text-[var(--data-rose)]">{connectError}</p>}
                 <AccountsTable
                   rows={accounts}
                   roles={roles}
