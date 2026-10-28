@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { DayChart, Legend } from "@/components/charts";
-import { PlanLineView } from "@/components/plan-line";
 import { Mark } from "@/components/mark";
 import { BarSpark, EmptyNote, Figure, Page, PageHeader, RoiLabel, SectionTitle, Shimmer, SparkLine, StatTile, TickGauge, TopBar } from "@/components/ui";
 import { costPerOutcomeSeries, cumulative, engineName, explainPick, candidateLabel, outcomeLabel, pointInfo, recentPicks, scopeFigures, scopeReturn, scopedCampaigns, targetOf, type Model, type ScopeFigures } from "@/lib/model";
-import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
+import { formatBudget, formatVolume, formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
 export function TodayPage() {
@@ -154,9 +153,14 @@ function Today({ model, scope }: { model: Model; scope: string | null }) {
             {campaigns.length === 0 && <EmptyNote>No campaign yet. Start one with New campaign.</EmptyNote>}
           </div>
           {campaigns[0] && (
-            <div className="k-card mt-3 p-4">
-              <p className="k-label mb-2">The first campaign's Plan</p>
-              <PlanLineView model={model} campaign={campaigns[0]} />
+            <div className="k-card mt-3 p-4" data-testid="first-campaign">
+              <p className="k-label mb-2">The first campaign</p>
+              <p className="text-[14px] font-medium">{campaigns[0].name}</p>
+              {campaigns[0].description && <p className="k-fg2 mt-0.5 text-[13px] leading-5">{campaigns[0].description}</p>}
+              <p className="k-fg3 mt-1 text-[12px] tabular-nums">
+                {formatBudget(campaigns[0].dailyBudgetCents, campaigns[0].budgetPeriodDays)}
+                {campaigns[0].volume ? `, ${formatVolume(campaigns[0].volume)}` : ""}
+              </p>
             </div>
           )}
         </section>

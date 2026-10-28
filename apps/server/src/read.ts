@@ -37,7 +37,7 @@ import {
 import { one, q } from "./db";
 import { FACTORIES, OUTCOMES, performerOfRow } from "./catalogue-seed";
 import { inScope, shownBrand } from "./visibility";
-import { CAUSED_BY_US, loadCatalogue, loadEvidence, milestoneValue, planOf, milestoneLine, type Brand, type CampaignRow, type EvidenceState, type PlanNode, type Unit } from "./factory";
+import { CAUSED_BY_US, loadCatalogue, spentInPeriodMicro, loadEvidence, milestoneValue, planOf, milestoneLine, type Brand, type CampaignRow, type EvidenceState, type PlanNode, type Unit } from "./factory";
 
 export const cents = (micro: number) => Math.round(micro / 100) / 100;
 
@@ -138,10 +138,10 @@ export async function campaignsOut(rows: CampaignRow[]): Promise<ApiCampaign[]> 
   );
   const counts = await countsByCampaign(ids);
   const catalogue = await loadCatalogue();
-  const today = new Date().toISOString().slice(0, 10);
-  return rows.map((c) => {
+  const inPeriod = await Promise.all(rows.map((c) => spentInPeriodMicro(c)));
+  return rows.map((c, i) => {
     const s = spend.find((x) => x.campaign_id === c.id);
-    const capReachedOn = c.cap_reached_on ? new Date(c.cap_reached_on).toISOString().slice(0, 10) : null;
+    const periodCents = cents(inPeriod[i] ?? 0);
     return {
       id: c.id,
       brandId: c.brand_id,
@@ -158,7 +158,8 @@ export async function campaignsOut(rows: CampaignRow[]): Promise<ApiCampaign[]> 
       volume: c.volume ?? null,
       spentTodayCents: cents(s?.today ?? 0),
       spentTotalCents: cents(s?.total ?? 0),
-      capReached: capReachedOn === today,
+      spentInPeriodCents: periodCents,
+      capReached: periodCents >= Number(c.daily_budget_cents),
       brief: c.brief ?? "",
       verdicts: c.verdicts ?? {},
       caps: c.caps ?? {},
