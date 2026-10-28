@@ -20,9 +20,9 @@ import { PERFORMED_BY, START, meetsAll, type Catalogue, type Script, type Tactic
 import { one, q } from "./db";
 import { OUTCOMES, PERFORMERS, rowOfPerformer, WORLD } from "./catalogue-seed";
 import { allowedScripts, choose, dayOf, enginesOf, newId, onSideOf, planOf, produce, milestoneLine, saveCatalogue, startRun, finishRun, todaysRating, type Brand, type CampaignRow, type EvidenceState, type Lead, type PlanNode, type RunHandle, type Unit } from "./factory";
-import { canRun, compiledOf } from "./code";
+import { canRun, compiledOf, somethingCanRun } from "./code";
 import { personOfKey, unitHash } from "./mock-vendor";
-import { adapterOf, anyAdapter } from "./vendors";
+import { adapterOf } from "./vendors";
 import type { BridgeAnswer, BridgeOp } from "./sandbox";
 import { openTask } from "./tasks";
 import { flushPending } from "./pending";
@@ -93,8 +93,8 @@ function callers(plan: PlanNode): Map<string, string> {
 /** One tick of one campaign: its Plan, then each Engine of it, the most advanced first. */
 export async function runCampaign(ctx: CampaignCtx): Promise<void> {
   const plan = await replan(ctx);
-  // No real vendor connected: the Plan is computed and kept, and nothing runs (no pick, no run).
-  if (!anyAdapter()) return;
+  // Nothing can run (no lead script has its vendors connected): the Plan is computed and kept, and nothing runs (no pick, no run).
+  if (!somethingCanRun(ctx.catalogue)) return;
   const caller = callers(plan);
   for (const engine of enginesOf(plan)) {
     const kind = ctx.catalogue.outcome(engine)?.subject;

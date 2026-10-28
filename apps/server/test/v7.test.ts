@@ -106,6 +106,9 @@ describe.runIf(!!url)("GTM Factory v7", () => {
   });
 
   it("v10: nothing runs while no real vendor is connected: the Plan is computed, no pick, no run, and the pages say so", async () => {
+    // The client's Claude is connected in production, yet it only answers pieces ordered by a lead's run: nothing runs on it alone.
+    const { registerProductionVendors } = await import("../src/vendors/claude-local");
+    registerProductionVendors();
     expect((await api("POST", "/api/campaigns/northwind-outbound/launch")).status).toBe(200);
     const before = { runs: (await q(`SELECT count(*)::int AS n FROM runs_all`))[0]!.n, choices: (await q(`SELECT count(*)::int AS n FROM choices_all`))[0]!.n };
     for (let i = 0; i < 3; i++) await tickNow();
