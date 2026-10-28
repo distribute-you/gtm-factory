@@ -8,17 +8,15 @@
 import {
   OURS,
   START,
-  convergence,
-  hiddenBest,
+  chanceOfBest,
+  estimatedRegret,
   type Campaign,
   type Catalogue,
   type PickRecord,
-  type HiddenCandidate,
   type Unit,
   type OutcomeId,
   type Person,
   type PlanNode,
-  type PointConvergence,
   type Script,
   type SimulationSession,
   type WorldClient,
@@ -350,7 +348,7 @@ export function scopeReturn(model: Model, campaigns: readonly Campaign[]): { mea
 }
 
 // ---------------------------------------------------------------------------
-// Candidate places: beliefs, picks, hidden truth
+// Candidate places: beliefs, picks, the chance each candidate is the best
 // ---------------------------------------------------------------------------
 
 export interface CandidateRow {
@@ -366,9 +364,8 @@ export interface CandidateRow {
   valuePerDollar: number;
   decisions: number;
   successes: number;
-  /** Hidden: true share reaching the next milestone, true cost, true value per dollar. */
-  truth: HiddenCandidate | null;
-  isHiddenBest: boolean;
+  /** The chance it is the best here by value per dollar, read from the beliefs. */
+  chanceBest: number;
   isBelievedBest: boolean;
 }
 
@@ -379,23 +376,16 @@ export interface PointRow {
   picks: number;
 }
 
-/** The hidden best of every point of a campaign (cached per day). */
-export function hiddenOf(model: Model, campaign: Campaign): Map<string, { best: string; candidates: HiddenCandidate[] }> {
-  return memo(model, `hidden:${campaign.id}`, () => hiddenBest(model.session, campaign));
-}
-
 /** Every candidate place a campaign used, in the order its decisions are made. */
 export function pointsOf(model: Model, campaign: Campaign): PointRow[] {
   return memo(model, `points:${campaign.id}`, () => {
-    const hidden = hiddenOf(model, campaign);
-    const keys = model.session.candidatePlaces().filter((p) => p.campaignId === campaign.id).map((p) => p.point);
-    const ordered = [...hidden.keys(), ...keys.filter((k) => !hidden.has(k))].filter((k) => keys.includes(k));
+    const keys = [...new Set(model.session.candidatePlaces().filter((p) => p.campaignId === campaign.id).map((p) => p.point))];
     // Brand inputs (ICPs, templates) are read on the row of the script that used them, never as a place of their own.
-    return ordered.filter((key) => pointInfo(model.catalogue, key).kind === "script").map((key) => pointRow(model, campaign, key, hidden.get(key) ?? null));
+    return keys.filter((key) => pointInfo(model.catalogue, key).kind === "script").map((key) => pointRow(model, campaign, key));
   });
 }
 
-export function pointRow(model: Model, campaign: Campaign, key: string, hidden: { best: string; candidates: HiddenCandidate[] } | null): PointRow {
+export function pointRow(model: Model, campaign: Campaign, key: string): PointRow {
   const info = pointInfo(model.catalogue, key);
   const series = model.session.pickSeries(key, campaign.id);
   const recent = new Map<string, number>();
@@ -409,35 +399,70 @@ export function pointRow(model: Model, campaign: Campaign, key: string, hidden: 
   }
   const beliefs = model.session.beliefsAt(key, campaign.id);
   const bestBelief = [...beliefs].sort((a, b) => b.valuePerDollar - a.valuePerDollar)[0]?.candidate ?? null;
-  const candidates: CandidateRow[] = beliefs.map((b) => {
-    const truth = hidden?.candidates.find((h) => h.candidate === b.candidate) ?? null;
-    return {
-      candidate: b.candidate,
-      label: candidateLabel(model, key, b.candidate, campaign.brandId),
-      share: total > 0 ? (recent.get(b.candidate) ?? 0) / total : 0,
-      picks: series.get(b.candidate)?.reduce((x, y) => x + y, 0) ?? 0,
-      rate: b.rate,
-      rateSd: b.rateSd,
-      cost: b.cost,
-      valuePerDollar: b.valuePerDollar,
-      decisions: b.decisions,
-      successes: b.successes,
-      truth,
-      isHiddenBest: hidden?.best === b.candidate,
-      isBelievedBest: bestBelief === b.candidate,
-    };
-  });
+  const chance = chanceOfBest(beliefs.map((b) => ({ id: b.candidate, rate: b.rate, rateSd: b.rateSd, cost: b.cost })));
+  const candidates: CandidateRow[] = beliefs.map((b) => ({
+    candidate: b.candidate,
+    label: candidateLabel(model, key, b.candidate, campaign.brandId),
+    share: total > 0 ? (recent.get(b.candidate) ?? 0) / total : 0,
+    picks: series.get(b.candidate)?.reduce((x, y) => x + y, 0) ?? 0,
+    rate: b.rate,
+    rateSd: b.rateSd,
+    cost: b.cost,
+    valuePerDollar: b.valuePerDollar,
+    decisions: b.decisions,
+    successes: b.successes,
+    chanceBest: chance[b.candidate] ?? 0,
+    isBelievedBest: bestBelief === b.candidate,
+  }));
   return { info, campaignId: campaign.id, candidates, picks: all };
 }
 
-/** Convergence of every candidate place toward its hidden best (cached per day). */
-export function convergenceOf(model: Model): PointConvergence[] {
-  return memo(model, "convergence", () => convergence(model.session));
+/**
+ * How the picks at a candidate place settled, day by day, read from the Rating's own beliefs:
+ * the picks, those on the candidate it believed best that day, and the value lost on the
+ * others (estimated regret). No hidden truth.
+ */
+export interface PointConvergence {
+  point: string;
+  picks: number;
+  /** The candidate the Rating believes best now, per campaign. */
+  bestByCampaign: Record<string, string>;
+  daily: { picks: number; onBest: number; regretCents: number }[];
 }
 
-/** Share on the hidden best per day (null on a day without picks). */
+/** The settling of every candidate place (cached per day). */
+export function convergenceOf(model: Model): PointConvergence[] {
+  return memo(model, "convergence", () => {
+    const by = new Map<string, PointConvergence>();
+    for (const r of model.session.pickLog) {
+      let pc = by.get(r.point);
+      if (!pc) by.set(r.point, (pc = { point: r.point, picks: 0, bestByCampaign: {}, daily: Array.from({ length: model.day }, () => ({ picks: 0, onBest: 0, regretCents: 0 })) }));
+      const picks = r.candidates.reduce((x, c) => x + c.picks, 0);
+      const d = pc.daily[r.day] ?? (pc.daily[r.day] = { picks: 0, onBest: 0, regretCents: 0 });
+      d.picks += picks;
+      d.onBest += r.candidates.find((c) => c.id === r.bestId)?.picks ?? 0;
+      d.regretCents += estimatedRegret({ candidates: r.candidates }).regretCents;
+      pc.picks += picks;
+      pc.bestByCampaign[r.campaignId] = r.bestId;
+    }
+    return [...by.values()];
+  });
+}
+
+/** Share of picks on the candidate believed best that day (null on a day without picks). */
 export function shareSeries(pc: PointConvergence): (number | null)[] {
   return pc.daily.map((d) => (d.picks > 0 ? d.onBest / d.picks : null));
+}
+
+/** The chance the favourite of a place is the best, over the campaigns that use it. */
+export function placeChance(model: Model, point: string): number | null {
+  let best: number | null = null;
+  for (const c of model.campaigns) {
+    if (!model.session.candidatePlaces().some((p) => p.campaignId === c.id && p.point === point)) continue;
+    const top = Math.max(0, ...pointRow(model, c, point).candidates.map((x) => x.chanceBest));
+    best = best === null ? top : Math.max(best, top);
+  }
+  return best;
 }
 
 /** The latest pick records of a set of campaigns, newest first. */

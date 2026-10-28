@@ -18,18 +18,14 @@ export function DayChart({
   series,
   format,
   reference,
-  days: labels,
   height = 180,
 }: {
   series: Series[];
-  /** The ISO day of each point, oldest first: the axis reads dates. */
-  days?: string[];
   format: (v: number) => string;
   reference?: { y: number; label: string };
   height?: number;
 }) {
   const days = Math.max(0, ...series.map((s) => s.values.length));
-  const dayLabel = (d: number) => (labels ? (labels[d] ? new Date(labels[d]!).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "") : `Day ${d}`);
   const data = Array.from({ length: days }, (_, d) => {
     const row: Record<string, number | null> = { day: d };
     for (const s of series) row[s.key] = s.values[d] ?? null;
@@ -43,13 +39,12 @@ export function DayChart({
           <XAxis
             dataKey="day"
             type="number"
-            allowDecimals={false}
             domain={[0, Math.max(1, days - 1)]}
             tick={{ fontSize: 11, fill: "var(--fg-3)" }}
             tickLine={false}
             axisLine={false}
             minTickGap={30}
-            tickFormatter={(d: number) => dayLabel(d)}
+            tickFormatter={(d: number) => `Day ${d}`}
           />
           <YAxis tick={{ fontSize: 11, fill: "var(--fg-3)" }} tickLine={false} axisLine={false} width={52} tickCount={4} tickFormatter={(v: number) => format(v)} />
           {reference && (
@@ -60,7 +55,7 @@ export function DayChart({
             content={({ active, payload, label }) =>
               active && payload?.length ? (
                 <div className="k-popover px-2.5 py-1.5 text-[12px]">
-                  <p className="k-fg3 k-mono">{dayLabel(Number(label))}</p>
+                  <p className="k-fg3 k-mono">Day {String(label)}</p>
                   {payload.map((p) => {
                     const s = series.find((x) => x.key === p.dataKey);
                     return p.value == null ? null : (

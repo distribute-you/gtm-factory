@@ -54,7 +54,7 @@ export function ApiTeamPage() {
                     <EmptyNote>Your team performs no script yet.</EmptyNote>
                   </div>
                 ) : (
-                  <CardTable note="Work your team does by hand, and how much of it fits in a day.">
+                  <CardTable>
                     <thead>
                       <tr className="k-line-subtle border-b">
                         <th className={`${TH} w-full`}>Script</th>

@@ -30,7 +30,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 | `seed/fictional-world.json` | The fictional world: Northwind Analytics starting from scratch, with cold email, LinkedIn and ads. Catalogue, campaigns and their briefs, market and hidden truth. Every scenario number lives here. |
 | `docs/framework.md` | The framework, in plain English, with worked examples checked by tests. |
 | `docs/api.md` | The API a running GTM Factory serves to the dashboard. |
-| `apps/dashboard` | The dashboard. Every page reads the GTM Factory API. The GitHub Pages demo reads a fixed example database: the fictional brand's history, generated once by the simulator and shipped as files (`public/demo`). Next.js static export, deployed on every push to `main`. |
+| `apps/dashboard` | The live dashboard: the whole product on the simulated world, in the browser. Next.js static export, deployed to GitHub Pages on every push to `main`. |
 | `apps/server` | A hosted GTM Factory: the API the dashboard reads, the scheduler, a Postgres ledger, every script run in its own isolated V8. distribute.you hosts one. See [apps/server/README.md](apps/server/README.md). |
 | `apps/desktop` | The Mac app (Tauri 2): the hosted dashboard in its own window, writing with your own Claude subscription through the `claude` CLI. Built, signed ad hoc and released on every `desktop-v*` tag. |
 
@@ -55,7 +55,7 @@ console.log(meanRegret(regret, 0, 10), meanRegret(regret, 50, 60));
 
 ## The dashboard
 
-Open the [demo](https://distribute-you.github.io/gtm-factory/): the same pages a running GTM Factory serves, over 30 days of a fictional client's history. Every page reads the framework's code: the campaign page shows its Goal, proactive or reactive, its Plan as a tree of what ran with the share and cost of each branch, what its subjects went through milestone to milestone, the cost of each milestone from Start and the attempts per Target, and each script with its materials and the Provider each comes from. The "Done by your team" page holds the capacity of the scripts the client's team performs. The research page shows, at every place, the Rating's estimate for each script with its margin, the chance each one is the best, and the value lost to weaker picks day by day. The ledger reconciles to the cent.
+Open the [live site](https://distribute-you.github.io/gtm-factory/), start the clock, and watch a fictional client win paying clients. Every page reads the framework's code: the campaign page shows its Goal, proactive or reactive, its Plan as a tree of what ran with the share and cost of each branch, what its subjects went through milestone to milestone, the cost of each milestone from Start and the attempts per Target, and each script with its materials and the Provider each comes from. The "Done by your team" page holds the capacity of the scripts the client's team performs. The research page shows, at every place, the Rating's estimate for each candidate and the chance it is the best, and the ledger reconciles to the cent.
 
 With `NEXT_PUBLIC_DATA_SOURCE=api`, the same dashboard runs a real GTM Factory through its API. See [docs/api.md](docs/api.md).
 

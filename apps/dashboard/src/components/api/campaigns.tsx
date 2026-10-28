@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Flows, PlanTree, type FlowView, type TreeNode } from "@/components/plan-tree";
 import { START, type ApiCampaign, type ApiCampaignDetail, type ApiPlanNode, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
-import { BarSpark, CardTable, ChartNote, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
+import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { engineTitle, outcomeName, outcomePluralName, scriptTitle } from "@/lib/api/labels";
@@ -35,7 +35,7 @@ export function ApiCampaignsPage() {
                   </EmptyNote>
                 </div>
               ) : (
-                <CardTable note="Each campaign, its daily cap, and how much of today's cap it used.">
+                <CardTable>
                   <thead>
                     <tr className="k-line-subtle border-b">
                       <th className={`${TH} w-full`}>Campaign</th>
@@ -211,7 +211,6 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
         </StatTile>
         <StatTile label="Spend by day" note={d.spendByDay.length > 0 ? `${d.spendByDay.length} days` : undefined}>
           {d.spendByDay.length > 0 ? <BarSpark values={d.spendByDay.map((x) => x.cents)} className="h-10" /> : <span className="k-fg4">—</span>}
-          <ChartNote>What this campaign spent each day.</ChartNote>
         </StatTile>
       </div>
 
@@ -224,7 +223,7 @@ function Campaign({ d, catalogue }: { d: ApiCampaignDetail; catalogue: Catalogue
       {d.milestones.length > 0 && (
         <section className="mt-8">
           <SectionTitle count={d.milestones.length}>Milestones</SectionTitle>
-          <CardTable note="What one result costs at each milestone, and how many attempts it takes.">
+          <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={TH}>Milestone</th>

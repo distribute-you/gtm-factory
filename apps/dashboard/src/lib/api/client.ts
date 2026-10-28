@@ -7,19 +7,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BASE_PATH, FACTORY_API_URL, IS_API } from "@/lib/data-source";
-import { demoFile } from "@/lib/demo-key";
+import { FACTORY_API_URL } from "@/lib/data-source";
 
 const REFRESH_EVENT = "gtm-factory:refresh";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  if (!IS_API) {
-    // The demo reads a fixed example database: one file per read, nothing computed here, nothing written.
-    if (method !== "GET") throw new Error("The demo shows example data. Changes work on your own GTM Factory.");
-    const res = await fetch(`${BASE_PATH}/demo/${demoFile(path)}`);
-    if (!res.ok) throw new Error("This view is not in the example data.");
-    return (await res.json()) as T;
-  }
   const res = await fetch(`${FACTORY_API_URL}${path}`, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
