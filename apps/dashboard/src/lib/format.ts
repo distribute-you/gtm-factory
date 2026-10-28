@@ -26,6 +26,11 @@ export function periodWord(days: number): string {
   return days <= 1 ? "day" : days === 7 ? "week" : days >= 28 && days <= 31 ? "month" : `${days} days`;
 }
 
+/** "today", "this week", "this month", else "in the last N days": the period a budget is counted over. */
+export function periodPhrase(days: number): string {
+  return days <= 1 ? "today" : days === 7 ? "this week" : days >= 28 && days <= 31 ? "this month" : `per ${days} days`;
+}
+
 /** A campaign's budget as typed: "$40/day", "$200/week", "$90 per 3 days". */
 export function formatBudget(cents: number, periodDays = 1): string {
   const p = periodWord(periodDays);

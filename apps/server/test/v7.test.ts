@@ -377,7 +377,7 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     expect((await api("POST", "/api/outcomes", { label: "Webinar attended" })).status).toBe(409);
     const waiting = await api("POST", "/api/campaigns", { ...base, start: "webinar_attended", dailyBudgetCents: 2000, budgetPeriodDays: 7, volume: { units: 50, periodDays: 7 }, name: "By hand", description: "Typed." });
     expect(waiting.status).toBe(200);
-    expect(waiting.body).toMatchObject({ name: "By hand", description: "Typed.", budgetPeriodDays: 7, volume: { units: 50, periodDays: 7 }, noScript: true });
+    expect(waiting.body).toMatchObject({ name: "By hand", description: "Typed.", budgetPeriodDays: 7, volume: { units: 50, periodDays: 7 }, noScript: true, spentInPeriodCents: 0, capReached: false });
     expect((await api("POST", "/api/campaigns", { ...base, start: "no_such_event", dailyBudgetCents: 2000 })).status).toBe(400);
     // A new strategy rewrites the name and description; a hand edit after it wins.
     const id = (waiting.body as unknown as { id: string }).id;

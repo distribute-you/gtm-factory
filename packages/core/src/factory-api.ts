@@ -263,7 +263,9 @@ export interface ApiCampaign {
   volume: { units: number; periodDays: number } | null;
   spentTodayCents: number;
   spentTotalCents: number;
-  /** Today's spend reached the cap: nothing more runs until tomorrow (UTC). */
+  /** Spend over the budget's own period (today for a daily budget, this week, this month): the figure the budget is compared to. */
+  spentInPeriodCents: number;
+  /** The period's spend reached the budget: nothing more runs until the next period (UTC). */
   capReached: boolean;
   /** Its strategy, in the client's words. */
   brief: string;

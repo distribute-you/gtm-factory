@@ -76,9 +76,9 @@ function Today({ o }: { o: ApiOverview }) {
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Campaign</th>
                 <th className={TH}>Status</th>
-                <th className={TH}>Daily cap</th>
-                <th className={TH}>Today</th>
-                <th className={`${TH} text-right`}>Spent</th>
+                <th className={TH}>Budget</th>
+                <th className={TH}>Spent</th>
+                <th className={`${TH} text-right`}>Spent in total</th>
                 <th className={`${TH} text-right`}>Last tick</th>
               </tr>
             </thead>
@@ -90,9 +90,8 @@ function Today({ o }: { o: ApiOverview }) {
                       <Mark kind="outcome" id={c.target} size={28} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{c.name}</span>
-                        <span className="k-fg3 block truncate text-[12px]">
-                          {brandName(c.brandId)}: {c.line.length > 0 ? c.line.map((x) => outcomeName(o.catalogue, x)).join(" → ") : "Not run yet"}
-                        </span>
+                        <span className="k-fg3 block truncate text-[12px]">{brandName(c.brandId)}</span>
+                        {c.description && <span className="k-fg2 mt-0.5 block text-[12px] leading-5">{c.description}</span>}
                       </span>
                     </Link>
                   </td>

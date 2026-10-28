@@ -12,7 +12,7 @@ import { Mark } from "@/components/mark";
 import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
 import { engineTitle, outcomeName } from "@/lib/api/labels";
-import { formatBudget, formatCents, formatCount, formatRatePct, formatRoi, periodWord } from "@/lib/format";
+import { formatBudget, formatCents, formatCount, formatRatePct, formatRoi, periodPhrase, periodWord } from "@/lib/format";
 
 /** "3m ago", "2h ago", "4d ago". */
 export function timeAgo(iso: string | null | undefined): string {
@@ -221,11 +221,11 @@ export function CapBar({ campaign }: { campaign: ApiCampaign }) {
   return (
     <div className="min-w-[140px]">
       <div className="flex items-baseline justify-between gap-2 text-[12px] tabular-nums">
-        <span>{formatCents(campaign.spentTodayCents)}</span>
-        <span className="k-fg3">of {formatCents(campaign.dailyBudgetCents)}</span>
+        <span>{formatCents(campaign.spentInPeriodCents)}</span>
+        <span className="k-fg3">of {formatCents(campaign.dailyBudgetCents)} {periodPhrase(campaign.budgetPeriodDays)}</span>
       </div>
-      <Meter value={campaign.spentTodayCents} max={campaign.dailyBudgetCents} className="mt-1" color={campaign.capReached ? "var(--data-amber)" : "var(--accent)"} />
-      {campaign.capReached && <span className="mt-1 block text-[12px] text-[var(--data-amber)]">Cap reached</span>}
+      <Meter value={campaign.spentInPeriodCents} max={campaign.dailyBudgetCents} className="mt-1" color={campaign.capReached ? "var(--data-amber)" : "var(--accent)"} />
+      {campaign.capReached && <span className="mt-1 block text-[12px] text-[var(--data-amber)]">Budget reached</span>}
     </div>
   );
 }
