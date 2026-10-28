@@ -29,7 +29,7 @@ export function DayChart({
   height?: number;
 }) {
   const days = Math.max(0, ...series.map((s) => s.values.length));
-  const dayLabel = (d: number) => (labels?.[d] ? new Date(labels[d]!).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : `Day ${d}`);
+  const dayLabel = (d: number) => (labels ? (labels[d] ? new Date(labels[d]!).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "") : `Day ${d}`);
   const data = Array.from({ length: days }, (_, d) => {
     const row: Record<string, number | null> = { day: d };
     for (const s of series) row[s.key] = s.values[d] ?? null;
@@ -43,6 +43,7 @@ export function DayChart({
           <XAxis
             dataKey="day"
             type="number"
+            allowDecimals={false}
             domain={[0, Math.max(1, days - 1)]}
             tick={{ fontSize: 11, fill: "var(--fg-3)" }}
             tickLine={false}
