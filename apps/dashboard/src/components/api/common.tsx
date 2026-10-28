@@ -7,8 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
 import { OURS, type ApiCampaign, type ApiPick, type ApiCandidates, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
-import { CardTable, ChartNote, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
-import { DayChart } from "@/components/charts";
+import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
@@ -256,7 +255,7 @@ export function RunsTable({ runs, catalogue, empty = "No run yet." }: { runs: Ap
   const [openId, setOpenId] = useState<string | null>(null);
   if (runs.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
-    <CardTable note="Each run, what happened, and what it cost." footer={`${formatCount(runs.length)} runs`}>
+    <CardTable footer={`${formatCount(runs.length)} runs`}>
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
@@ -329,7 +328,7 @@ export function PicksTable({ picks, empty = "No pick made yet." }: { picks: ApiP
   const [openId, setOpenId] = useState<string | null>(null);
   if (picks.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
-    <CardTable note="Each pick the Rating made, and why it made it." footer={`${formatCount(picks.length)} picks`}>
+    <CardTable footer={`${formatCount(picks.length)} picks`}>
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={TH}>When</th>
@@ -356,7 +355,7 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
         <td className={`${TD} whitespace-nowrap`}>
           <span className="inline-flex items-center gap-2">
             <Mark kind={pick.kind === "input" ? "material" : "engine"} id={pick.place} size={16} />
-            {pick.kind === "input" ? `${pick.placeLabel} used` : `${pick.placeLabel} · script`}
+            {pick.kind === "input" ? `${pick.placeLabel} used` : pick.placeLabel}
           </span>
         </td>
         <td className={`${TD} whitespace-nowrap font-medium`}>{pick.pickedLabel}</td>
@@ -393,39 +392,24 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
 }
 
 /** Each candidate place and its candidates' beliefs, under a uniform title. Rows keep the served order. */
-/** The chance the Rating's favourite is the best here, from its beliefs. */
-export function topChance(p: ApiCandidates): number {
-  return Math.max(0, ...p.candidates.map((o) => o.chanceBest));
-}
-
-/** A place has a clear winner when one candidate is the best with a chance over 90%. */
-export const CLEAR_WINNER = 0.9;
-
-const LINE_COLORS = ["var(--accent)", "var(--data-teal)", "var(--data-amber)", "var(--data-rose)", "var(--run)", "var(--fg-3)"];
-
 export function PointsList({ points, catalogue, empty = "No candidate place yet." }: { points: ApiCandidates[]; catalogue?: CatalogueData | null; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
-        const days = p.daily.map((d) => d.day);
-        const shareLines = p.candidates.map((o, i) => ({ key: `s${i}`, label: o.label, values: p.daily.map((d) => (d.picks > 0 ? (d.shares[o.id] ?? 0) : null)), color: LINE_COLORS[i % LINE_COLORS.length]! }));
-        const marginLine = [{ key: "m", label: "Margin on the favourite's rate", values: p.daily.map((d) => d.bestMargin), color: "var(--accent)" }];
-        const learned = p.daily.length > 1;
         return (
-          <CardTable key={p.id} note="The Rating's estimate for each script, its margin, and the chance it is the best here." footer={`${formatCount(p.candidates.length)} scripts compete here`}>
+          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} scripts compete here`}>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`} colSpan={8}>
+                <th className={`${TH} w-full`} colSpan={7}>
                   <ApiPointTitle point={p} catalogue={catalogue} />
                 </th>
               </tr>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Script</th>
                 <th className={`${TH} text-right`}>Share this week</th>
-                <th className={`${TH} text-right`}>% reach the next milestone</th>
                 <th className={`${TH} text-right`}>$ per outcome</th>
-                <th className={`${TH} text-right`}>Chance to be the best</th>
+                <th className={`${TH} text-right`}>% reach the next milestone</th>
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
@@ -434,39 +418,18 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
             <tbody>
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
-                  <td className={`${TD} w-full max-w-0`}>
-                    <span className="truncate">{o.label}</span>
+                  <td className={TD}>
+                    {o.label}
                     <InputsLine inputs={o.inputs.map((i) => ({ label: i.label, versions: i.versions.map((v) => ({ label: v.label, share: v.share })) }))} className="mt-0.5" />
                   </td>
                   <td className={TDN}>{formatRatePct(o.share)}</td>
-                  <td className={TDN}>
-                    {formatRatePct(o.rateMean)} <span className="k-fg3">± {formatRatePct(o.rateSd)}</span>
-                  </td>
                   <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
-                  <td className={`${TDN} ${o.chanceBest >= CLEAR_WINNER ? "text-[var(--run)]" : ""}`}>{formatRatePct(o.chanceBest)}</td>
+                  <td className={TDN}>{formatRatePct(o.rateMean)}</td>
                   <td className={TDN}>{formatCount(o.picks)}</td>
                   <td className={TDN}>{formatCount(o.successes)}</td>
                   <td className={TDN}>{formatCents(o.spentCents)}</td>
                 </tr>
               ))}
-              {learned && (
-                <tr>
-                  <td colSpan={8} className="px-4 pb-3 pt-3">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <p className="k-label mb-1">Share of picks over time</p>
-                        <DayChart series={shareLines} days={days} format={(v) => formatRatePct(v)} height={120} />
-                        <ChartNote>How the picks moved toward the script the Rating trusts most.</ChartNote>
-                      </div>
-                      <div>
-                        <p className="k-label mb-1">Margin on the favourite</p>
-                        <DayChart series={marginLine} days={days} format={(v) => formatRatePct(v)} height={120} />
-                        <ChartNote>How unsure the Rating was about its favourite. It narrows as results come in.</ChartNote>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </CardTable>
         );

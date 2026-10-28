@@ -2,7 +2,7 @@
 
 The dashboard reads one of two data sources, picked at build time:
 
-- **demo** (default): a fixed example database, the fictional brand's 30 days, generated once by the simulator (`pnpm --filter dashboard demo-data`) and read as files. Nothing is computed in the browser and nothing can be changed. This is the GitHub Pages build.
+- **simulator** (default): the fictional world, computed in the browser. This is the GitHub Pages build.
 - **api**: a running GTM Factory. The dashboard reads and writes its backend over JSON: brands, campaigns (start, Target, brief, launch, pause, daily cap, volume; their Plan, milestones and what their subjects went through), leads and their Units with their traceability, brand dynasties (templates, ICPs), scripts with their code, materials and capacity, the Supplier rating's beliefs and the ledger. This repository ships the contract, not a backend.
 
 The contract is [`packages/core/src/factory-api.ts`](../packages/core/src/factory-api.ts): every endpoint and every shape, typed. A running GTM Factory implements it under one base URL. Every figure is computed by the backend; the dashboard divides nothing. Money is integer cents, times are ISO strings. Pins (the sidebar's pinned outcomes) are the backend's data too (`ApiOverview.pins`).
@@ -11,7 +11,7 @@ The contract is [`packages/core/src/factory-api.ts`](../packages/core/src/factor
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_DATA_SOURCE` | `api` (anything else: the demo's example database) |
+| `NEXT_PUBLIC_DATA_SOURCE` | `api` (anything else: the simulator) |
 | `NEXT_PUBLIC_FACTORY_API_URL` | base URL of the API, default `/api` (same origin) |
 | `NEXT_OUTPUT` | `standalone` for a Node server; default is the static export |
 | `NEXT_PUBLIC_BASE_PATH` | `""` to serve from the root |
@@ -75,7 +75,6 @@ A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashb
 
 A client may have their own Claude (Pro or Max) write the LLM completions their campaigns need, at $0 to the host, through the GTM Factory app on their Mac. `GET /claude/requests` answers `ApiClaudeRequests`: the requests waiting, oldest first, each with its `prompt`; every call says the app is online. `POST /claude/requests/:id/answer` with `ApiClaudeAnswer` (`text`, optional `model`) posts what the client's Claude wrote: the next tick lands it as the LLM completion, and the run that asked goes on. `GET /claude/status` answers `ApiClaudeStatus`: `online` when the app called in the last 2 minutes, and how many requests wait. Inside the app, the dashboard runs this loop itself; in a browser it only shows "Your Claude: online" or "offline".
 
-## One dashboard, two data sources
+## Research reads beliefs only
 
-Every page of the dashboard reads this API and nothing else. The demo reads the same answers from files the simulator wrote once (`apps/dashboard/src/lib/demo-data.test.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. No answer carries a hidden truth: Research shows the Rating's estimates, their margins, the chance each candidate is the best (`chanceBest`) and the value lost to weaker picks (`daily[].regretCents`), all from the beliefs. When nothing runs (no real vendor connected), `scheduler.waiting` says so in plain words and every page shows it.
-
+No answer carries a hidden truth: Research shows the Rating's estimates, their margins, the chance each candidate is the best (`chanceBest`) and the value lost to weaker picks (`daily[].regretCents`), all from the beliefs. When nothing runs (no real vendor connected), `scheduler.waiting` says so in plain words.

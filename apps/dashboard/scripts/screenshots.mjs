@@ -1,5 +1,5 @@
-// Render check: serve the static export under /gtm-factory (the demo reads its example database),
-// open every page at desktop width, save a screenshot per page, and fail on any console error.
+// Render check: serve the static export under /gtm-factory, open every page after 30 simulated
+// days at desktop width, save a screenshot per page, and fail on any console error.
 // Usage: pnpm --filter dashboard build && pnpm --filter dashboard screenshots [outDir]
 import { createServer } from "node:http";
 import { readFile, stat, mkdir } from "node:fs/promises";
@@ -40,11 +40,11 @@ export const PAGES = [
   ["campaign-reactive", "/campaigns/view/?id=campaign-follow-ups"],
   ["campaign-ads", "/campaigns/view/?id=campaign-ads"],
   ["team", "/team/"],
-  ["audiences", "/audiences/"],
-  ["companies", "/companies/"],
   ["accounts", "/accounts/"],
+  ["icps", "/audiences/"],
   ["leads", "/leads/"],
   ["lead", "LEAD"],
+  ["companies", "/companies/"],
   ["pinned-templates", "/pinned/?pin=outcome%3Atemplate_written"],
   ["pinned-llms", "/pinned/?pin=outcome%3Allm_completion"],
   ["research", "/research/"],
@@ -64,11 +64,14 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(`${page.url()}: ${m.text()}`));
 page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
 
+// Day 30 of the world, then every page reads the same saved history.
+await page.goto(`${origin}/?day=30`);
+await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
 let leadHref = "/leads/";
 for (const [name, route] of PAGES) {
   await page.goto(`${origin}${route === "LEAD" ? leadHref.replace(BASE, "") : route}`);
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(800);
+  await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
+  await page.waitForTimeout(1200);
   // The panel scrolls inside a fixed frame: grow the window to the panel's height to capture it whole.
   const h = await page.evaluate(() => (document.querySelector("main")?.scrollHeight ?? 900) + 64);
   await page.setViewportSize({ width: 1440, height: Math.min(Math.max(900, h), 7000) });
@@ -85,7 +88,7 @@ for (const [name, route] of PAGES) {
 }
 // The organization, brand and offer selector, open.
 await page.goto(`${origin}/campaigns/`);
-await page.waitForLoadState("networkidle");
+await page.waitForSelector('[data-testid="sim-day"]:has-text("Day 30")', { timeout: 90000 });
 await page.click('[data-testid="scope-selector"]');
 await page.waitForTimeout(500);
 await page.screenshot({ path: path.join(outDir, "scope-selector.png") });

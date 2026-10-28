@@ -7,7 +7,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   BookOpenIcon,
-  BuildingsIcon,
   FlaskIcon,
   HouseIcon,
   PlusIcon,
@@ -24,11 +23,10 @@ import { Mark } from "@/components/mark";
 import { OverviewProvider, useOverview, useScope } from "@/lib/api/overview";
 import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
-import { IS_API } from "@/lib/data-source";
 import { timeAgo } from "./common";
 import { ClaudeBridge, ClaudeMark } from "./claude";
 
-/** The one frame: Keel's canvas and sidebar, every page in one inset panel; a plain line above it when nothing runs. */
+/** The frame in api mode: Keel's canvas and sidebar, every page in one inset panel, no simulator. */
 export function ApiShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -57,13 +55,6 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
       </NavContext.Provider>
     </OverviewProvider>
   );
-}
-
-/** Says plainly why nothing runs (no real vendor connected yet), when the backend says so. */
-function WaitingLine() {
-  const { data } = useOverview();
-  if (!data?.scheduler.waiting) return null;
-  return <p className="k-inset mb-2 ml-2 mr-2 rounded-[8px] px-3 py-2 text-[13px] lg:ml-0">{data.scheduler.waiting}</p>;
 }
 
 const pinKey = (p: { kind: string; id: string }) => `${p.kind}:${p.id}`;
@@ -99,19 +90,25 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+/** Says plainly why nothing runs (no real vendor connected yet), when the backend says so. */
+function WaitingLine() {
+  const { data } = useOverview();
+  if (!data?.scheduler.waiting) return null;
+  return <p className="k-inset mb-2 ml-2 mr-2 rounded-[8px] px-3 py-2 text-[13px] lg:ml-0">{data.scheduler.waiting}</p>;
+}
+
 function Sidebar() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
   const { data, error } = useOverview();
   const { orgs, scope, setScope } = useScope();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
-  const audience = data?.catalogue.outcomes.find((x) => x.contentType === "audience" && !x.retired);
   const id = search.get("id");
   const brandName = (bid: string) => data?.brands.find((b) => b.id === bid)?.name ?? "";
   return (
     <aside className="flex h-full w-[248px] max-w-[85vw] shrink-0 flex-col">
       <div className="space-y-2 px-2 pt-2">
-        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory ${RELEASE} · ${!IS_API ? "example data, fictional brand" : error ? "server unreachable" : data?.scheduler.waiting ? "nothing runs yet" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
+        <ScopeSelector orgs={orgs} value={scope} onChange={setScope} note={`GTM Factory ${RELEASE} · ${error ? "server unreachable" : data?.scheduler.lastTickAt ? `last tick ${timeAgo(data.scheduler.lastTickAt)}` : "running for real"}`} />
         <Link href="/campaigns/new/" className="k-btn-strong w-full justify-center">
           <PlusIcon size={14} weight="bold" />
           New campaign
@@ -147,8 +144,6 @@ function Sidebar() {
         </Group>
         <Group title="Records">
           <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} />
-          <NavItem href="/companies/" label="Companies" icon={<BuildingsIcon size={15} />} active={at("/companies")} />
-          {audience && <NavItem href="/audiences/" label={audience.plural ?? `${audience.label}s`} icon={<Mark kind="object" id={audience.id} icon={audience.icon} size={16} />} active={at("/audiences")} />}
         </Group>
         {data?.pins && data.pins.length > 0 && (
           <Group title="Pinned">

@@ -48,11 +48,11 @@ describe("read models", () => {
     expect(session.ledger().reconciles).toBe(true);
   });
 
-  it("lists every pick of a campaign with beliefs and the hidden best", () => {
+  it("lists every pick of a campaign with beliefs and the chance each candidate is the best, never a hidden truth", () => {
     const points = pointsOf(model, model.campaigns[0]!);
     expect(points.length).toBeGreaterThan(5);
-    const graded = points.filter((p) => p.candidates.length > 1 && p.candidates.some((o) => o.isHiddenBest));
-    expect(graded.length).toBeGreaterThan(5);
+    for (const p of points) if (p.candidates.length > 0) expect(p.candidates.reduce((x, o) => x + o.chanceBest, 0)).toBeCloseTo(1, 6);
+    expect(JSON.stringify(points)).not.toMatch(/"(truth|isHiddenBest)"/);
   });
 
   it("shows who calls an Engine and the best script for each caller", () => {

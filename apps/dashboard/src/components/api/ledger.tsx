@@ -1,7 +1,7 @@
 "use client";
 
 import type { ApiLedger, CatalogueData } from "@gtm-factory/core";
-import { BarSpark, CardTable, ChartNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
+import { BarSpark, CardTable, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { engineTitle, outcomeName } from "@/lib/api/labels";
@@ -34,7 +34,6 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
         </StatTile>
         <StatTile label="Spend by day" note={l.byDay.length > 0 ? `${l.byDay.length} days` : undefined}>
           {l.byDay.length > 0 ? <BarSpark values={l.byDay.map((d) => d.cents)} className="h-10" /> : <span className="k-fg4">—</span>}
-          <ChartNote>What every campaign spent each day, together.</ChartNote>
         </StatTile>
         <StatTile label="Reconciled to the cent">
           {r.reconciles ? <ToneDot tone="run">Yes</ToneDot> : <ToneDot tone="rose">No</ToneDot>}
@@ -47,7 +46,7 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section>
           <SectionTitle count={l.byVendor.length}>By vendor</SectionTitle>
-          <CardTable note="What each vendor charged, item by item.">
+          <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={TH}>Vendor</th>
@@ -70,7 +69,7 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
         </section>
         <section>
           <SectionTitle count={l.byCampaign.length}>By campaign</SectionTitle>
-          <CardTable note="What each campaign spent in total.">
+          <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Campaign</th>
@@ -89,7 +88,7 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
         </section>
         <section>
           <SectionTitle count={l.byEngine.length}>By Engine</SectionTitle>
-          <CardTable note="What each Engine spent, and how many results it made.">
+          <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Engine</th>
@@ -112,7 +111,7 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
         </section>
         <section>
           <SectionTitle count={l.byScript.length}>By script</SectionTitle>
-          <CardTable note="What each script spent across its runs.">
+          <CardTable>
             <thead>
               <tr className="k-line-subtle border-b">
                 <th className={`${TH} w-full`}>Script</th>
@@ -135,7 +134,7 @@ function Ledger({ l, catalogue }: { l: ApiLedger; catalogue: CatalogueData | und
 
       <section className="mt-8">
         <SectionTitle count={r.report.length}>Unit cost of each outcome, every path</SectionTitle>
-        <CardTable note="What one unit of each result cost, counting every path that made it.">
+        <CardTable>
           <thead>
             <tr className="k-line-subtle border-b">
               <th className={`${TH} w-full`}>Outcome</th>
