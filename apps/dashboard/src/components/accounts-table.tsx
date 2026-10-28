@@ -31,7 +31,7 @@ const CHANNEL_ICON: Record<string, React.ReactNode> = {
 export function AccountsTable({ rows, roles, onRole }: { rows: AccountRow[]; roles: string[]; onRole: (id: string, role: string) => Promise<string | null> | string | null }) {
   const sorted = [...rows].sort((a, b) => a.channel.localeCompare(b.channel) || a.role.localeCompare(b.role) || a.address.localeCompare(b.address));
   return (
-    <CardTable footer="A script asks for a role, then picks one of the accounts with that role. Change a role here and the next run follows it.">
+    <CardTable note="Each account, its role, and how much it sent and read." footer="A script asks for a role, then picks one of the accounts with that role. Change a role here and the next run follows it.">
       <thead>
         <tr className="k-line-subtle border-b">
           <th className={`${TH} w-full`}>Account</th>

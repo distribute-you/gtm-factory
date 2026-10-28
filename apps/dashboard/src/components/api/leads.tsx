@@ -60,7 +60,7 @@ export function ApiLeadsPage() {
                 <EmptyNote>No lead here yet.</EmptyNote>
               </div>
             ) : (
-              <CardTable footer={plural(leads.length, "lead", "leads")}>
+              <CardTable note="Every person found, and the furthest milestone each one reached." footer={plural(leads.length, "lead", "leads")}>
                 <thead>
                   <tr className="k-line-subtle border-b">
                     <th className={TH}>Name</th>

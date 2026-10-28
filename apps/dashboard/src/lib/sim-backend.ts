@@ -9,7 +9,9 @@
 import {
   OURS,
   START,
+  chanceOfBest,
   describeCondition,
+  estimatedRegret,
   isOurs,
   type ApiCompany,
   type ApiProposal,
@@ -42,14 +44,18 @@ import {
   type ScriptInput,
   type WorldClient,
 } from "@gtm-factory/core";
-import { candidateLabel, companyName, convergenceOf, engineName, explainPick, headScript, hiddenOf, leadRows, materialsOfScript, objectDynasties, outcomeLabel, personName, pointInfo, previewPlan, scopeFigures, scopeReturn, type Model } from "./model";
+import { candidateLabel, companyName, engineName, explainPick, headScript, leadRows, materialsOfScript, objectDynasties, outcomeLabel, personName, pointInfo, previewPlan, scopeFigures, scopeReturn, type Model } from "./model";
 import { campaignMilestones, freshCampaignId, newClient } from "./campaigns";
 import type { SimAction } from "./world";
 import { SOURCES } from "@gtm-factory/scripts";
 
-/** The simulated day being shown is today: day d is (today's day - d) days ago. */
+/** The simulated day being shown is the anchor (now, or the fixed date of the shipped example data): day d is (shown day - d) days before it. */
 let shownDay = 0;
-export const isoOfDay = (day: number): string => new Date(Date.now() - (shownDay - day) * 86_400_000).toISOString();
+let anchorMs: number | null = null;
+export function setAnchor(ms: number | null): void {
+  anchorMs = ms;
+}
+export const isoOfDay = (day: number): string => new Date((anchorMs ?? Date.now()) - (shownDay - day) * 86_400_000).toISOString();
 
 export class SimHttpError extends Error {
   constructor(
@@ -274,30 +280,30 @@ function candidatesOf(model: Model, c: Campaign, point: string): ApiCandidates {
     recent.set(o, n);
     total += n;
   }
-  const hidden = hiddenOf(model, c).get(point) ?? null;
-  const candidates: ApiCandidate[] = model.session.beliefsAt(point, c.id).map((b) => ({
+  const beliefs = model.session.beliefsAt(point, c.id);
+  const chance = chanceOfBest(beliefs.map((b) => ({ id: b.candidate, rate: b.rate, rateSd: b.rateSd, cost: b.cost })));
+  const candidates: ApiCandidate[] = beliefs.map((b) => ({
     id: b.candidate,
     label: candidateLabel(model, point, b.candidate, c.brandId),
     rateMean: b.rate,
+    rateSd: b.rateSd,
     costMeanCents: Math.round(b.cost * 100),
     meanScore: b.valuePerDollar,
+    chanceBest: chance[b.candidate] ?? 0,
     share: total > 0 ? (recent.get(b.candidate) ?? 0) / total : 0,
     picks: series.get(b.candidate)?.reduce((x, y) => x + y, 0) ?? 0,
     successes: b.successes,
     spentCents: spentByDynasty(model, c).get(b.candidate) ?? 0,
     inputs: info.kind === "script" ? inputsOut(model, model.session.inputsOf(b.candidate, c.id)) : [],
-    ...truthOf(hidden, b.candidate),
   }));
-  const conv = convergenceOf(model).find((x) => x.point === point);
-  const onBest = conv ? conv.daily.map((d, day) => ({ day: isoOfDay(day), picks: d.picks, onBest: d.onBest })) : undefined;
-  return { id: point, consumer: info.consumer, material: info.material, label: info.title, candidates, campaignId: c.id, ...(onBest ? { onBest } : {}) };
-}
-
-/** The world's hidden truth about a candidate: only the simulator knows it, so only it serves these optional fields. */
-function truthOf(hidden: { best: string; candidates: { candidate: string; rate: number; costCents: number; perDollar: number }[] } | null, candidate: string): Pick<ApiCandidate, "truth" | "hiddenBest"> {
-  const t = hidden?.candidates.find((h) => h.candidate === candidate);
-  if (!hidden) return {};
-  return { hiddenBest: hidden.best === candidate, ...(t ? { truth: { rate: t.rate, costCents: t.costCents, perDollar: t.perDollar } } : {}) };
+  const daily = model.session.pickLog
+    .filter((p) => p.point === point && p.campaignId === c.id)
+    .map((p) => {
+      const picks = p.candidates.reduce((x, o) => x + o.picks, 0);
+      const r = estimatedRegret({ candidates: p.candidates });
+      return { day: isoOfDay(p.day), picks, shares: Object.fromEntries(p.candidates.map((o) => [o.id, picks > 0 ? o.picks / picks : 0])), regretCents: r.regretCents, bestMargin: r.bestMargin };
+    });
+  return { id: point, consumer: info.consumer, material: info.material, label: info.title, candidates, campaignId: c.id, daily };
 }
 
 /** The places where a campaign's scripts compete. The brand's competing inputs (ICPs, templates) ride on the row of the script that used them. */

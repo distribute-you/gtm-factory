@@ -28,7 +28,7 @@ export function ApiBrandsPage() {
                   </EmptyNote>
                 </div>
               ) : (
-                <CardTable>
+                <CardTable note="Each brand you sell for, who it sells to, and what we spent on it.">
                   <thead>
                     <tr className="k-line-subtle border-b">
                       <th className={TH}>Brand</th>

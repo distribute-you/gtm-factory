@@ -15,7 +15,7 @@ Built by [distribute.you](https://distribute.you). Revenue made easy.
 - **Pull and push, on a Plan recomputed every tick.** A Campaign fixes only its Target, its start, its budget and a brief in plain words, which a judge reads once per Engine. From Start it pulls from the Target down, most advanced Units first; from any other outcome it pushes each Unit that lands up toward the Target. Its page shows the Plan as what actually ran this week: every script that made Units is a branch, nothing is frozen.
 - **A Supplier rating.** Thompson sampling on value per dollar, pooled from the candidate everywhere down to the client, with delay censoring, measured costs and the picks under each branch rated at their best. Every Unit carries its traceability, so every pick is credited when the next milestone lands.
 - **A ledger.** The common stock of every Unit. Decisions read each candidate's own cost; reports price every outcome by every path, reconciled to the cent.
-- **A simulator.** One fictional world as data, with a hidden truth, played tick by tick. It runs the same script code against a vendor that answers from the hidden truth, and grades the Rating by its regret.
+- **A simulator.** One fictional world as data, with a hidden truth, played tick by tick. It runs the same script code against a vendor that answers from the hidden truth, and grades the Rating by its regret in the tests. The hidden truth never reaches a page.
 
 **Open source and hosted.** This repository is the framework and one fictional world to adapt to your own use case. A hosted GTM Factory keeps its catalogue in its database: outcomes, Engines, scripts and every version of their code, Providers. It keeps every run's result there too. Its estimates sharpen over time, because what one client learns is pooled with the others.
 
@@ -30,7 +30,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 | `seed/fictional-world.json` | The fictional world: Northwind Analytics starting from scratch, with cold email, LinkedIn and ads. Catalogue, campaigns and their briefs, market and hidden truth. Every scenario number lives here. |
 | `docs/framework.md` | The framework, in plain English, with worked examples checked by tests. |
 | `docs/api.md` | The API a running GTM Factory serves to the dashboard. |
-| `apps/dashboard` | The live dashboard: the whole product on the simulated world, in the browser. Next.js static export, deployed to GitHub Pages on every push to `main`. |
+| `apps/dashboard` | The dashboard. Every page reads the GTM Factory API. The GitHub Pages demo reads a fixed example database: the fictional brand's history, generated once by the simulator and shipped as files (`public/demo`). Next.js static export, deployed on every push to `main`. |
 
 ## Quick start
 
@@ -53,7 +53,7 @@ console.log(meanRegret(regret, 0, 10), meanRegret(regret, 50, 60));
 
 ## The dashboard
 
-Open the [live site](https://distribute-you.github.io/gtm-factory/), start the clock, and watch a fictional client win paying clients. Every page reads the framework's code: the campaign page shows its Goal, proactive or reactive, its Plan as a tree of what ran with the share and cost of each branch, what its subjects went through milestone to milestone, the cost of each milestone from Start and the attempts per Target, and each script with its materials and the Provider each comes from. The "Done by your team" page holds the capacity of the scripts the client's team performs. The research page shows every pick beside the hidden best, and the ledger reconciles to the cent.
+Open the [demo](https://distribute-you.github.io/gtm-factory/): the same pages a running GTM Factory serves, over 30 days of a fictional client's history. Every page reads the framework's code: the campaign page shows its Goal, proactive or reactive, its Plan as a tree of what ran with the share and cost of each branch, what its subjects went through milestone to milestone, the cost of each milestone from Start and the attempts per Target, and each script with its materials and the Provider each comes from. The "Done by your team" page holds the capacity of the scripts the client's team performs. The research page shows, at every place, the Rating's estimate for each script with its margin, the chance each one is the best, and the value lost to weaker picks day by day. The ledger reconciles to the cent.
 
 With `NEXT_PUBLIC_DATA_SOURCE=api`, the same dashboard runs a real GTM Factory through its API. See [docs/api.md](docs/api.md).
 

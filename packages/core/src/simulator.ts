@@ -80,8 +80,10 @@ export interface PickRecord {
   day: number;
   campaignId: string;
   point: string;
-  candidates: { id: string; meanScore: number; picks: number }[];
+  /** Each candidate as the Rating believed it that day: value per dollar, rate and its margin, cost. */
+  candidates: { id: string; meanScore: number; picks: number; rate: number; rateSd: number; costCents: number }[];
   pickedId: string;
+  /** The candidate the Rating believed best that day. */
   bestId: string;
 }
 
@@ -2029,7 +2031,7 @@ export class SimulationSession {
       const brandId = this.campaign(campaignId)!.brandId;
       const scored = candidates.map((o) => {
         const b = this.belief(point, o, candidates, brandId, day);
-        return { id: o, meanScore: betaMean(b.posterior) / Math.max(b.cost.mean, 1e-6), picks: picks.get(o) ?? 0 };
+        return { id: o, meanScore: betaMean(b.posterior) / Math.max(b.cost.mean, 1e-6), picks: picks.get(o) ?? 0, rate: betaMean(b.posterior), rateSd: Math.sqrt(betaVariance(b.posterior)), costCents: b.cost.mean * 100 };
       });
       const pickedId = [...scored].sort((x, y) => y.picks - x.picks || (x.id < y.id ? -1 : 1))[0]!.id;
       const bestId = [...scored].sort((x, y) => y.meanScore - x.meanScore || (x.id < y.id ? -1 : 1))[0]!.id;

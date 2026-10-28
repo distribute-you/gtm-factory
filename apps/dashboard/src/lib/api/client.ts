@@ -7,26 +7,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FACTORY_API_URL, IS_API } from "@/lib/data-source";
+import { BASE_PATH, FACTORY_API_URL, IS_API } from "@/lib/data-source";
+import { demoFile } from "@/lib/demo-key";
 
 const REFRESH_EVENT = "gtm-factory:refresh";
 
-/** In the demo, the simulator answers the factory API in the browser: the same pages, another data source. */
-export type SimHandler = (method: string, path: string, body: unknown) => unknown;
-let simHandler: SimHandler | null = null;
-const waiting: (() => void)[] = [];
-
-/** The simulator registers itself as the backend; every read refetches. */
-export function setSimBackend(h: SimHandler): void {
-  simHandler = h;
-  for (const w of waiting.splice(0)) w();
-  refreshAll();
-}
-
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (!IS_API) {
-    if (!simHandler) await new Promise<void>((r) => waiting.push(r));
-    return simHandler!(method, path, body) as T;
+    // The demo reads a fixed example database: one file per read, nothing computed here, nothing written.
+    if (method !== "GET") throw new Error("The demo shows example data. Changes work on your own GTM Factory.");
+    const res = await fetch(`${BASE_PATH}/demo/${demoFile(path)}`);
+    if (!res.ok) throw new Error("This view is not in the example data.");
+    return (await res.json()) as T;
   }
   const res = await fetch(`${FACTORY_API_URL}${path}`, {
     method,
