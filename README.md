@@ -31,7 +31,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 | `docs/framework.md` | The framework, in plain English, with worked examples checked by tests. |
 | `docs/api.md` | The API a running GTM Factory serves to the dashboard. |
 | `apps/dashboard` | The live dashboard: the whole product on the simulated world, in the browser. Next.js static export, deployed to GitHub Pages on every push to `main`. |
-| `apps/server` | A hosted GTM Factory: the API the dashboard reads, the scheduler, a Postgres ledger, every script run in its own isolated V8. It serves https://factory.distribute.you. See [apps/server/README.md](apps/server/README.md). |
+| `apps/server` | A hosted GTM Factory: the API the dashboard reads, the scheduler, a Postgres ledger, every script run in its own isolated V8. distribute.you hosts one. See [apps/server/README.md](apps/server/README.md). |
 
 ## Quick start
 
