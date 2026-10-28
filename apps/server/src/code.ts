@@ -54,6 +54,15 @@ export const hasCode = (s: Pick<Script, "code">): boolean => keys.has(s.code);
 /** Can this script run now: its code is here and every vendor it calls has a real adapter. */
 export const canRun = (s: Pick<Script, "code">): boolean => keys.has(s.code) && adaptersFor(keys.get(s.code)!);
 
+/**
+ * Can any campaign run something? A campaign serves the Engines of its leads; a brand's, a
+ * company's or a run's piece is only ordered by a run that needs it. So something runs only when
+ * an active script of a lead's outcome calls a vendor and has every vendor it calls connected. A connected vendor
+ * that only answers pieces ordered by others (the client's Claude) runs nothing on its own.
+ */
+export const somethingCanRun = (catalogue: Catalogue): boolean =>
+  catalogue.scripts.some((s) => s.status === "active" && !s.webhook && catalogue.outcome(s.outcome)?.subject === "lead" && (keys.get(s.code)?.length ?? 0) > 0 && canRun(s));
+
 export async function sourceOf(key: string): Promise<string | null> {
   return (await one<{ source: string }>(`SELECT source FROM script_code WHERE key = $1`, [key]))?.source ?? null;
 }

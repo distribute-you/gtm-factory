@@ -71,5 +71,3 @@ export function vendorsOf(source: string): string[] {
 /** Every vendor of the list has a real adapter. */
 export const adaptersFor = (vendors: readonly string[]): boolean => vendors.every((v) => adapters.has(v));
 
-/** Is any adapter registered at all? */
-export const anyAdapter = (): boolean => adapters.size > 0;

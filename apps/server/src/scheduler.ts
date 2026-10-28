@@ -5,9 +5,9 @@
  * the sandbox, vendors mocked. A test of a stated length ends on its day.
  */
 
+import { somethingCanRun } from "./code";
 import { one, q } from "./db";
 import { loadCatalogue, loadEvidence, todayUtc, todaysRating, type Brand, type CampaignRow } from "./factory";
-import { anyAdapter } from "./vendors";
 import { CapReached, runCampaign, type CampaignCtx } from "./runner";
 import { loadPending } from "./pending";
 
@@ -63,8 +63,8 @@ async function runTick(): Promise<void> {
         if (!brand) continue;
         const ctx: CampaignCtx = { catalogue, ev, campaign: c, brand, log: [] };
         try {
-          // The Rating's daily run only when scripts can run (a real vendor connected): no run otherwise.
-          if (anyAdapter()) await todaysRating(brand.id);
+          // The Rating's daily run only when scripts can run: no run otherwise.
+          if (somethingCanRun(catalogue)) await todaysRating(brand.id);
           await runCampaign(ctx);
           if (c.cap_reached_on && c.cap_reached_on !== todayUtc()) await q(`UPDATE campaigns SET cap_reached_on = NULL WHERE id = $1`, [c.id]);
         } catch (e) {
