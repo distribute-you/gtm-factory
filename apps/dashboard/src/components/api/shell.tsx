@@ -23,6 +23,7 @@ import { Mark } from "@/components/mark";
 import { OverviewProvider, useOverview, useScope } from "@/lib/api/overview";
 import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
+import { pinHref, pinKey, usePins } from "@/lib/api/pins";
 import { timeAgo } from "./common";
 import { ClaudeBridge, ClaudeMark } from "./claude";
 
@@ -57,8 +58,6 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const pinKey = (p: { kind: string; id: string }) => `${p.kind}:${p.id}`;
-const pinHref = (p: { kind: string; id: string }) => `/pinned/?pin=${encodeURIComponent(pinKey(p))}`;
 
 function NavItem({ href, label, icon, active, trailing }: { href: string; label: string; icon?: React.ReactNode; active?: boolean; trailing?: React.ReactNode }) {
   return (
@@ -103,6 +102,7 @@ function Sidebar() {
   const { data, error } = useOverview();
   const { orgs, scope, setScope } = useScope();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
+  const { pins } = usePins();
   const id = search.get("id");
   const brandName = (bid: string) => data?.brands.find((b) => b.id === bid)?.name ?? "";
   return (
@@ -145,9 +145,9 @@ function Sidebar() {
         <Group title="Records">
           <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} />
         </Group>
-        {data?.pins && data.pins.length > 0 && (
+        {pins.length > 0 && (
           <Group title="Pinned">
-            {data.pins.map((p) => (
+            {pins.map((p) => (
               <NavItem
                 key={pinKey(p)}
                 href={pinHref(p)}

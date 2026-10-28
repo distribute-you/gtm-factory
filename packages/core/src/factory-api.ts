@@ -18,7 +18,8 @@
  *   GET  /campaigns/:id                 -> ApiCampaignDetail
  *   POST /campaigns/:id/launch          -> ApiCampaign
  *   POST /campaigns/:id/pause           -> ApiCampaign
- *   PATCH /campaigns/:id  { dailyBudgetCents } -> ApiCampaign
+ *   PATCH /campaigns/:id  { dailyBudgetCents } | { verdict: { outcome, strategyId } } -> ApiCampaign
+ *                                       (strategyId "none" routes around that Engine)
  *   GET  /leads?campaignId=&brandId=&state= -> ApiLead[]
  *   GET  /leads/:id                     -> ApiLeadDetail
  *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another party)
@@ -27,6 +28,10 @@
  *   GET  /scripts?outcome=              -> ApiScriptStats[]
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
  *   POST /scripts/:id/capacity ApiCapacity -> ApiScriptStats (a person types it for a Client's team script)
+ *   GET  /scripts/:id/code              -> { scriptId, code, source } (the version's code, as stored)
+ *   POST /scripts/:id/versions ApiNewScriptCode -> ApiScriptStats (an upgrade: a new version of its dynasty)
+ *   POST /scripts/:id/forks    ApiNewScriptCode -> ApiScriptStats (a new dynasty from its belief, its own code)
+ *   GET  /storage/:engine               -> ApiStorage (what an Engine's scripts keep: tables, rows, a sample)
  *   GET  /research                      -> ApiCandidates[]
  *   GET  /series?brandId=               -> ApiSeries (spend, Units and value per day: the Today charts)
  *   GET  /companies?brandId=            -> ApiCompany[]
@@ -376,6 +381,14 @@ export interface ApiCampaignDetail {
   candidates: ApiCandidates[];
   recentPicks: ApiPick[];
   recentRuns: ApiRun[];
+  /** A reactive campaign: the Units of its start outcome handed to its Plan, newest first. */
+  pushes?: { at: string; unitId: string; subjectId: string; subjectName: string }[];
+  /**
+   * Its return: the value of one Target over its cost from Start, on today's estimates
+   * (expected) and on what its subjects did (measured, null until mature); our spend and the
+   * value our runs won, cents.
+   */
+  economics?: { targetValueCents: number; expected: number | null; measured: number | null; spendCents: number; valueWonCents: number };
 }
 
 /** One Unit of the ledger's stock: one piece of an outcome about one subject. */
@@ -411,6 +424,12 @@ export interface ApiLeadDetail {
   units: ApiUnit[];
   runs: ApiRun[];
   picks: ApiPick[];
+  /** What is known of the person, by tactic (seniority, role...). */
+  values?: Record<string, string | number | boolean>;
+  /** Their company: its key (GET /companies), name and values. */
+  company?: { id: string; name: string; values: Record<string, string | number | boolean> } | null;
+  /** The campaigns that reached them. */
+  campaignIds?: string[];
 }
 
 export interface ApiObjectVersion {
@@ -704,4 +723,16 @@ export interface ApiClaudeStatus {
   lastSeenAt: string | null;
   /** Requests waiting for the app. */
   pending: number;
+}
+
+/** The code of a new script version or fork: it must compile in the sandbox and call its Providers with literals. */
+export interface ApiNewScriptCode {
+  source: string;
+  name?: string;
+}
+
+/** What an Engine's scripts keep in its private storage: never copies of Units, only notes and references. */
+export interface ApiStorage {
+  engine: OutcomeId;
+  tables: { name: string; rows: number; sample: { key: string; value: unknown }[] }[];
 }
