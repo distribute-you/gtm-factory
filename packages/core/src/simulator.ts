@@ -616,6 +616,24 @@ export class SimulationSession {
     c.status = status;
   }
 
+  /**
+   * The budget a campaign may have spent by tick t of a day: its dollar budget is per period
+   * (a day by default, or N days), paced evenly over the period's ticks.
+   */
+  private budgetAllowed(c: Campaign, day: number, t: number): number {
+    const p = Math.max(1, Math.round(c.budgetPeriodDays ?? 1));
+    const into = (day % p) * this.ticksPerDay + t + 1;
+    return Math.round((c.dailyBudgetCents * into) / (p * this.ticksPerDay));
+  }
+
+  /** Our spend of a campaign since its current budget period began, today included. */
+  private spentInPeriod(c: Campaign, day: number): number {
+    const p = Math.max(1, Math.round(c.budgetPeriodDays ?? 1));
+    let n = this.spentToday.get(c.id) ?? 0;
+    for (const d of this.days) if (d.day >= day - (day % p) && d.day < day) n += d.spendCents[c.id] ?? 0;
+    return n;
+  }
+
   setCampaignBudget(campaignId: string, dailyBudgetCents: number): void {
     const c = this.campaign(campaignId);
     if (!c) throw new Error(`campaign "${campaignId}" not found`);
@@ -657,7 +675,7 @@ export class SimulationSession {
     const order = this.campaigns().filter((c) => c.status === "running");
     for (let t = 0; t < tpd; t++) {
       this.tickIndex = day * tpd + t;
-      for (const c of this.campaigns()) this.budgetLeft.set(c.id, c.status === "running" ? Math.round((c.dailyBudgetCents * (t + 1)) / tpd) - (this.spentToday.get(c.id) ?? 0) : 0);
+      for (const c of this.campaigns()) this.budgetLeft.set(c.id, c.status === "running" ? this.budgetAllowed(c, day, t) - this.spentInPeriod(c, day) : 0);
       this.deliver(day);
       this.webhooks(day, t === 0);
       for (const campaign of order) {

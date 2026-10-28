@@ -12,7 +12,7 @@ import { Mark } from "@/components/mark";
 import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
 import { engineTitle, outcomeName } from "@/lib/api/labels";
-import { formatCents, formatCount, formatRatePct, formatRoi } from "@/lib/format";
+import { formatBudget, formatCents, formatCount, formatRatePct, formatRoi, periodWord } from "@/lib/format";
 
 /** "3m ago", "2h ago", "4d ago". */
 export function timeAgo(iso: string | null | undefined): string {
@@ -141,7 +141,7 @@ function OwnStatusButton({ campaign }: { campaign: ApiCampaign }) {
 /** The daily cap as a button ("$10/day"); a modal edits it. Another party's cap is shown as it reports it. */
 export function BudgetButton({ campaign }: { campaign: ApiCampaign }) {
   const other = otherPerformer(campaign.performedBy);
-  if (other) return <span className="whitespace-nowrap text-[13px] tabular-nums">{campaign.dailyBudgetCents > 0 ? `${formatCents(campaign.dailyBudgetCents)}/day` : "No daily cap"}</span>;
+  if (other) return <span className="whitespace-nowrap text-[13px] tabular-nums">{campaign.dailyBudgetCents > 0 ? formatBudget(campaign.dailyBudgetCents, campaign.budgetPeriodDays) : "No budget"}</span>;
   return <OwnBudgetButton campaign={campaign} />;
 }
 
@@ -150,7 +150,7 @@ function OwnBudgetButton({ campaign }: { campaign: ApiCampaign }) {
   return (
     <>
       <button type="button" className="k-btn tabular-nums" onClick={() => setOpen(true)}>
-        {formatCents(campaign.dailyBudgetCents)}/day
+        {formatBudget(campaign.dailyBudgetCents, campaign.budgetPeriodDays)}
         <CaretDownIcon size={11} className="k-fg3" />
       </button>
       {open && <BudgetModal campaign={campaign} onClose={() => setOpen(false)} />}
@@ -188,17 +188,17 @@ function BudgetModal({ campaign, onClose }: { campaign: ApiCampaign; onClose: ()
     <div className="v2-root fixed inset-0 z-50 flex items-center justify-center" style={{ background: "#10101224" }} onClick={onClose}>
       <div className="k-popover w-[min(380px,calc(100vw-16px))]" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="k-line-subtle flex h-11 items-center justify-between border-b px-4">
-          <span className="k-label">Daily cap</span>
+          <span className="k-label">Budget</span>
           <button type="button" onClick={onClose} className="k-btn-ghost" aria-label="Close">
             <XIcon size={14} />
           </button>
         </div>
         <div className="space-y-3 p-4">
-          <p className="k-fg2 text-[13px]">No run starts once today&apos;s spend would pass this cap.</p>
+          <p className="k-fg2 text-[13px]">No run starts once the spend of the period would pass this budget.</p>
           <label className="k-input flex items-center gap-1 px-2">
             <span className="k-fg3">$</span>
-            <input autoFocus aria-label="Daily cap in dollars" className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={text} onChange={(e) => setText(e.target.value.replace(/[^0-9.]/g, ""))} onKeyDown={(e) => e.key === "Enter" && save()} />
-            <span className="k-fg3 shrink-0">per day</span>
+            <input autoFocus aria-label="Budget in dollars" className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={text} onChange={(e) => setText(e.target.value.replace(/[^0-9.]/g, ""))} onKeyDown={(e) => e.key === "Enter" && save()} />
+            <span className="k-fg3 shrink-0">per {periodWord(campaign.budgetPeriodDays ?? 1)}</span>
           </label>
           {error && <p className="text-[12px] text-[var(--data-rose)]">{error}</p>}
           <div className="flex justify-end gap-2">

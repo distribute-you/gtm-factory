@@ -19,6 +19,7 @@
 import { PERFORMED_BY, START, meetsAll, type Catalogue, type Script, type TacticValue } from "@gtm-factory/core";
 import { one, q } from "./db";
 import { OUTCOMES, PERFORMERS, rowOfPerformer, WORLD } from "./catalogue-seed";
+import { expectedRunMicro, foundInVolumePeriod, spentInPeriodMicro } from "./factory";
 import { allowedScripts, choose, dayOf, enginesOf, newId, onSideOf, planOf, produce, milestoneLine, saveCatalogue, startRun, finishRun, todaysRating, type Brand, type CampaignRow, type EvidenceState, type Lead, type PlanNode, type RunHandle, type Unit } from "./factory";
 import { canRun, compiledOf, somethingCanRun } from "./code";
 import { personOfKey, unitHash } from "./mock-vendor";
@@ -31,11 +32,25 @@ import { accountsOf } from "./accounts";
 
 export class CapReached extends Error {
   constructor(readonly spentMicro: number, readonly capMicro: number, readonly neededMicro: number) {
-    super(`daily cap reached: spent ${(spentMicro / 10_000).toFixed(2)} cents of ${(capMicro / 10_000).toFixed(0)}, next run needs about ${(neededMicro / 10_000).toFixed(2)}`);
+    super(`budget reached for this period: spent ${(spentMicro / 10_000).toFixed(2)} cents of ${(capMicro / 10_000).toFixed(0)}, next run needs about ${(neededMicro / 10_000).toFixed(2)}`);
   }
 }
 
 export class NoOption extends Error {}
+
+/**
+ * The dollar budget always holds: a run starts only when the campaign's spend in its budget
+ * period, plus what this run is expected to cost, stays within it. The optional volume is the
+ * second limit: once that many new subjects were found in its period, no script finds more.
+ */
+async function withinBudget(ctx: CampaignCtx, script: Script): Promise<void> {
+  const c = ctx.campaign;
+  const spent = await spentInPeriodMicro(c);
+  const needed = await expectedRunMicro(ctx.catalogue, script.id);
+  const cap = Number(c.daily_budget_cents) * 10_000;
+  if (spent + needed > cap) throw new CapReached(spent, cap, needed);
+  if (c.volume && ctx.catalogue.createsSubjects(script) && (await foundInVolumePeriod(c)) >= c.volume.units) throw new CapReached(spent, cap, 0);
+}
 
 export interface CampaignCtx {
   catalogue: Catalogue;
@@ -285,6 +300,7 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
   }
   const code = await compiledOf(script.code);
   if (!code) throw new NoOption(`no code ${script.code} in the database`);
+  await withinBudget(ctx, script);
   const day = dayOf();
   const storage = await loadStorage(script.outcome);
   // The brand's accounts and their counts, read once: the script picks among those with the role it asks for.

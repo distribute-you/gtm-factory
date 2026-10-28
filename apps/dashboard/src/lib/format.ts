@@ -21,6 +21,25 @@ export function formatCents(cents: number | null | undefined): string {
   return cents == null ? "—" : formatUsd(cents / 100);
 }
 
+/** Words for a period of N days: "day", "week", "month", else "N days". */
+export function periodWord(days: number): string {
+  return days <= 1 ? "day" : days === 7 ? "week" : days >= 28 && days <= 31 ? "month" : `${days} days`;
+}
+
+/** A campaign's budget as typed: "$40/day", "$200/week", "$90 per 3 days". */
+export function formatBudget(cents: number, periodDays = 1): string {
+  const p = periodWord(periodDays);
+  return p.includes(" ") ? `${formatCents(cents)} per ${p}` : `${formatCents(cents)}/${p}`;
+}
+
+/** A campaign's optional volume: "100 new people/week". */
+export function formatVolume(volume: { units: number; periodDays: number } | null | undefined): string | null {
+  if (!volume) return null;
+  const p = periodWord(volume.periodDays);
+  const who = volume.units === 1 ? "person" : "people";
+  return p.includes(" ") ? `${formatCount(volume.units)} new ${who} per ${p}` : `${formatCount(volume.units)} new ${who}/${p}`;
+}
+
 /** Exact cents, for the ledger: $1,234.56. */
 export function formatCentsExact(cents: number): string {
   const sign = cents < 0 ? "-" : "";

@@ -17,6 +17,7 @@ export type CatalogueKind = keyof CatalogueData;
 export type SimAction =
   | { type: "launch"; client: WorldClient }
   | { type: "status"; campaignId: string; status: "running" | "paused" }
+  | { type: "outcome"; label: string }
   | { type: "budget"; campaignId: string; dailyBudgetCents: number }
   | { type: "verdict"; campaignId: string; outcome: string; strategyId: string }
   | { type: "capacity"; scriptId: string; capacity: Capacity }
@@ -49,6 +50,12 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
     case "status":
       session.setCampaignStatus(action.campaignId, action.status);
       return;
+    case "outcome": {
+      const id = action.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      if (!id) throw new Error("That name has no letter or digit.");
+      c.add("outcomes", { id, label: action.label, subject: "lead", event: true });
+      return;
+    }
     case "budget":
       session.setCampaignBudget(action.campaignId, action.dailyBudgetCents);
       return;

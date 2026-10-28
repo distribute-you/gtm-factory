@@ -4,14 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckIcon, RocketLaunchIcon } from "@phosphor-icons/react";
 import { START, type Campaign, type WorldClient } from "@gtm-factory/core";
-import { PlanLineView } from "@/components/plan-line";
 import { draftPlanLine } from "@/lib/plan";
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, RoiLabel, SectionTitle, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
 import { campaignHref } from "./campaigns";
 import { freshCampaignId, newClient } from "@/lib/campaigns";
-import { outcomeLabel, outcomePlural, type Model } from "@/lib/model";
+import { outcomeLabel, type Model } from "@/lib/model";
 import { formatRoi, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
@@ -19,7 +18,7 @@ type Stage = "client" | "goal" | "plan";
 const STAGES: { id: Stage; label: string }[] = [
   { id: "client", label: "Client" },
   { id: "goal", label: "What you want" },
-  { id: "plan", label: "Brief and budget" },
+  { id: "plan", label: "Strategy and budget" },
 ];
 
 interface Draft {
@@ -33,9 +32,20 @@ interface Draft {
   value: string;
   perDay: string;
   campaignName: string;
-  /** Its strategy in plain words: read once per Engine. */
+  description: string;
+  /** Days of one budget period: 1 a day, 7 a week, 30 a month. */
+  periodDays: number;
+  /** Optional: at most this many new people per period; empty for none. */
+  volume: string;
+  /** Its strategy in plain words, long free text. */
   brief: string;
 }
+
+const PERIODS = [
+  { days: 1, label: "day" },
+  { days: 7, label: "week" },
+  { days: 30, label: "month" },
+];
 
 export function NewCampaignPage() {
   const { model } = useSim();
@@ -77,6 +87,9 @@ function defaultDraft(model: Model, existing: boolean): Draft {
     value: value ? String(value) : "1000",
     perDay: "30",
     campaignName: "",
+    description: "",
+    periodDays: 1,
+    volume: "",
     brief: "Cold email and LinkedIn. Never write again to someone who asked to stop.",
   };
 }
@@ -95,18 +108,35 @@ function Flow({ model }: { model: Model }) {
   const offerOutcomes = client ? client.offer.outcomes : trackedOutcomes(model);
   const targets = trackedOutcomes(model).filter((o) => offerOutcomes.includes(o));
   // Start, or any outcome a script works on that is not a milestone: a reactive campaign pushes each one that lands.
-  const worked = [...new Set(model.catalogue.scripts.filter((s) => s.status === "active" && !s.webhook).map((s) => model.catalogue.subjectOf(s)).filter((o): o is string => !!o && !model.catalogue.outcome(o)?.track))];
-  const starts = [{ id: START, label: "The market (Start): pulls each tick" }, ...worked.map((o) => ({ id: o, label: `${outcomeLabel(model.catalogue, o)}: pushes each one` }))];
+  const events = model.catalogue.outcomes.filter((o) => o.subject === "lead" && !o.retired && !o.track && o.id !== d.target).map((o) => o.id);
+  const starts = [{ id: START, label: "Proactive: looks for new people" }, ...events.map((o) => ({ id: o, label: `Reactive: on ${outcomeLabel(model.catalogue, o)}` }))];
   const start = starts.find((e) => e.id === d.start) ?? starts[0]!;
+  // A reactive campaign needs an event some script makes or reads; else it is refused.
+  const unmade = start.id !== START && !model.catalogue.canStartOn(start.id);
+  const [newEvent, setNewEvent] = useState("");
+  const createEvent = () => {
+    const err = dispatch({ type: "outcome", label: newEvent.trim() });
+    setError(err);
+    if (!err) {
+      set({ start: newEvent.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") });
+      setNewEvent("");
+    }
+  };
   const value = Number(d.value) || 0;
   const brandForPlan = client?.brand.id ?? model.clients[0]?.brand.id ?? "";
+  const waits = start.id !== START && model.catalogue.outcome(start.id)?.event === true && !model.catalogue.isMade(start.id);
   const draft = useMemo(() => (stage === "plan" && d.target && brandForPlan ? draftPlanLine(model, brandForPlan, start.id, d.target) : null), [model, stage, d.target, brandForPlan, start.id]);
   // A campaign of the same brand already passing through the same milestones: its expected return, on the same formula.
   const sibling = draft ? model.campaigns.find((c) => c.brandId === brandForPlan && c.start === start.id && model.session.milestoneLine(c).join(">") === draft.line.join(">")) : undefined;
   const expected = sibling ? model.session.economics(sibling.id).expected.value : null;
 
   const launch = () => {
-    if (!draft?.plan) return;
+    if (!draft?.plan && !waits) return;
+    const dollars = Number(d.perDay);
+    if (!(dollars > 0)) return setError("A dollar budget is required.");
+    if (!d.campaignName.trim() || !d.description.trim()) return setError("The demo cannot rewrite the name and description from your strategy. Type them here, or run your own host to have them written for you.");
+    const volume = d.volume.trim() ? Math.round(Number(d.volume)) : 0;
+    if (d.volume.trim() && !(volume >= 1)) return setError("A volume is at least 1 new person.");
     const brandId = client?.brand.id ?? null;
     const base: WorldClient = client
       ? { ...client, campaigns: [], seeds: [] }
@@ -116,10 +146,13 @@ function Flow({ model }: { model: Model }) {
       id,
       brandId: base.brand.id,
       offerId: base.offer.id,
-      name: d.campaignName.trim() || `${outcomePlural(model.catalogue, d.target)} for ${client?.brand.name ?? (d.name.trim() || "a new client")}`,
+      name: d.campaignName.trim(),
+      description: d.description.trim(),
       start: start.id,
       target: d.target,
-      dailyBudgetCents: Math.round((Number(d.perDay) || 0) * 100),
+      dailyBudgetCents: Math.round(dollars * 100),
+      budgetPeriodDays: d.periodDays,
+      ...(volume ? { volume: { units: volume, periodDays: d.periodDays } } : {}),
       status: "running",
       brief: d.brief.trim(),
     };
@@ -130,7 +163,7 @@ function Flow({ model }: { model: Model }) {
 
   return (
     <>
-      <PageHeader title="New campaign" sub="Say who it is for, the Target you want, your brief and your budget. The Plan is recomputed at every tick." />
+      <PageHeader title="New campaign" sub="Say who it is for, the Target you want, your strategy and your budget. The Plan is recomputed at every tick." />
       <ol className="mb-6 flex flex-wrap gap-2" aria-label="Progress">
         {STAGES.map((s, i) => {
           const at = STAGES.findIndex((x) => x.id === stage);
@@ -202,7 +235,7 @@ function Flow({ model }: { model: Model }) {
                 ))}
               </div>
             </Field>
-            <Field label="Start outcome">
+            <Field label="Proactive or reactive">
               <div className="flex flex-wrap gap-1">
                 {starts.map((e) => (
                   <button key={e.id} type="button" className={`k-chip ${start.id === e.id ? "k-chip-on" : ""}`} onClick={() => set({ start: e.id })}>
@@ -211,6 +244,20 @@ function Flow({ model }: { model: Model }) {
                 ))}
               </div>
             </Field>
+            {unmade && (
+              <div className="k-inset space-y-2 rounded-[8px] p-3 text-[13px]" data-testid="unmade-event">
+                <p>No script makes or reads &ldquo;{start.label.replace("Reactive: on ", "")}&rdquo;, so this campaign would never start. Pick another event, or create the outcome.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="k-btn" onClick={() => set({ start: START })}>
+                    Pick another event
+                  </button>
+                  <input aria-label="New outcome" className="k-input px-2" style={{ font: "inherit" }} placeholder="Name of the new outcome" value={newEvent} onChange={(e) => setNewEvent(e.target.value)} />
+                  <button type="button" className="k-btn" disabled={!newEvent.trim()} onClick={createEvent}>
+                    Create the outcome
+                  </button>
+                </div>
+              </div>
+            )}
             <Field label={`Value of one ${outcomeLabel(model.catalogue, d.target).toLowerCase()}`}>
               <span className="k-input inline-flex w-[160px] items-center gap-1 px-2">
                 <span className="k-fg3">$</span>
@@ -222,7 +269,7 @@ function Flow({ model }: { model: Model }) {
             <button type="button" className="k-btn-ghost" onClick={() => setStage("client")}>
               Back
             </button>
-            <button type="button" className="k-btn-strong" disabled={!d.target} onClick={() => setStage("plan")}>
+            <button type="button" className="k-btn-strong" disabled={!d.target || unmade} onClick={() => setStage("plan")}>
               Continue
             </button>
           </div>
@@ -233,13 +280,16 @@ function Flow({ model }: { model: Model }) {
         <div className="space-y-6">
           <section>
             <SectionTitle right={<span>Recomputed at every tick once it runs</span>}>The Plan it would run today</SectionTitle>
-            {!draft?.plan || draft.parts.length === 0 ? (
+            {waits ? (
+              <div className="k-card">
+                <EmptyNote>No script makes this yet. The campaign waits for one.</EmptyNote>
+              </div>
+            ) : !draft?.plan || draft.parts.length === 0 ? (
               <div className="k-card">
                 <EmptyNote>No Plan reaches this outcome from this start. Pick another start or outcome.</EmptyNote>
               </div>
             ) : (
               <div className="k-card space-y-2.5 p-4" data-testid="draft-plan">
-                <PlanLineView model={model} line={draft} size="md" />
                 <p className="k-fg3 text-[12px]">
                   {expected != null ? (
                     <>
@@ -253,24 +303,41 @@ function Flow({ model }: { model: Model }) {
             )}
           </section>
 
-          {draft?.plan && draft.parts.length > 0 && (
+          {(waits || (draft?.plan && draft.parts.length > 0)) && (
             <div className="k-card space-y-3 p-4">
-              <Field label="Brief">
+              <Field label="Strategy">
                 <textarea className="k-input w-full resize-y px-2 py-1.5 leading-6" style={{ font: "inherit", height: "auto" }} rows={3} value={d.brief} onChange={(e) => set({ brief: e.target.value })} />
               </Field>
-              <p className="k-fg3 text-[12px]">The brief is read once per Engine: the scripts it keeps, daily caps, a test length. See and change what each Engine keeps on the campaign page.</p>
+              <p className="k-fg3 text-[12px]">Write it as long as you like. The strategy is read once per Engine: the scripts it keeps, caps, a test length.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Campaign name">
-                  <input className="k-input w-full px-2" style={{ font: "inherit" }} placeholder="Named after its Target" value={d.campaignName} onChange={(e) => set({ campaignName: e.target.value })} />
+                  <input className="k-input w-full px-2" style={{ font: "inherit" }} value={d.campaignName} onChange={(e) => set({ campaignName: e.target.value })} />
                 </Field>
-                <Field label="Daily budget">
+                <Field label="Description">
+                  <input className="k-input w-full px-2" style={{ font: "inherit" }} value={d.description} onChange={(e) => set({ description: e.target.value })} />
+                </Field>
+                <Field label="Budget (required)">
                   <span className="k-input inline-flex w-full items-center gap-1 px-2">
                     <span className="k-fg3">$</span>
-                    <input aria-label="Dollars per day" className="w-full bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={d.perDay} onChange={(e) => set({ perDay: e.target.value.replace(/[^0-9.]/g, "") })} />
-                    <span className="k-fg3">/day</span>
+                    <input aria-label="Dollars per period" className="w-full bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={d.perDay} onChange={(e) => set({ perDay: e.target.value.replace(/[^0-9.]/g, "") })} />
+                    <span className="k-fg3">per</span>
+                    <select aria-label="Budget period" className="bg-transparent outline-none" style={{ font: "inherit" }} value={d.periodDays} onChange={(e) => set({ periodDays: Number(e.target.value) })}>
+                      {PERIODS.map((p) => (
+                        <option key={p.days} value={p.days}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </Field>
+                <Field label="Volume limit (optional)">
+                  <span className="k-input inline-flex w-full items-center gap-1 px-2">
+                    <input aria-label="New people per period" className="w-full bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} placeholder="No limit" value={d.volume} onChange={(e) => set({ volume: e.target.value.replace(/[^0-9]/g, "") })} />
+                    <span className="k-fg3 shrink-0">new people</span>
                   </span>
                 </Field>
               </div>
+              <p className="k-fg3 text-[12px]">Whichever limit is hit first stops the campaign for the period.</p>
               <button type="button" className="k-btn-accent k-cta w-full justify-center" onClick={launch}>
                 <RocketLaunchIcon size={16} weight="fill" />
                 {expected != null ? `Launch and earn up to ${formatRoi(expected)} per $1 expected` : "Launch and start learning"}

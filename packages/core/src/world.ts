@@ -50,15 +50,20 @@ export interface Campaign {
   brandId: string;
   offerId: string;
   name: string;
+  /** What it does, in one or two sentences: rewritten from its strategy at each save, editable by hand. */
+  description?: string;
   /** START (the market: proactive), or the outcome whose Units it pushes (reactive). */
   start: OutcomeId;
   /** The outcome it orders. */
   target: OutcomeId;
+  /** Its dollar budget per budget period, always set: whatever the volume, spend never passes it. */
   dailyBudgetCents: number;
-  /** At most this many new subjects per period. */
+  /** Days of one budget period (1 = a day, 7 = a week, 30 = a month); 1 when unset. */
+  budgetPeriodDays?: number;
+  /** Optional: at most this many new subjects per period; whichever of the two is hit first stops it for the period. */
   volume?: { units: number; periodDays: number };
   status: "running" | "paused";
-  /** Its strategy, in the client's words ("cold email and LinkedIn, at most 30 a day in email"). */
+  /** Its strategy, in the client's words ("cold email and LinkedIn, at most 30 a day in email"): long free text. */
   brief: string;
   /**
    * What a judge read in the brief, per Engine: the strategy it keeps (a

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { START, type ApiCampaign, type ApiNewCampaign, type ApiPlanPreview, type CatalogueData } from "@gtm-factory/core";
+import { START, type ApiCampaign, type ApiNewCampaign, type ApiNewOutcome, type ApiPlanPreview, type CatalogueData } from "@gtm-factory/core";
 import { Mark } from "@/components/mark";
 import { EmptyNote, Page, PageHeader, SectionTitle, TopBar } from "@/components/ui";
 import { apiSend, useApi } from "@/lib/api/client";
@@ -29,18 +29,39 @@ export function ApiNewCampaignPage() {
   const [start, setStart] = useState<string>(START);
   const [brief, setBrief] = useState("");
   const [budget, setBudget] = useState("10");
+  const [periodDays, setPeriodDays] = useState(1);
+  const [volume, setVolume] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [newEvent, setNewEvent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dollars = Number(budget);
-  const valid = brandId && offerId && target && start !== target && Number.isFinite(dollars) && dollars > 0;
   // A reactive campaign starts from an outcome about a person: each Unit of it that lands is pushed up.
   const starts = [START, ...(catalogue?.outcomes.filter((o) => (o.subject === "lead" || o.subject === "company") && !o.retired && o.id !== target).map((o) => o.id) ?? [])];
+  // A reactive campaign needs an event some script makes or reads: else it is refused.
+  const startOutcome = catalogue?.outcomes.find((o) => o.id === start);
+  const unmade =
+    start !== START && !!catalogue && !startOutcome?.event && !catalogue.scripts.some((s) => s.status === "active" && (s.outcome === start || s.materials.includes(start)));
+  const createEvent = async () => {
+    setError(null);
+    try {
+      const c = await apiSend<CatalogueData>("POST", "/outcomes", { label: newEvent.trim() } satisfies ApiNewOutcome);
+      const made = c.outcomes.find((o) => o.label === newEvent.trim());
+      if (made) setStart(made.id);
+      setNewEvent("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const valid = brandId && offerId && target && start !== target && !unmade && Number.isFinite(dollars) && dollars > 0 && (!volume || Number(volume) >= 1);
 
   const create = async () => {
     if (!valid) return;
     setBusy(true);
     setError(null);
-    const body: ApiNewCampaign = { brandId: brandId!, offerId: offerId!, start, target: target!, dailyBudgetCents: Math.round(dollars * 100), ...(brief.trim() ? { brief: brief.trim() } : {}) };
+    const body: ApiNewCampaign = { brandId: brandId!, offerId: offerId!, start, target: target!, dailyBudgetCents: Math.round(dollars * 100), budgetPeriodDays: periodDays, ...(volume ? { volume: { units: Math.round(Number(volume)), periodDays } } : {}), ...(name.trim() ? { name: name.trim() } : {}), ...(description.trim() ? { description: description.trim() } : {}), ...(brief.trim() ? { brief: brief.trim() } : {}) };
     try {
       const c = await apiSend<ApiCampaign>("POST", "/campaigns", body);
       router.push(`/campaigns/view/?id=${encodeURIComponent(c.id)}`);
@@ -54,7 +75,7 @@ export function ApiNewCampaignPage() {
     <>
       <TopBar crumbs={[{ label: "Campaigns", href: "/campaigns/" }, { label: "New campaign" }]} />
       <Page narrow>
-        <PageHeader title="Start a campaign" sub="Pick a brand, a Target and a budget, then say your strategy in your own words. The campaign starts paused: you launch it." />
+        <PageHeader title="Start a campaign" sub="Pick a Target and a budget, then write your strategy in your own words. The campaign starts paused: you launch it." />
         {overview && brands.length === 0 ? (
           <div className="k-card">
             <EmptyNote>
@@ -87,17 +108,31 @@ export function ApiNewCampaignPage() {
               )}
             </section>
 
-            <Field label="Start" hint="Start pulls new people from the market at each tick. Any other outcome pushes each Unit of it that lands up to the Target.">
+            <Field label="Proactive or reactive" hint="Proactive looks for new people in the market. Reactive starts each time the event below happens.">
               <select className="k-input w-full max-w-[360px] px-1.5" style={{ font: "inherit" }} value={start} onChange={(e) => setStart(e.target.value)}>
                 {starts.map((o) => (
                   <option key={o} value={o}>
-                    {outcomeName(catalogue, o)}
+                    {o === START ? "Proactive" : `Reactive: on ${outcomeName(catalogue, o)}`}
                   </option>
                 ))}
               </select>
             </Field>
+            {unmade && (
+              <div className="k-inset space-y-2 rounded-[8px] p-3 text-[13px]" data-testid="unmade-event">
+                <p>No script makes or reads &ldquo;{outcomeName(catalogue, start)}&rdquo;, so this campaign would never start. Pick another event, or create the outcome.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="k-btn" onClick={() => setStart(START)}>
+                    Pick another event
+                  </button>
+                  <input aria-label="New outcome" className="k-input px-2" style={{ font: "inherit" }} placeholder="Name of the new outcome" value={newEvent} onChange={(e) => setNewEvent(e.target.value)} />
+                  <button type="button" className="k-btn" disabled={!newEvent.trim()} onClick={createEvent}>
+                    Create the outcome
+                  </button>
+                </div>
+              </div>
+            )}
 
-            <Field label="Strategy" hint="A judge reads it once for each Engine and keeps the scripts that fit, daily caps and a test length.">
+            <Field label="Strategy" hint="Write it as long as you like. A judge reads it once for each Engine. The name and description are written from it, and you can edit them after.">
               <textarea
                 aria-label="Strategy"
                 className="k-input min-h-[88px] w-full px-2 py-1.5"
@@ -108,11 +143,32 @@ export function ApiNewCampaignPage() {
               />
             </Field>
 
-            <Field label="Daily cap" hint="A hard cap. No run starts once today's spend would pass it.">
-              <label className="k-input flex w-48 items-center gap-1 px-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Name" hint="Optional. Left empty, it is written from the strategy.">
+                <input aria-label="Name" className="k-input w-full px-2" style={{ font: "inherit" }} value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <Field label="Description" hint="Optional. Left empty, it is written from the strategy.">
+                <input aria-label="Description" className="k-input w-full px-2" style={{ font: "inherit" }} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </Field>
+            </div>
+
+            <Field label="Budget (required)" hint="The most it spends per period. Whichever limit is hit first stops the campaign for the period.">
+              <label className="k-input flex w-64 items-center gap-1 px-2">
                 <span className="k-fg3">$</span>
-                <input aria-label="Daily cap in dollars" className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ""))} />
-                <span className="k-fg3 shrink-0">per day</span>
+                <input aria-label="Budget in dollars" className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ""))} />
+                <span className="k-fg3 shrink-0">per</span>
+                <select aria-label="Budget period" className="bg-transparent outline-none" style={{ font: "inherit" }} value={periodDays} onChange={(e) => setPeriodDays(Number(e.target.value))}>
+                  <option value={1}>day</option>
+                  <option value={7}>week</option>
+                  <option value={30}>month</option>
+                </select>
+              </label>
+            </Field>
+
+            <Field label="Volume limit (optional)" hint="At most this many new people in the same period.">
+              <label className="k-input flex w-64 items-center gap-1 px-2">
+                <input aria-label="New people per period" className="w-full min-w-0 bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} placeholder="No limit" value={volume} onChange={(e) => setVolume(e.target.value.replace(/[^0-9]/g, ""))} />
+                <span className="k-fg3 shrink-0">new people</span>
               </label>
             </Field>
 
@@ -142,7 +198,6 @@ function PlanCard({ plan, rank, catalogue, on, onPick }: { plan: ApiPlanPreview;
             {rank === 0 && <span className="k-chip">Best value per dollar</span>}
             <span className="k-chip">{plan.label === "measured" ? "Measured" : "Expected"}</span>
           </div>
-          <p className="k-fg3 mt-0.5 text-[12px]">Passes through {plan.line.map((o) => outcomeName(catalogue, o)).join(", ")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="k-chip">{outcomeName(catalogue, START)}</span>
             {plan.milestones.map((m) => (

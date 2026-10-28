@@ -2124,7 +2124,8 @@
           "target": "paid_client",
           "dailyBudgetCents": 4000,
           "status": "running",
-          "brief": "Find paid clients with cold email, LinkedIn and WhatsApp. Never write again to someone who asked to stop. Every message goes out from our AI agent."
+          "brief": "Find paid clients with cold email, LinkedIn and WhatsApp. Never write again to someone who asked to stop. Every message goes out from our AI agent.",
+          "description": "Finds new people in the market and turns them into paid clients through cold email, LinkedIn and WhatsApp."
         },
         {
           "id": "campaign-follow-ups",
@@ -2135,7 +2136,8 @@
           "target": "lead_interested",
           "dailyBudgetCents": 1500,
           "status": "running",
-          "brief": "Follow up once on every cold email that got no answer, four days later."
+          "brief": "Follow up once on every cold email that got no answer, four days later.",
+          "description": "Follows up once, four days later, on every cold email that got no answer."
         },
         {
           "id": "campaign-ads",
@@ -2146,7 +2148,8 @@
           "target": "meeting_booked",
           "dailyBudgetCents": 3000,
           "status": "running",
-          "brief": "Test ads for 30 days, at most 120 visits a day, and book meetings from the signups."
+          "brief": "Test ads for 30 days, at most 120 visits a day, and book meetings from the signups.",
+          "description": "Tests search and Meta ads for 30 days and books meetings with the people who sign up."
         },
         {
           "brandId": "brand-1",
@@ -2157,7 +2160,8 @@
           "target": "welcomed",
           "dailyBudgetCents": 500,
           "status": "running",
-          "brief": "Send every new client one welcome from my WhatsApp Pro: they can write to me there any time."
+          "brief": "Send every new client one welcome from my WhatsApp Pro: they can write to me there any time.",
+          "description": "Sends each new client one welcome from your WhatsApp Pro number."
         },
         {
           "brandId": "brand-1",
@@ -2168,7 +2172,8 @@
           "target": "answered_by_you",
           "dailyBudgetCents": 100,
           "status": "running",
-          "brief": "When someone writes to my Pro number, I answer myself."
+          "brief": "When someone writes to my Pro number, I answer myself.",
+          "description": "Turns every message on your Pro number into a task you answer yourself."
         }
       ],
       "accounts": [

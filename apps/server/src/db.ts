@@ -319,6 +319,15 @@ const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS account_items_recent ON account_items (account_id, at);
     `,
   },
+  {
+    // The campaign model (owner 2026-10-28): a name and a description written from the strategy,
+    // and a dollar budget per period (a day, a week, a month), always set; the volume stays optional.
+    id: "011_campaign_model",
+    sql: `
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS budget_period_days int NOT NULL DEFAULT 1 CHECK (budget_period_days BETWEEN 1 AND 31);
+    `,
+  },
 ];
 
 /** The v5 legs whose storage schemas the v4 migration (002) still reads on a database created before it. */

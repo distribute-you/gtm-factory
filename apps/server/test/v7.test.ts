@@ -37,9 +37,14 @@ describe.runIf(!!url)("GTM Factory v7", () => {
       let raw = "";
       req.on("data", (c) => (raw += c));
       req.on("end", () => {
-        const b = JSON.parse(raw) as { questions: Record<string, { criteria: Record<string, string> }>; support?: unknown };
+        const b = JSON.parse(raw) as { questions?: Record<string, { criteria: Record<string, string> }>; support?: unknown; message?: string };
+        // The text-writing call: a name and a description from the strategy.
+        if (b.message) {
+          res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ content: JSON.stringify({ name: "Meetings from cold email", description: "Books meetings with cold email, for lead interest." }) }));
+          return;
+        }
         const answers: Record<string, { type: string; choice: string; confidence: number }> = {};
-        for (const [k, qn] of Object.entries(b.questions)) {
+        for (const [k, qn] of Object.entries(b.questions ?? {})) {
           const opts = Object.keys(qn.criteria);
           const choice = k === "keep:lead_found" ? "lead_found#recontact-60" : k === "cap:message_queued" ? "30" : k === "days" ? "30" : opts[0]!;
           answers[k] = { type: "choice", choice, confidence: 0.9 };
@@ -358,5 +363,27 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ verdicts: { lead_found: "lead_found#recontact-60" }, caps: { message_queued: 30 }, offerId: "northwind-offer" });
     expect((await api("POST", "/api/campaigns", { brandId: "northwind", offerId: "nope", target: "lead_interested", dailyBudgetCents: 500 })).status).toBe(400);
+    // The name and the description come from the strategy.
+    expect(r.body).toMatchObject({ name: "Meetings from cold email", description: "Books meetings with cold email, for lead interest.", budgetPeriodDays: 1 });
+  });
+
+  it("the campaign model: a dollar budget is required, a reactive event must be made or read, a new strategy rewrites the text", async () => {
+    const base = { brandId: "northwind", offerId: "northwind-offer", target: "lead_interested" };
+    // No budget: refused.
+    expect((await api("POST", "/api/campaigns", { ...base, start: "start" })).status).toBe(400);
+    // An event nothing makes or reads: refused, with the two ways out.
+    const made = await api("POST", "/api/outcomes", { label: "Webinar attended" });
+    expect(made.status).toBe(200);
+    expect((await api("POST", "/api/outcomes", { label: "Webinar attended" })).status).toBe(409);
+    const waiting = await api("POST", "/api/campaigns", { ...base, start: "webinar_attended", dailyBudgetCents: 2000, budgetPeriodDays: 7, volume: { units: 50, periodDays: 7 }, name: "By hand", description: "Typed." });
+    expect(waiting.status).toBe(200);
+    expect(waiting.body).toMatchObject({ name: "By hand", description: "Typed.", budgetPeriodDays: 7, volume: { units: 50, periodDays: 7 }, noScript: true });
+    expect((await api("POST", "/api/campaigns", { ...base, start: "no_such_event", dailyBudgetCents: 2000 })).status).toBe(400);
+    // A new strategy rewrites the name and description; a hand edit after it wins.
+    const id = (waiting.body as unknown as { id: string }).id;
+    const saved = await api("PATCH", `/api/campaigns/${id}`, { brief: "Invite every lead to a webinar." });
+    expect(saved.body).toMatchObject({ name: "Meetings from cold email" });
+    const edited = await api("PATCH", `/api/campaigns/${id}`, { name: "Webinar follow-up" });
+    expect(edited.body).toMatchObject({ name: "Webinar follow-up", description: "Books meetings with cold email, for lead interest." });
   });
 });

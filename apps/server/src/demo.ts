@@ -38,9 +38,9 @@ export async function seedDemo(): Promise<boolean> {
   for (const c of client.campaigns) {
     const read = WORLD.truth.briefs?.[c.id] ?? {};
     await q(
-      `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, target, brief, verdicts, caps, test_days)
-       VALUES ($1,$2,$3,$4,'','',$5,'[]','paused',$6,'{}',$7,$8,$9,$10,$11,$12)`,
-      [`northwind-${c.id.replace(/^campaign-/, "")}`, DEMO_BRAND, DEMO_OFFER, c.name, JSON.stringify([c.start ?? START, c.target]), c.dailyBudgetCents, c.start, c.target, c.brief, JSON.stringify(read.verdicts ?? {}), JSON.stringify(read.caps ?? {}), read.days ?? null],
+      `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, target, brief, verdicts, caps, test_days, description, budget_period_days)
+       VALUES ($1,$2,$3,$4,'','',$5,'[]','paused',$6,'{}',$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [`northwind-${c.id.replace(/^campaign-/, "")}`, DEMO_BRAND, DEMO_OFFER, c.name, JSON.stringify([c.start ?? START, c.target]), c.dailyBudgetCents, c.start, c.target, c.brief, JSON.stringify(read.verdicts ?? {}), JSON.stringify(read.caps ?? {}), read.days ?? null, c.description ?? "", c.budgetPeriodDays ?? 1],
     );
   }
   return true;
@@ -59,11 +59,15 @@ export async function seedAccounts(): Promise<number> {
       if (await one(`SELECT id FROM campaigns WHERE id = $1`, [id])) continue;
       const read = WORLD.truth.briefs?.[c.id] ?? {};
       await q(
-        `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, target, brief, verdicts, caps, test_days)
-         VALUES ($1,$2,$3,$4,'','',$5,'[]','paused',$6,'{}',$7,$8,$9,$10,$11,$12)`,
-        [id, DEMO_BRAND, DEMO_OFFER, c.name, JSON.stringify([c.start ?? START, c.target]), c.dailyBudgetCents, c.start, c.target, c.brief, JSON.stringify(read.verdicts ?? {}), JSON.stringify(read.caps ?? {}), read.days ?? null],
+        `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, target, brief, verdicts, caps, test_days, description, budget_period_days)
+         VALUES ($1,$2,$3,$4,'','',$5,'[]','paused',$6,'{}',$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [id, DEMO_BRAND, DEMO_OFFER, c.name, JSON.stringify([c.start ?? START, c.target]), c.dailyBudgetCents, c.start, c.target, c.brief, JSON.stringify(read.verdicts ?? {}), JSON.stringify(read.caps ?? {}), read.days ?? null, c.description ?? "", c.budgetPeriodDays ?? 1],
       );
       added++;
+    }
+    // The demo campaigns seeded before the campaign model get their description once.
+    for (const c of WORLD.clients[0]!.campaigns) {
+      if (c.description) await q(`UPDATE campaigns SET description = $2 WHERE id = $1 AND description = ''`, [`northwind-${c.id.replace(/^campaign-/, "")}`, c.description]);
     }
   }
   return added;

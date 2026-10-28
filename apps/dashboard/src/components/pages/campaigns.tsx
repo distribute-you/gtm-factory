@@ -14,7 +14,7 @@ import { PageSkeleton, WhyFeed } from "./today";
 import { campaignMilestones, milestoneOfPoints } from "@/lib/campaigns";
 import { candidateWord, engineLine, engineName, outcomeLabel, outcomePlural, pointsOf, scopedCampaigns, targetOf, type Model, type PointInfo, type PointRow } from "@/lib/model";
 import { campaignPlanLine, flowsOf, inputsView, planTreeOf, type ChainPart } from "@/lib/plan";
-import { formatCents, formatCount, formatRatePct, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
+import { formatBudget, formatCents, periodWord, formatCount, formatRatePct, formatRoi, formatUsd, formatVolume, plural, roiIsGood } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
 export const campaignHref = (id: string) => `/campaigns/view/?id=${encodeURIComponent(id)}`;
@@ -42,7 +42,7 @@ function CampaignList({ model, scope }: { model: Model; scope: string | null }) 
     <>
       <PageHeader
         title={`${running} of ${plural(campaigns.length, "campaign", "campaigns")} running`}
-        sub={`A campaign orders production: a Target, a daily budget, a start and a brief. Started from the market it pulls on its Target each tick; ${plural(reactive, "campaign starts", "campaigns start")} from an outcome and pushes each of its Units.`}
+        sub={`A campaign orders production: a Target, a budget, proactive or reactive, and a strategy. Started from the market it pulls on its Target each tick; ${plural(reactive, "campaign starts", "campaigns start")} from an outcome and pushes each of its Units.`}
         right={
           <Link href="/campaigns/new/" className="k-btn-strong">
             New campaign
@@ -53,7 +53,7 @@ function CampaignList({ model, scope }: { model: Model; scope: string | null }) 
         <thead>
           <tr className="k-line-subtle border-b">
             <th className={TH}>Campaign</th>
-            <th className={TH}>Start</th>
+            <th className={TH}>Type</th>
             <th className={TH}>Target</th>
             <th className={`${TH} text-right`}>
               <RoiLabel>Expected ROI</RoiLabel>
@@ -95,14 +95,12 @@ function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) 
           <span className="min-w-0">
             <span className="block truncate font-medium">{campaign.name}</span>
             <span className="k-fg3 block truncate text-[12px]">{brand}</span>
-            <span className="mt-0.5 block">
-              <PlanLineView model={model} campaign={campaign} />
-            </span>
+            {campaign.description && <span className="k-fg2 mt-0.5 block text-[12px] leading-5">{campaign.description}</span>}
           </span>
         </Link>
       </td>
       <td className={TD}>
-        <span className="k-fg2 whitespace-nowrap text-[12px]">{campaign.start === START ? "Start: pulls" : `${outcomeLabel(model.catalogue, campaign.start)}: pushes`}</span>
+        <span className="k-fg2 whitespace-nowrap text-[12px]">{campaign.start === START ? "Proactive" : `Reactive: on ${outcomeLabel(model.catalogue, campaign.start)}`}</span>
       </td>
       <td className={TD}>
         <span className="k-fg2 whitespace-nowrap text-[12px]">{outcomeLabel(model.catalogue, targetOf(campaign))}</span>
@@ -126,7 +124,8 @@ function CampaignRow({ model, campaign }: { model: Model; campaign: Campaign }) 
       <td className={TD}>
         <span className="flex flex-col gap-0.5">
           <StateDot running={campaign.status === "running"} />
-          <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{formatCents(campaign.dailyBudgetCents)}/day</span>
+          <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{formatBudget(campaign.dailyBudgetCents, campaign.budgetPeriodDays)}</span>
+          {campaign.volume && <span className="k-fg3 whitespace-nowrap text-[12px] tabular-nums">{formatVolume(campaign.volume)}</span>}
         </span>
       </td>
     </tr>
@@ -194,10 +193,10 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
         <Kpi label={proactive ? "Proactive" : "Reactive"}>
           <span className="flex flex-col gap-1">
             <OutcomeChip model={model} outcome={campaign.start} size={16} />
-            <span className="k-fg3 text-[12px] font-normal">{proactive ? `Pulls on ${targetWord.toLowerCase()} at each tick, down its Plan` : "Pushes each Unit that lands up its Plan"}</span>
+            <span className="k-fg3 text-[12px] font-normal">{!proactive && !model.catalogue.isMade(campaign.start) && model.catalogue.outcome(campaign.start)?.event ? "No script makes this yet" : proactive ? `Pulls on ${targetWord.toLowerCase()} at each tick, down its Plan` : "Pushes each Unit that lands up its Plan"}</span>
           </span>
         </Kpi>
-        <Kpi label="Brief">
+        <Kpi label="Strategy">
           <span className="flex flex-col gap-1">
             <span className="text-[14px] font-normal leading-5" data-testid="campaign-brief">{campaign.brief || "No brief: every script competes"}</span>
             <span className="k-fg3 text-[12px] font-normal">
@@ -206,10 +205,10 @@ function CampaignView({ model, campaign }: { model: Model; campaign: Campaign })
             </span>
           </span>
         </Kpi>
-        <Kpi label="Daily budget">
+        <Kpi label="Budget">
           <span className="flex flex-col gap-1">
-            <span>{formatCents(campaign.dailyBudgetCents)}</span>
-            <span className="k-fg3 text-[12px] font-normal">{campaign.volume ? `At most ${formatCount(campaign.volume.units)} new subjects per ${plural(campaign.volume.periodDays, "day", "days")}` : "No volume limit"}</span>
+            <span>{formatBudget(campaign.dailyBudgetCents, campaign.budgetPeriodDays)}</span>
+            <span className="k-fg3 text-[12px] font-normal">{campaign.volume ? `At most ${formatVolume(campaign.volume)}; the first limit hit stops it` : "No volume limit"}</span>
           </span>
         </Kpi>
       </div>
@@ -374,16 +373,16 @@ function BudgetControl({ campaign }: { campaign: Campaign }) {
     <>
       <button type="button" className="k-btn tabular-nums" onClick={() => setOpen(true)}>
 
-        {formatCents(campaign.dailyBudgetCents)}/day
+        {formatBudget(campaign.dailyBudgetCents, campaign.budgetPeriodDays)}
         <CaretDownIcon size={11} className="k-fg3" />
       </button>
       {open && (
-        <Modal title="Daily budget" onClose={() => setOpen(false)}>
-          <p className="k-fg2 mb-3 text-[13px]">What this campaign may spend per day on our runs.</p>
+        <Modal title="Budget" onClose={() => setOpen(false)}>
+          <p className="k-fg2 mb-3 text-[13px]">What this campaign may spend per period on our runs.</p>
           <label className="k-input flex items-center gap-1 px-2">
             <span className="k-fg3">$</span>
             <input aria-label="Dollars per day" value={text} onChange={(e) => setText(e.target.value.replace(/[^0-9.]/g, ""))} className="w-full bg-transparent tabular-nums outline-none" style={{ font: "inherit" }} />
-            <span className="k-fg3">/day</span>
+            <span className="k-fg3">per {periodWord(campaign.budgetPeriodDays ?? 1)}</span>
           </label>
           {error && <p className="mt-2 text-[12px] text-[var(--data-rose)]">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
