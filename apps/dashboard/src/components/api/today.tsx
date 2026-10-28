@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import type { ApiOverview } from "@gtm-factory/core";
+import { useState } from "react";
+import type { ApiOverview, ApiSeries } from "@gtm-factory/core";
+import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
-import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
-import { useOverview } from "@/lib/api/overview";
+import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
+import { useApi } from "@/lib/api/client";
+import { useOverview, useScope } from "@/lib/api/overview";
 import { outcomeName } from "@/lib/api/labels";
-import { formatCents, formatCount, plural } from "@/lib/format";
+import { formatCents, formatCount, formatRoi, formatUsd, plural, roiIsGood } from "@/lib/format";
 import { BudgetButton, CampaignStatusButton, CapBar, PicksTable, Read, RunsTable, timeAgo } from "./common";
 
 export function ApiTodayPage() {
@@ -24,6 +27,8 @@ export function ApiTodayPage() {
 }
 
 function Today({ o }: { o: ApiOverview }) {
+  const { scope } = useScope();
+  const series = useApi<ApiSeries>(`/series${scope.brandId ? `?brandId=${encodeURIComponent(scope.brandId)}` : ""}`).data ?? null;
   const live = o.campaigns.filter((c) => c.status === "live").length;
   const leadOutcomes = o.catalogue.outcomes.filter((x) => x.subject === "lead" && !x.retired && o.totals.counts[x.id] != null);
   const brandName = (id: string) => o.brands.find((b) => b.id === id)?.name ?? "";
@@ -52,13 +57,22 @@ function Today({ o }: { o: ApiOverview }) {
         </StatTile>
         <StatTile label="Spent in total">
           <Figure value={formatCents(o.totals.spentTotalCents)} />
+          <BarSpark className="mt-auto pt-2" values={series?.spendCents ?? null} />
         </StatTile>
         {leadOutcomes.map((x) => (
           <StatTile key={x.id} label={x.plural ?? x.label}>
             <Figure value={formatCount(o.totals.counts[x.id] ?? 0)} />
+            <SparkLine className="mt-auto h-8 pt-2" values={series?.outcomes[x.id] ? cumulative(series.outcomes[x.id]!) : null} color="var(--data-teal)" />
           </StatTile>
         ))}
       </div>
+
+      {series && (
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <CostPerOutcomeCard o={o} series={series} />
+          <ReturnCard series={series} />
+        </div>
+      )}
 
       <section className="mt-8">
         <SectionTitle count={o.campaigns.length} right={<Link href="/campaigns/new/" className="k-accent">New campaign</Link>}>
@@ -134,5 +148,67 @@ function Today({ o }: { o: ApiOverview }) {
         </p>
       )}
     </>
+  );
+}
+
+function cumulative(values: readonly number[]): number[] {
+  let s = 0;
+  return values.map((v) => (s += v));
+}
+
+/** Spend to date over outcomes to date, day by day, for the milestone picked. */
+function CostPerOutcomeCard({ o, series }: { o: ApiOverview; series: ApiSeries }) {
+  const states = o.catalogue.outcomes.filter((x) => x.subject === "lead" && !x.retired && (series.outcomes[x.id] ?? []).some((v) => v > 0));
+  const [state, setState] = useState<string | null>(null);
+  const picked = state && states.some((x) => x.id === state) ? state : (states[0]?.id ?? null);
+  const label = picked ? outcomeName(o.catalogue, picked).toLowerCase() : "outcome";
+  const spend = cumulative(series.spendCents);
+  const outs = cumulative(picked ? (series.outcomes[picked] ?? []) : []);
+  const measured = spend.map((s, i) => ((outs[i] ?? 0) > 0 ? s / 100 / outs[i]! : null));
+  const last = [...measured].reverse().find((x) => x != null) ?? null;
+  const lines = [{ key: "m", label: `Cost per ${label}`, values: measured, color: "var(--accent)" }];
+  return (
+    <section>
+      <SectionTitle right={<span>Spend to date over outcomes to date</span>}>$ per outcome over time</SectionTitle>
+      <div className="k-card px-4 pb-3 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Figure value={last != null ? formatUsd(last) : "None yet"} sub={`per ${label}`} />
+          <div className="flex flex-wrap gap-1">
+            {states.map((x) => (
+              <button key={x.id} type="button" onClick={() => setState(x.id)} className={`k-chip ${x.id === picked ? "k-chip-on" : ""}`} aria-pressed={x.id === picked}>
+                {x.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3">{measured.some((x) => x != null) ? <DayChart series={lines} days={series.days} format={formatUsd} /> : <EmptyNote>No outcome yet.</EmptyNote>}</div>
+        <Legend series={lines} />
+      </div>
+    </section>
+  );
+}
+
+/** Value won by our runs over our spend, to date, day by day; the expected return beside it. */
+function ReturnCard({ series }: { series: ApiSeries }) {
+  const spend = cumulative(series.spendCents);
+  const value = series.valueCents ? cumulative(series.valueCents) : null;
+  const roi = value ? spend.map((s, i) => (s > 0 ? value[i]! / s : null)) : [];
+  const expected = series.expectedReturn ?? null;
+  const lines = [
+    { key: "m", label: "Measured return: our value over our spend", values: roi, color: "var(--run)" },
+    ...(expected ? [{ key: "e", label: "Expected: the same formula on today's estimates", values: series.days.map(() => expected), color: "var(--fg-4)", dashed: true }] : []),
+  ];
+  const last = [...roi].reverse().find((x) => x != null) ?? null;
+  return (
+    <section>
+      <SectionTitle right={<span>Value won by our runs over our spend</span>}>Return over time</SectionTitle>
+      <div className="k-card px-4 pb-3 pt-3">
+        <Figure value={<span className={roiIsGood(last) ? "text-[var(--run)]" : ""}>{formatRoi(last)}</span>} sub={`expected ${formatRoi(expected)}`} />
+        <div className="mt-3">
+          {value ? <DayChart series={lines} days={series.days} format={(v) => formatRoi(v)} reference={{ y: 1, label: "Break-even" }} /> : <EmptyNote>No value measured yet. A paid client's value comes in once its lifetime value is known.</EmptyNote>}
+        </div>
+        <Legend series={lines} />
+      </div>
+    </section>
   );
 }

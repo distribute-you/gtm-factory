@@ -9,6 +9,11 @@
 import {
   OURS,
   START,
+  describeCondition,
+  isOurs,
+  type ApiCompany,
+  type ApiProposal,
+  type ApiSeries,
   type ApiBrand,
   type ApiCampaign,
   type ApiCampaignDetail,
@@ -37,7 +42,7 @@ import {
   type ScriptInput,
   type WorldClient,
 } from "@gtm-factory/core";
-import { candidateLabel, companyName, engineName, explainPick, headScript, materialsOfScript, outcomeLabel, personName, pointInfo, previewPlan, type Model } from "./model";
+import { candidateLabel, companyName, convergenceOf, engineName, explainPick, headScript, hiddenOf, leadRows, materialsOfScript, objectDynasties, outcomeLabel, personName, pointInfo, previewPlan, scopeFigures, scopeReturn, type Model } from "./model";
 import { campaignMilestones, freshCampaignId, newClient } from "./campaigns";
 import type { SimAction } from "./world";
 import { SOURCES } from "@gtm-factory/scripts";
@@ -91,6 +96,9 @@ export function simRoute(host: SimBackendHost, method: string, rawPath: string, 
     if (p[0] === "objects") return objectsOf(model, q("outcome") ?? fail(400, "Name an outcome."));
     if (p[0] === "scripts") return scriptsOf(model, q("outcome"));
     if (p[0] === "research") return research(model);
+    if (p[0] === "series") return seriesOf(model, q("brandId"));
+    if (p[0] === "companies") return companiesOf(model, q("brandId"));
+    if (p[0] === "proposals") return proposalsOf(model, q("brandId"));
     if (p[0] === "picks") return picksOf(model, new Set(model.campaigns.filter((c) => !q("campaignId") || c.id === q("campaignId")).map((c) => c.id)), 50);
     if (p[0] === "tasks") return tasksOf(model, q("brandId"));
     if (p[0] === "accounts") return accountsOf(model, q("brandId") ?? fail(400, "Name a brand."));
@@ -266,6 +274,7 @@ function candidatesOf(model: Model, c: Campaign, point: string): ApiCandidates {
     recent.set(o, n);
     total += n;
   }
+  const hidden = hiddenOf(model, c).get(point) ?? null;
   const candidates: ApiCandidate[] = model.session.beliefsAt(point, c.id).map((b) => ({
     id: b.candidate,
     label: candidateLabel(model, point, b.candidate, c.brandId),
@@ -277,8 +286,18 @@ function candidatesOf(model: Model, c: Campaign, point: string): ApiCandidates {
     successes: b.successes,
     spentCents: spentByDynasty(model, c).get(b.candidate) ?? 0,
     inputs: info.kind === "script" ? inputsOut(model, model.session.inputsOf(b.candidate, c.id)) : [],
+    ...truthOf(hidden, b.candidate),
   }));
-  return { id: point, consumer: info.consumer, material: info.material, label: info.title, candidates };
+  const conv = convergenceOf(model).find((x) => x.point === point);
+  const onBest = conv ? conv.daily.map((d, day) => ({ day: isoOfDay(day), picks: d.picks, onBest: d.onBest })) : undefined;
+  return { id: point, consumer: info.consumer, material: info.material, label: info.title, candidates, campaignId: c.id, ...(onBest ? { onBest } : {}) };
+}
+
+/** The world's hidden truth about a candidate: only the simulator knows it, so only it serves these optional fields. */
+function truthOf(hidden: { best: string; candidates: { candidate: string; rate: number; costCents: number; perDollar: number }[] } | null, candidate: string): Pick<ApiCandidate, "truth" | "hiddenBest"> {
+  const t = hidden?.candidates.find((h) => h.candidate === candidate);
+  if (!hidden) return {};
+  return { hiddenBest: hidden.best === candidate, ...(t ? { truth: { rate: t.rate, costCents: t.costCents, perDollar: t.perDollar } } : {}) };
 }
 
 /** The places where a campaign's scripts compete. The brand's competing inputs (ICPs, templates) ride on the row of the script that used them. */
@@ -446,6 +465,7 @@ function leadDetail(model: Model, id: string): ApiLeadDetail | null {
 
 function objectsOf(model: Model, outcome: OutcomeId): ApiObjectDynasty[] {
   const out: ApiObjectDynasty[] = [];
+  const figures = new Map(objectDynasties(model, outcome, null).map((d) => [`${d.brandId}|${d.dynasty}`, d]));
   for (const c of model.clients) {
     const versions = model.session.objectVersions(c.brand.id, outcome);
     for (const d of [...new Set(versions.map((v) => v.dynasty!))]) {
@@ -458,10 +478,87 @@ function objectsOf(model: Model, outcome: OutcomeId): ApiObjectDynasty[] {
         versions: vs.map((v, i) => ({ id: v.id, version: v.version ?? 1, name: v.name ?? d, content: v.text ?? JSON.stringify(v.content ?? {}), createdAt: isoOfDay(v.day), head: i === vs.length - 1 })),
         stats: [],
         retired: false,
+        ...objectFigures(model, figures.get(`${c.brand.id}|${d}`), vs[0]!.id),
       });
     }
   }
   return out;
+}
+
+function objectFigures(model: Model, d: ReturnType<typeof objectDynasties>[number] | undefined, firstId: string): Pick<ApiObjectDynasty, "picks" | "share" | "producer" | "proposed"> {
+  const s = d?.head.scriptId ? model.catalogue.script(d.head.scriptId) : undefined;
+  const p = model.session.proposals.find((x) => x.kind === "audience" && x.createdId === firstId);
+  return {
+    picks: d?.picks ?? 0,
+    share: d?.share ?? 0,
+    producer: s ? { scriptId: s.id, name: headScript(model.catalogue, s.dynasty)?.name ?? s.name, performedBy: isOurs(s) ? OURS : String(s.tactics.performed_by ?? OURS) } : null,
+    proposed: p ? { at: isoOfDay(p.day), subjects: p.study.proposal?.all.trials ?? 0 } : null,
+  };
+}
+
+/** Spend, Units and value per day for one brand's campaigns (or all). */
+function seriesOf(model: Model, brandId: string | null): ApiSeries {
+  const campaigns = model.campaigns.filter((c) => !brandId || c.brandId === brandId);
+  const f = scopeFigures(model, campaigns);
+  return {
+    days: f.dailySpendCents.map((_, d) => isoOfDay(d)),
+    spendCents: f.dailySpendCents,
+    outcomes: f.dailyOutcomes,
+    valueCents: f.dailyValueOurs.map((v) => Math.round(v * 100)),
+    expectedReturn: scopeReturn(model, campaigns).expected,
+  };
+}
+
+/** Companies the brand's leads belong to: one research of a company serves every lead of it. */
+function companiesOf(model: Model, brandId: string | null): ApiCompany[] {
+  const leads = leadRows(model, brandId);
+  const by = new Map<string, typeof leads>();
+  for (const l of leads) by.set(l.person.companyId, [...(by.get(l.person.companyId) ?? []), l]);
+  const researched = new Map<string, number>();
+  const unitCompany = new Map<string, string>();
+  for (const u of model.session.units) {
+    if (!by.has(u.subject)) continue;
+    unitCompany.set(u.id, u.subject);
+    if (model.catalogue.outcome(u.outcome)?.subject === "company") researched.set(u.subject, Math.min(researched.get(u.subject) ?? u.day, u.day));
+  }
+  const uses = new Map<string, number>();
+  for (const u of model.session.units)
+    for (const id of Object.values(u.materials)) {
+      const cid = unitCompany.get(id);
+      if (cid) uses.set(cid, (uses.get(cid) ?? 0) + 1);
+    }
+  const companyTactics = model.catalogue.tactics.filter((t) => t.describes.includes("company")).map((t) => t.id);
+  return [...by].map(([id, ls]) => {
+    let furthest: { outcome: OutcomeId; rank: number } | null = null;
+    for (const l of ls) for (const st of Object.values(l.states)) if (st && (!furthest || st.rank > furthest.rank)) furthest = { outcome: st.outcome, rank: st.rank };
+    const values: Record<string, string | number | boolean> = {};
+    for (const t of companyTactics) if (ls[0]!.person.values[t] !== undefined) values[t] = ls[0]!.person.values[t] as string | number | boolean;
+    const day = researched.get(id);
+    return { id, name: companyName(id), brandId: ls[0]!.person.brandId, values, leads: ls.length, leadId: ls[0]!.person.id, furthest: furthest?.outcome ?? null, researchedAt: day === undefined ? null : isoOfDay(day), researchUses: uses.get(id) ?? 0 };
+  });
+}
+
+/** What the splits proposed, newest first. */
+function proposalsOf(model: Model, brandId: string | null): ApiProposal[] {
+  return model.session.proposals
+    .filter((p) => !brandId || p.brandId === brandId || p.brandId === null)
+    .map((p) => {
+      const strategy = p.kind === "strategy" ? model.catalogue.strategy(p.createdId) : undefined;
+      return {
+        kind: p.kind,
+        createdId: p.createdId,
+        brandId: p.brandId,
+        at: isoOfDay(p.day),
+        where: p.point ? pointInfo(model.catalogue, p.point).title : strategy ? engineName(model.catalogue, strategy.outcome) : null,
+        conditions: p.conditions.map((c) => describeCondition(c, model.catalogue)),
+        text: p.text || null,
+        splits: [...p.study.root]
+          .sort((a, b) => a.likeForLike.pValue - b.likeForLike.pValue)
+          .slice(0, 20)
+          .map((x) => ({ inside: describeCondition(x.inside, model.catalogue), insideSuccesses: x.insideCounts.successes, insideTrials: x.insideCounts.trials, outsideSuccesses: x.outsideCounts.successes, outsideTrials: x.outsideCounts.trials, verdict: x.verdict })),
+      };
+    })
+    .reverse();
 }
 
 function scriptsOf(model: Model, outcome: string | null): ApiScriptStats[] {

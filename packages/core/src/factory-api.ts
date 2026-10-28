@@ -28,6 +28,9 @@
  *   POST /scripts/:id/retire | /restore -> ApiScriptStats
  *   POST /scripts/:id/capacity ApiCapacity -> ApiScriptStats (a person types it for a Client's team script)
  *   GET  /research                      -> ApiCandidates[]
+ *   GET  /series?brandId=               -> ApiSeries (spend, Units and value per day: the Today charts)
+ *   GET  /companies?brandId=            -> ApiCompany[]
+ *   GET  /proposals?brandId=            -> ApiProposal[] (what the splits proposed: finer ICPs, strategies)
  *   GET  /picks?campaignId=&leadId=     -> ApiPick[]
  *   GET  /tasks?brandId=&status=        -> ApiTask[] (work the Plan ordered from the client's team)
  *   GET  /accounts?brandId=              -> ApiConnectedAccount[] (the brand's accounts, their role and counts)
@@ -261,6 +264,13 @@ export interface ApiCandidate {
   spentCents: number;
   /** The brand inputs (ICPs, templates) whose versions compete inside this script's runs, and the share of each version. */
   inputs: ApiScriptInput[];
+  /**
+   * What the world really does with this candidate, never read by any pick. Only a simulator
+   * knows it (the hidden truth of its fictional world); a running backend leaves it out.
+   */
+  truth?: { rate: number; costCents: number; perDollar: number };
+  /** The simulator's hidden best at this place (absent on a running backend). */
+  hiddenBest?: boolean;
 }
 
 /**
@@ -276,6 +286,10 @@ export interface ApiCandidates {
   label: string;
   /** The scripts of the material's Engine, each with the brand inputs it used. */
   candidates: ApiCandidate[];
+  /** The campaign these picks are made for, when the place is read per campaign. */
+  campaignId?: string;
+  /** Simulator only: picks per day and how many went to the hidden best, oldest first. */
+  onBest?: { day: string; picks: number; onBest: number }[];
 }
 
 /** One pick: the candidate the Rating's draw took, for one subject, at one place. */
@@ -410,6 +424,14 @@ export interface ApiObjectDynasty {
   /** Per place it competes at. */
   stats: { place: string; placeLabel: string; picks: number; successes: number; rateMean: number }[];
   retired: boolean;
+  /** Picks to date at every place that consumes it, every campaign of its brand. */
+  picks?: number;
+  /** Its share of its brand's picks at those places over the last 7 days. */
+  share?: number;
+  /** The script that wrote its head version, and who performs it. */
+  producer?: { scriptId: string; name: string; performedBy: string } | null;
+  /** When a split proposed it: the day and the mature subjects it was read on. */
+  proposed?: { at: string; subjects: number } | null;
 }
 
 export interface ApiNewObjectVersion {
@@ -524,4 +546,59 @@ export interface ApiConnectedAccount {
   sentToday: number;
   sentWeek: number;
   readWeek: number;
+}
+
+/** Spend, Units and value per UTC day, oldest first: what the Today charts draw. The page divides nothing a backend would not. */
+export interface ApiSeries {
+  days: string[];
+  /** Our spend per day, cents. */
+  spendCents: number[];
+  /** Units landed per day, per outcome. */
+  outcomes: Record<OutcomeId, number[]>;
+  /** Value won per day by the runs we performed, cents; absent when the backend measures no value. */
+  valueCents?: number[];
+  /** The return expected on today's estimates (value per dollar), spend-weighted over the campaigns. */
+  expectedReturn?: number | null;
+}
+
+/** A company the leads belong to: one research of it serves every lead there. */
+export interface ApiCompany {
+  id: string;
+  name: string;
+  brandId: string;
+  /** Its values of the tactics that describe a company (size, industry...). */
+  values: Record<string, string | number | boolean>;
+  leads: number;
+  /** One of its leads, to open. */
+  leadId: string | null;
+  /** The furthest milestone one of its leads reached. */
+  furthest: OutcomeId | null;
+  /** When it was first researched, and how many Units consumed that research. */
+  researchedAt: string | null;
+  researchUses: number;
+}
+
+/** One split looked at: a condition, its rate inside and outside, and the verdict. */
+export interface ApiSplit {
+  inside: string;
+  insideSuccesses: number;
+  insideTrials: number;
+  outsideSuccesses: number;
+  outsideTrials: number;
+  verdict: "conclusion" | "signal" | "noise";
+}
+
+/** What a split proposed: a finer object version (an ICP) or a strategy, read on mature subjects. */
+export interface ApiProposal {
+  kind: "audience" | "strategy";
+  /** The object dynasty or the strategy it created. */
+  createdId: string;
+  brandId: string | null;
+  at: string;
+  /** Where it competes, in plain words. */
+  where: string | null;
+  /** Its conditions, in plain words. */
+  conditions: string[];
+  text: string | null;
+  splits: ApiSplit[];
 }
