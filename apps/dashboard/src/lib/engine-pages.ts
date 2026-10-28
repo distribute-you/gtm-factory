@@ -14,9 +14,9 @@ export interface PointGroup {
 }
 
 /** Candidate places grouped by the Engine that calls the outcome. */
-export function pointGroups(model: Model): PointGroup[] {
+export function pointGroups(model: Model, campaignIds: ReadonlySet<string> | null = null): PointGroup[] {
   const groups = new Map<string, PointGroup>();
-  for (const conv of convergenceOf(model)) {
+  for (const conv of convergenceOf(model, campaignIds)) {
     const info = pointInfo(model.catalogue, conv.point);
     // Brand inputs (ICPs, templates) show on the row of the script that used them.
     if (info.kind !== "script") continue;
@@ -60,7 +60,7 @@ export interface PerformerFigures {
 }
 
 /** What each performer ran (the "Performed by" tactic): its scripts, runs, Units and what it cost (our spend or an access cost). */
-export function performerFigures(model: Model): PerformerFigures[] {
+export function performerFigures(model: Model, runs = model.session.runs): PerformerFigures[] {
   const by = new Map<string, PerformerFigures>();
   const of = (id: string) => {
     let f = by.get(id);
@@ -68,18 +68,18 @@ export function performerFigures(model: Model): PerformerFigures[] {
     return f;
   };
   for (const s of model.catalogue.scripts) of(String(s.tactics.performed_by ?? OURS)).scripts.push(s.id);
-  for (const r of model.session.runs) {
+  const ids = runs === model.session.runs ? null : new Set(runs.map((r) => r.id));
+  for (const r of runs) {
     const f = of(r.performedBy);
     f.runs++;
     f.spendCents += r.spendCents;
   }
-  for (const u of model.session.units) of(u.performedBy).units++;
+  for (const u of model.session.units) if (!ids || (u.runId && ids.has(u.runId))) of(u.performedBy).units++;
   return [...by.values()].sort((a, b) => Number(b.ours) - Number(a.ours) || a.id.localeCompare(b.id));
 }
 
 /** The Units consumed most often: where the reuse gain of the ledger comes from. */
-export function mostReused(model: Model, limit = 6): { id: string; consumptions: number; standardCents: number }[] {
-  const l = model.session.ledger();
+export function mostReused(model: Model, limit = 6, l = model.session.ledger()): { id: string; consumptions: number; standardCents: number }[] {
   return Object.entries(l.consumptions)
     .filter(([, n]) => n > 1)
     .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))

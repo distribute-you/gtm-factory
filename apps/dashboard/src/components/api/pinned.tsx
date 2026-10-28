@@ -60,7 +60,7 @@ function ObjectsPage({ pin }: { pin: Pin }) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {dynasties.map((d) => {
+                    {dynasties.filter((d) => !d.brandId || !o || o.brands.some((b) => b.id === d.brandId)).map((d) => {
                       const head = d.versions.find((v) => v.head) ?? d.versions[d.versions.length - 1];
                       return (
                         <div key={d.dynasty} className="k-card p-4">

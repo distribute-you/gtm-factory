@@ -13,7 +13,7 @@ import { judgeBrief } from "./brief";
 import { brandOut, brandsOut, campaignFlows, campaignMilestones, campaignOut, campaignsOut, cents, evidenceForReads, ledgerOut, leadsOut, picksOut, placeLabel, planOut, plansFor, researchOut, runsOut, totalCounts, unitOut } from "./read";
 import { answerTask, tasksOut } from "./tasks";
 import { forkFromCode, somethingCanRun, sourceOf, upgradeFromCode } from "./code";
-import { IMPORT_ON, shownBrand, shownBrandRow } from "./visibility";
+import { IMPORT_ON, brandIdsOf, shownBrand, shownBrandRow } from "./visibility";
 import { accountsOut, setAccountRole } from "./accounts";
 import { answerConnect, channels as connectChannels, connectState, disconnect, startConnect } from "./connect";
 import { finishGoogle } from "./connect/google";
@@ -412,7 +412,7 @@ for (const action of ["retire", "restore"] as const) {
   });
 }
 
-route("GET", "/api/research", async () => researchOut(await loadCatalogue()));
+route("GET", "/api/research", async (_req, _p, url) => researchOut(await loadCatalogue(), undefined, undefined, brandIdsOf(url)));
 
 route("GET", "/api/picks", async (_req, _p, url) => {
   const catalogue = await loadCatalogue();
@@ -592,7 +592,7 @@ route("POST", "/api/scripts/:id/forks", async (req, [id]) => {
   return (await scriptsOut(null, made.id))[0]!;
 });
 
-route("GET", "/api/ledger", async () => ledgerOut(await loadCatalogue()));
+route("GET", "/api/ledger", async (_req, _p, url) => ledgerOut(await loadCatalogue(), brandIdsOf(url)));
 
 route("GET", "/api/storage/:engine", async (_req, [engine]) => storageReport(engine!));
 

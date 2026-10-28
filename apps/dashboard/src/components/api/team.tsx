@@ -23,7 +23,10 @@ export function ApiTeamPage() {
   const read = useApi<ApiScriptStats[]>("/scripts");
   const { data: o } = useOverview();
   const { scope } = useScope();
-  const tasks = useApi<ApiTask[]>(scope.brandId ? `/tasks?brandId=${encodeURIComponent(scope.brandId)}&status=open` : null, 15_000);
+  const { data: scoped } = useOverview();
+  const raw = useApi<ApiTask[]>(scope.brandId ? `/tasks?brandId=${encodeURIComponent(scope.brandId)}&status=open` : "/tasks?status=open", 15_000);
+  // All brands picked: every brand of the organization, never another organization's.
+  const tasks = { ...raw, data: raw.data && scoped ? raw.data.filter((t) => scoped.brands.some((b) => b.id === t.brandId)) : raw.data };
   return (
     <>
       <TopBar crumbs={[{ label: "Done by your team" }]} />

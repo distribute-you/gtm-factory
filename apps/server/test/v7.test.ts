@@ -187,6 +187,24 @@ describe.runIf(!!url)("GTM Factory v7", () => {
     expect((await api("POST", "/api/accounts/connect", { brandId: "northwind", channel: "Email", role: "AI agent" })).status).toBe(400);
   });
 
+  it("v10: the research and the ledger answer for the brands the sidebar's switch picked, and only them", async () => {
+    type Ledger = { totalCents: number; runs: { brandId: string | null }[] };
+    const mine = (await api("GET", "/api/ledger?brandIds=northwind")).body as unknown as Ledger;
+    const none = (await api("GET", "/api/ledger?brandIds=another-brand")).body as unknown as Ledger;
+    expect(mine.runs.length).toBeGreaterThan(0);
+    for (const r of mine.runs) expect(r.brandId).toBe("northwind");
+    expect(none.runs).toEqual([]);
+    expect(none.totalCents).toBe(0);
+    type Place = { daily: { picks: number }[] };
+    const picks = (xs: Place[]) => xs.reduce((x, p) => x + p.daily.reduce((y, d) => y + d.picks, 0), 0);
+    const r1 = (await api("GET", "/api/research?brandIds=northwind")).body as unknown as Place[];
+    const r0 = (await api("GET", "/api/research?brandIds=another-brand")).body as unknown as Place[];
+    expect(picks(r1)).toBeGreaterThan(0);
+    expect(picks(r0)).toBe(0);
+    // A brand id is checked before it reaches the database.
+    expect((await api("GET", "/api/ledger?brandIds=x');drop table runs;--")).status).toBe(200);
+  });
+
   it("v10: serves what the Today charts, the Companies page and the ICPs page read", async () => {
     type Series = { days: string[]; spendCents: number[]; outcomes: Record<string, number[]> };
     const s = (await api("GET", "/api/series?brandId=northwind")).body as unknown as Series;

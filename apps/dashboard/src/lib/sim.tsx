@@ -34,11 +34,14 @@ interface SimContextValue {
   setPins: (pins: Pin[]) => void;
   playing: boolean;
   speed: Speed;
-  /** The brand the pages show (null before the first pick). */
+  /** The brand the pages show (null: every brand). */
   scope: string | null;
-  /** The offer of that brand the pages show. */
+  /** The offer of that brand the pages show (null: every offer). */
   offer: string | null;
+  /** What the visitor picked, "*" for All: null before the first pick. */
+  picked: { brand: string | null; offer: string | null };
   actions: LoggedAction[];
+  /** Pick a brand and an offer; "*" is an explicit All. */
   setScope: (brandId: string | null, offerId?: string | null) => void;
   run: () => void;
   pause: () => void;
@@ -156,8 +159,9 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
     },
     playing,
     speed,
-    scope,
-    offer,
+    scope: scope === "*" ? null : scope,
+    offer: offer === "*" ? null : offer,
+    picked: { brand: scope, offer },
     actions,
     setScope,
     run: () => setPlaying(true),

@@ -192,7 +192,7 @@ function Sidebar() {
 
 /** Which organization, brand and offer the pages show, like distribute.you. */
 function ScopeSwitcher() {
-  const { model, scope, offer, setScope } = useSim();
+  const { model, picked, setScope } = useSim();
   const orgs = useMemo<ScopeOrg[]>(() => {
     const out: ScopeOrg[] = [];
     for (const c of model?.clients ?? []) {
@@ -202,12 +202,13 @@ function ScopeSwitcher() {
     }
     return out;
   }, [model?.clients]);
-  const value = resolveScope(orgs, { orgId: null, brandId: scope, offerId: offer });
-  // The pages always show one brand: the first one until another is picked.
+  // "*" is an explicit All; nothing picked yet opens on the first brand and its offer.
+  const asked = picked.brand === null ? null : { orgId: orgs[0]?.id ?? null, brandId: picked.brand === "*" ? null : picked.brand, offerId: picked.offer === "*" ? null : picked.offer };
+  const value = resolveScope(orgs, asked);
   useEffect(() => {
-    if (model && (value.brandId !== scope || value.offerId !== offer)) setScope(value.brandId, value.offerId);
-  }, [model, value.brandId, value.offerId, scope, offer, setScope]);
-  return <ScopeSelector orgs={orgs} value={value} onChange={(v) => setScope(v.brandId, v.offerId)} note={`GTM Factory ${RELEASE} · fictional data`} />;
+    if (model && picked.brand === null && value.brandId) setScope(value.brandId, value.offerId);
+  }, [model, picked.brand, value.brandId, value.offerId, setScope]);
+  return <ScopeSelector orgs={orgs} value={value} onChange={(v) => setScope(v.brandId ?? "*", v.brandId ? v.offerId ?? "*" : "*")} note={`GTM Factory ${RELEASE} · fictional data`} />;
 }
 
 /** The simulator, always in reach above every page: the day, run / pause / one day / speed, reset on a seed. */
