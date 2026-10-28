@@ -2,7 +2,7 @@
 
 A hosted GTM Factory: the core of this repository running for real, with its own database (the ledger, the common stock of every Unit) and its scheduler. It serves https://factory.distribute.you.
 
-**Every vendor is mocked for now** (`src/mock-vendor.ts` answers each call from the fictional world's hidden truth, deterministically, at $0: no email, no API call, no spend). It shows the demo brand (Northwind Analytics, seeded paused) and the host's own test brands.
+**One real vendor runs: the client's own Claude** (`src/vendors/claude-local.ts`). A script runs only when every vendor its code calls has a real adapter; the others are test stand-ins (`src/mock-vendor.ts`, registered by the tests only), so no full chain runs here yet. It shows the demo brand (Northwind Analytics, seeded paused) and the host's own test brands.
 
 | Path | What |
 |---|---|
@@ -14,6 +14,7 @@ A hosted GTM Factory: the core of this repository running for real, with its own
 | `src/demo.ts` | The demo brand, seeded once from the fictional world: its organization, brand, offer, starting Units and three campaigns, paused. |
 | `src/factory.ts` | Framework glue: stored catalogue, Runs, Units with traceability, the daily Rating, picks by Thompson sampling, each campaign's Plan. |
 | `src/api.ts`, `src/read.ts` | The API (contract: `factory-api.ts` in the core). Plus `GET /api/scripts/:id/code`, `POST /api/scripts/:id/versions` and `POST /api/scripts/:id/forks` (code text in, checked in the sandbox, materials read from its literal `ctx.get` names). |
+| `src/pending.ts`, `src/vendors/claude-local.ts` | A vendor answering in minutes. `claude_local.complete` queues the Request in `vendor_requests` (keyed by vendor, brand and request, so the retry finds it) and answers "pending": the run stops like a run missing a milestone and is tried again at a later tick, under the same picks. The GTM Factory Mac app (the client's `claude` CLI on their own subscription) polls `GET /api/claude/requests` (each poll marks it online), posts `POST /api/claude/requests/:id/answer` `{ text, model? }`, and the next tick lands the LLM completion at $0. `GET /api/claude/status`: online, last seen, waiting. A script may ask for `offline_after_minutes`: past that with no app, it hears `{ ok: false, data: { offline: true } }` and decides (the fallback script then calls our API). **This host has one owner login (Caddy basic auth), so the app serves every brand of this host**; per-client auth comes with client accounts. |
 | `src/vendors/` | The real vendor adapters (Apollo, BounceVerify, BounceBan, Firecrawl, LLMs, SMTP, IMAP), kept for when a mock is replaced; only the mail sender runs (task notifications). |
 | `Dockerfile` | This server (port 8080), built from the repository root. `apps/dashboard/Dockerfile`: the dashboard in api mode. |
 

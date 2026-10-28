@@ -23,7 +23,7 @@ import { buildLedger, type LedgerReport, type LedgerRun, type LedgerUnit } from 
 import { prioritize, type PricedCandidate } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
 import { createRng, type Rng } from "./rng";
-import { Waiting, type AccountView, type ScriptCode, type ScriptContext, type ScriptResult, type UnitView, type Vendor, type VendorAnswer } from "./script";
+import { Waiting, type AccountView, type RunRequest, type ScriptCode, type ScriptContext, type ScriptResult, type UnitView, type Vendor, type VendorAnswer } from "./script";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
 import { betaMean, betaVariance } from "./stats";
 import { StorageHouse, type StorageReport } from "./storage";
@@ -252,6 +252,8 @@ interface Order {
   fromStock: boolean;
   /** Why it failed, when it did. */
   failReason?: string;
+  /** The Request each consuming Engine's run handed to the pieces it orders whose subject is the run. */
+  asked: Map<OutcomeId, RunRequest>;
 }
 
 interface PendingLanding {
@@ -897,6 +899,7 @@ export class SimulationSession {
       milestoneOf: new Map(),
       passed: new Set(from === START ? [] : [from]),
       fromStock: false,
+      asked: new Map(),
     };
     this.orders.push(o);
     const list = this.open.get(campaign.id) ?? [];
@@ -999,7 +1002,9 @@ export class SimulationSession {
     const script = this.catalogue.headOf(dynasty);
     if (!script) return { kind: "fail", reason: `dynasty ${dynasty} has no active version` };
     o.milestoneOf.set(key, ms);
-    return this.runCode(o, key, script, ms, addRem(rem0, this.scriptTicks(script)), outcome === o.campaign.target || this.catalogue.isMilestone(outcome), day);
+    // A piece whose subject is the run gets the Request the run that ordered it asked.
+    const request = out?.subject === "run" ? (o.asked.get(consumer) ?? null) : null;
+    return this.runCode(o, key, script, ms, addRem(rem0, this.scriptTicks(script)), outcome === o.campaign.target || this.catalogue.isMilestone(outcome), day, request);
   }
 
   /**
@@ -1124,7 +1129,7 @@ export class SimulationSession {
   // ---- running a script's code ---------------------------------------------------------
 
   /** A script's context: its subject, its Engine's storage, `get` on the Providers, the vendor. */
-  private contextFor(o: Order, script: Script, milestone: OutcomeId, rem: Rem, day: number, vendor: Vendor, consumed: Record<OutcomeId, string>): ScriptContext & { wait(days: number): never } {
+  private contextFor(o: Order, script: Script, milestone: OutcomeId, rem: Rem, day: number, vendor: Vendor, consumed: Record<OutcomeId, string>, request: RunRequest | null): ScriptContext & { wait(days: number): never } {
     const nth = new Map<OutcomeId, number>();
     const self = this;
     return {
@@ -1136,6 +1141,10 @@ export class SimulationSession {
       tactics: script.tactics,
       storage: this.storage.forEngine(script.outcome),
       vendor,
+      request,
+      ask(r: RunRequest): void {
+        o.asked.set(script.outcome, { ...r });
+      },
       accounts(channel: string, role: string): AccountView[] {
         return self.accountsOf(o.client.brand.id).filter((a) => a.channel === channel && a.role === role);
       },
@@ -1168,7 +1177,7 @@ export class SimulationSession {
    * checked; then the code runs for real, its vendor answering from the
    * hidden truth, and its Unit lands after its delay.
    */
-  private runCode(o: Order, key: string, script: Script, milestone: OutcomeId, rem: Rem, final: boolean, day: number): Obtained {
+  private runCode(o: Order, key: string, script: Script, milestone: OutcomeId, rem: Rem, final: boolean, day: number, request: RunRequest | null): Obtained {
     const code: ScriptCode | undefined = this.world.library[script.code];
     if (!code) return { kind: "fail", reason: `no code "${script.code}"` };
     const dry: Vendor = {
@@ -1177,7 +1186,7 @@ export class SimulationSession {
       },
     };
     const consumed: Record<OutcomeId, string> = {};
-    const outcome = this.signal(() => code(this.contextFor(o, script, milestone, rem, day, dry, consumed)));
+    const outcome = this.signal(() => code(this.contextFor(o, script, milestone, rem, day, dry, consumed, request)));
     if (outcome.kind !== "ready") return outcome;
     // Every Material is in hand: the run happens today if the script has capacity left, and if the budget allows it.
     if (!this.allowedScripts(o.campaign, script.outcome).some((x) => x.id === script.id)) return this.tomorrow(o);
@@ -1223,7 +1232,7 @@ export class SimulationSession {
     };
     let result: ScriptResult = null;
     try {
-      result = code(this.contextFor(o, script, milestone, rem, day, vendor, consumedReal));
+      result = code(this.contextFor(o, script, milestone, rem, day, vendor, consumedReal, request));
     } catch (e) {
       if (!(e instanceof Waiting || e instanceof Blocked || e instanceof Failed)) throw e;
       result = null;

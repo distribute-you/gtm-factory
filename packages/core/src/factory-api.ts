@@ -606,3 +606,34 @@ export interface ApiProposal {
   text: string | null;
   splits: ApiSplit[];
 }
+
+/**
+ * The client's own Claude (the GTM Factory Mac app). `GET /claude/requests` lists the requests
+ * waiting for it (and says the app is online); `POST /claude/requests/:id/answer` posts the text
+ * (`ApiClaudeAnswer`); `GET /claude/status` says whether the app is online.
+ */
+export interface ApiClaudeRequest {
+  id: string;
+  brandId: string | null;
+  /** What to write, as the run asked it. */
+  prompt: string;
+  askedAt: string;
+}
+
+export interface ApiClaudeRequests {
+  requests: ApiClaudeRequest[];
+}
+
+export interface ApiClaudeAnswer {
+  text: string;
+  /** The model that wrote it, when the app knows (default "claude"). */
+  model?: string;
+}
+
+export interface ApiClaudeStatus {
+  /** The app polled in the last 2 minutes. */
+  online: boolean;
+  lastSeenAt: string | null;
+  /** Requests waiting for the app. */
+  pending: number;
+}

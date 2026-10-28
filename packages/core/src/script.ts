@@ -49,6 +49,12 @@ export interface AccountView {
   readWeek: number;
 }
 
+/**
+ * A Request: what a run hands to the pieces it orders whose subject is the run
+ * itself (the text an LLM completion writes, the question it answers). Plain JSON.
+ */
+export type RunRequest = Readonly<Record<string, unknown>>;
+
 /** The metered vendor client: every call is priced on the run that makes it. */
 export interface Vendor {
   call(name: string, args?: Readonly<Record<string, unknown>>): VendorAnswer;
@@ -81,6 +87,17 @@ export interface ScriptContext {
    * it returns another one (a fresher piece, made if need be).
    */
   get(outcome: OutcomeId): UnitView;
+  /**
+   * Set what this run hands to the pieces it orders next whose subject is the
+   * run itself (an LLM completion: what to write). Called before the `get` of
+   * that outcome; `get` keeps no argument.
+   */
+  ask(request: RunRequest): void;
+  /**
+   * For a script whose outcome's subject is the run: the Request of the run that
+   * ordered it. Null otherwise, and null when that run asked nothing.
+   */
+  readonly request: RunRequest | null;
   readonly vendor: Vendor;
   /**
    * The brand's connected accounts on a channel that carry a role, every one of

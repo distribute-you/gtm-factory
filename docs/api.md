@@ -71,6 +71,10 @@ A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashb
 
 `GET /accounts?brandId=` lists the brand's connected accounts (`ApiConnectedAccount`): channel, address or number, role, status, and counts (sent today, sent and read this week). `PATCH /accounts/:id` with `{ role }` gives an account another role: the next run follows it. `POST /accounts/connect` with `{ brandId, channel, role }` answers `{ url }`, the backend's own page that connects an account (a mailbox login, a WhatsApp link). The backend holds the accounts, roles and counts; the scripts pick the account.
 
+## The client's Claude
+
+A client may have their own Claude (Pro or Max) write the LLM completions their campaigns need, at $0 to the host, through the GTM Factory app on their Mac. `GET /claude/requests` answers `ApiClaudeRequests`: the requests waiting, oldest first, each with its `prompt`; every call says the app is online. `POST /claude/requests/:id/answer` with `ApiClaudeAnswer` (`text`, optional `model`) posts what the client's Claude wrote: the next tick lands it as the LLM completion, and the run that asked goes on. `GET /claude/status` answers `ApiClaudeStatus`: `online` when the app called in the last 2 minutes, and how many requests wait. Inside the app, the dashboard runs this loop itself; in a browser it only shows "Your Claude: online" or "offline".
+
 ## One dashboard, two data sources
 
 Every page of the dashboard reads this API and nothing else. The demo reads the same answers from files the simulator wrote once (`apps/dashboard/src/lib/demo-data.test.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. No answer carries a hidden truth: Research shows the Rating's estimates, their margins, the chance each candidate is the best (`chanceBest`) and the value lost to weaker picks (`daily[].regretCents`), all from the beliefs. When nothing runs (no real vendor connected), `scheduler.waiting` says so in plain words and every page shows it.

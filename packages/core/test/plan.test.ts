@@ -92,9 +92,9 @@ describe("the Plan is shown as what ran", () => {
       const total = n.branches.reduce((x, b) => x + b.share, 0);
       if (n.branches.some((b) => b.units > 0)) expect(total, n.outcome).toBeCloseTo(1, 6);
     }
-    // Two ways to a reply ran this week; the LinkedIn branch finds no email under it, the cold email branch does.
+    // Two ways to a reply ran this week; a branch on another channel (LinkedIn, WhatsApp) finds no email under it, the cold email branch does.
     const replies = all.filter((n) => n.outcome === "reply_received").flatMap((n) => n.branches);
-    const li = replies.find((b) => b.scriptId === "li_connect_v2");
+    const li = replies.find((b) => b.runs > 0 && ["LinkedIn", "WhatsApp"].includes(String(s.catalogue.script(b.scriptId)?.tactics.channel)));
     const mb = replies.find((b) => b.scriptId === "mb_replies_v2");
     expect(li && mb).toBeTruthy();
     const below = (b: { children: PlanTreeNode[] }): string[] => b.children.flatMap((n) => [n.outcome, ...n.branches.flatMap(below)]);

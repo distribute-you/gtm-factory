@@ -3,8 +3,8 @@
  * (isolated-vm), with its own heap capped at ISOLATE_MEMORY_MB and RUN_TIMEOUT_MS of time. The
  * isolate holds the language's built-ins and nothing of Node: no require, no process, no fetch, no
  * timers, no file system, and no object of this process. The script sees one object, its context
- * (its subject, its brand, the day, its tactics, its Engine's storage, `get` on the Providers, the
- * mocked vendor, `wait`), built inside the isolate from copied JSON; every call it makes crosses
+ * (its subject, its brand, the day, its tactics, its Engine's storage, `get` on the Providers,
+ * `ask` and the Request it was handed, the vendor, `wait`), built inside the isolate from copied JSON; every call it makes crosses
  * one callback that takes and returns text. A script that loops forever is stopped at the time
  * limit; one that eats memory is stopped at the limit; neither takes the app down.
  */
@@ -17,7 +17,7 @@ export const RUN_TIMEOUT_MS = 2000;
 export const ISOLATE_MEMORY_MB = 64;
 
 /** What a script asks the host for, one call at a time (JSON in, JSON out). */
-export type BridgeOp = "get" | "vendor" | "wait" | "accounts" | "storage.get" | "storage.set" | "storage.delete" | "storage.count";
+export type BridgeOp = "get" | "ask" | "vendor" | "wait" | "accounts" | "storage.get" | "storage.set" | "storage.delete" | "storage.count";
 /** The host's answer: a value, or a stop (the run cannot go on now: a piece is missing, it waits). */
 export type BridgeAnswer = { v: unknown } | { stop: string };
 export type Bridge = (op: BridgeOp, args: unknown[]) => BridgeAnswer;
@@ -27,6 +27,8 @@ export interface ScriptSpec {
   brand: string;
   day: number;
   tactics: Record<string, unknown>;
+  /** For a script whose outcome's subject is the run: the Request of the run that ordered it (null otherwise). */
+  request?: Record<string, unknown> | null;
 }
 
 export type RunOutcome =
@@ -51,6 +53,7 @@ var __make = (function (host) {
       brand: s.brand,
       day: s.day,
       tactics: freeze(s.tactics),
+      request: s.request ? freeze(s.request) : null,
       storage: freeze({
         get: function (t, k) { return call("storage.get", [t, k]); },
         set: function (t, k, v) { call("storage.set", [t, k, v === undefined ? null : v]); },
@@ -58,6 +61,7 @@ var __make = (function (host) {
         count: function (t) { return call("storage.count", [t]); },
       }),
       get: function (outcome) { return freeze(call("get", [outcome])); },
+      ask: function (request) { call("ask", [request === undefined ? null : request]); },
       vendor: freeze({ call: function (name, args) { return freeze(call("vendor", [name, args === undefined ? null : args])); } }),
       accounts: function (channel, role) { return freeze(call("accounts", [channel, role]).map(function (a) { return freeze(a); })); },
       wait: function (days) { call("wait", [days]); throw new Error("wait"); },
