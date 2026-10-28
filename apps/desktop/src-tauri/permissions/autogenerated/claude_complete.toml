@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-claude-complete"
+description = "Enables the claude_complete command without any pre-configured scope."
+commands.allow = ["claude_complete"]
+
+[[permission]]
+identifier = "deny-claude-complete"
+description = "Denies the claude_complete command without any pre-configured scope."
+commands.deny = ["claude_complete"]
