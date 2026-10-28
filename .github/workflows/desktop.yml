@@ -1,0 +1,106 @@
+name: Mac app
+
+# Builds the GTM Factory Mac app (Tauri 2, universal: Apple Silicon and Intel), signs it
+# ad hoc, and attaches it to a GitHub Release on every `desktop-v*` tag.
+# Pull requests touching apps/desktop build and test it without releasing.
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  pull_request:
+    paths: ["apps/desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release to create or update (desktop-vX.Y.Z). Empty: build only."
+        required: false
+      app_url:
+        description: "Site the app window loads. Empty: https://factory.distribute.you"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: apps/desktop/src-tauri
+    env:
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+      APP_URL: ${{ inputs.app_url }}
+      APP: target/universal-apple-darwin/release/bundle/macos/GTM Factory.app
+      ASSET: GTM-Factory-mac.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test
+        run: cargo test
+
+      - name: Build config (version from the tag, optional site)
+        run: |
+          VERSION="${TAG#desktop-v}"
+          [ -n "$TAG" ] || VERSION=$(jq -r .version tauri.conf.json)
+          URL="${APP_URL:-https://factory.distribute.you}"
+          URL="${URL%/}"
+          jq -n --arg v "$VERSION" --arg u "$URL" '{
+            version: $v,
+            build: { frontendDist: $u },
+            app: {
+              windows: [ { label: "main", title: "GTM Factory", url: $u, width: 1440, height: 920, minWidth: 900, minHeight: 600 } ],
+              security: { capabilities: [ {
+                identifier: "hosted-site",
+                description: "The hosted site, and only it, may run a prompt on the user'"'"'s Claude.",
+                windows: ["main"],
+                remote: { urls: [ ($u + "/*") ] },
+                permissions: ["allow-claude-complete"]
+              } ] }
+            }
+          }' > build.conf.json
+          cat build.conf.json
+
+      - name: Build
+        run: npx --yes @tauri-apps/cli@2 build --target universal-apple-darwin --config build.conf.json
+
+      - name: Check the ad hoc signature and zip
+        run: |
+          codesign --verify --deep --strict "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature|Format"
+          for b in "$APP"/Contents/MacOS/*; do lipo -archs "$b"; done
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/$ASSET"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ runner.temp }}/${{ env.ASSET }}
+
+      - name: Release
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$RUNNER_TEMP/$ASSET" --clobber
+          else
+            gh release create "$TAG" "$RUNNER_TEMP/$ASSET" --target "$GITHUB_SHA" --title "GTM Factory for Mac ${TAG#desktop-v}" --notes "Install or update in Terminal:
+
+          \`\`\`
+          curl -fsSL https://raw.githubusercontent.com/distribute-you/gtm-factory/main/apps/desktop/install.sh | sh
+          \`\`\`
+
+          The app opens https://factory.distribute.you and writes with your own Claude subscription through the \`claude\` CLI (run \`claude\`, then \`/login\`, once)."
+          fi

@@ -32,6 +32,7 @@ Read the spec: [docs/framework.md](docs/framework.md).
 | `docs/api.md` | The API a running GTM Factory serves to the dashboard. |
 | `apps/dashboard` | The dashboard. Every page reads the GTM Factory API. The GitHub Pages demo reads a fixed example database: the fictional brand's history, generated once by the simulator and shipped as files (`public/demo`). Next.js static export, deployed on every push to `main`. |
 | `apps/server` | A hosted GTM Factory: the API the dashboard reads, the scheduler, a Postgres ledger, every script run in its own isolated V8. distribute.you hosts one. See [apps/server/README.md](apps/server/README.md). |
+| `apps/desktop` | The Mac app (Tauri 2): the hosted dashboard in its own window, writing with your own Claude subscription through the `claude` CLI. Built, signed ad hoc and released on every `desktop-v*` tag. |
 
 ## Quick start
 
@@ -66,6 +67,18 @@ NEXT_PUBLIC_BASE_PATH="" pnpm --filter dashboard dev     # http://localhost:3000
 pnpm --filter dashboard build                             # static site in apps/dashboard/out
 pnpm --filter dashboard screenshots                       # render check: every page, day 30
 ```
+
+## Mac app
+
+GTM Factory for Mac opens the hosted dashboard in its own window. It writes with your own Claude subscription, through the official `claude` CLI. Install or update it in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/distribute-you/gtm-factory/main/apps/desktop/install.sh | sh
+```
+
+The script downloads the latest release, puts the app in /Applications and opens it. Apple does not notarize the app, so it installs from Terminal, not from a browser download. Claude Code is needed once: run `claude` in Terminal, then type `/login`.
+
+Each request runs the CLI with no tool, no MCP server, no settings, hooks or skills, in an empty temporary folder, one at a time, for 5 minutes at most. An email written by a prospect can be read and answered, and can do nothing on your Mac.
 
 ## License
 
