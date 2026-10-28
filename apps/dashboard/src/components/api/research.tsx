@@ -3,12 +3,13 @@
 import type { ApiCandidates } from "@gtm-factory/core";
 import { Page, PageHeader, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { useOverview } from "@/lib/api/overview";
+import { useOverview, useScopeQuery } from "@/lib/api/overview";
 import { plural } from "@/lib/format";
 import { PointsList, Read } from "./common";
 
 export function ApiResearchPage() {
-  const read = useApi<ApiCandidates[]>("/research");
+  const scopeQuery = useScopeQuery();
+  const read = useApi<ApiCandidates[]>(scopeQuery ? `/research?${scopeQuery}` : null);
   const { data: o } = useOverview();
   return (
     <>

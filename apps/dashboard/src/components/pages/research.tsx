@@ -8,7 +8,7 @@ import { DayChart, Legend } from "@/components/charts";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, SparkLine, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { headScript, candidateLabel, engineName, placeChance, pointInfo, pointRow, shareSeries, type Model } from "@/lib/model";
+import { headScript, candidateLabel, engineName, placeChance, scopedCampaigns, pointInfo, pointRow, shareSeries, type Model } from "@/lib/model";
 import { InputsLine } from "@/components/plan-tree";
 import { inputsView } from "@/lib/plan";
 import { multiPlugged, pointGroups, recentShare } from "@/lib/engine-pages";
@@ -16,24 +16,26 @@ import { formatCents, formatCount, formatRatePct, formatUsd } from "@/lib/format
 import { useSim } from "@/lib/sim";
 
 export function ResearchPage() {
-  const { model } = useSim();
+  const { model, scope, offer } = useSim();
   return (
     <>
       <TopBar crumbs={[{ label: "Research" }]} />
-      <Page>{model ? <Research model={model} /> : <PageSkeleton />}</Page>
+      <Page>{model ? <Research model={model} ids={new Set(scopedCampaigns(model, scope, offer).map((c) => c.id))} /> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-function Research({ model }: { model: Model }) {
+function Research({ model, ids }: { model: Model; ids: Set<string> }) {
   const search = useSearchParams();
   const router = useRouter();
-  const groups = useMemo(() => pointGroups(model), [model]);
+  // The scope picked at the top of the sidebar: only its campaigns' picks.
+  const key = [...ids].sort().join(",");
+  const groups = useMemo(() => pointGroups(model, ids), [model, key]); // eslint-disable-line react-hooks/exhaustive-deps
   const all = groups.flatMap((g) => g.points);
   const asked = search.get("point");
   const selected = all.find((p) => p.conv.point === asked) ?? [...all].sort((a, b) => b.conv.picks - a.conv.picks)[0] ?? null;
   const select = (point: string) => router.replace(`/research/?point=${encodeURIComponent(point)}`, { scroll: false });
-  const chances = useMemo(() => new Map(all.map((p) => [p.conv.point, placeChance(model, p.conv.point)])), [model, all]);
+  const chances = useMemo(() => new Map(all.map((p) => [p.conv.point, placeChance(model, p.conv.point, ids)])), [model, all]);
   const contested = all.filter((p) => p.conv.picks > 0);
   const clear = contested.filter((p) => (chances.get(p.conv.point) ?? 0) >= 0.9).length;
 
@@ -89,23 +91,23 @@ function Research({ model }: { model: Model }) {
               ))}
             </div>
           </section>
-          <section className="min-w-0">{selected && <PointDetail model={model} point={selected.conv.point} />}</section>
+          <section className="min-w-0">{selected && <PointDetail model={model} point={selected.conv.point} ids={ids} />}</section>
         </div>
       )}
 
       <MultiPlugged model={model} />
-      <ProposedStrategies model={model} />
+      <ProposedStrategies model={model} ids={ids} />
     </>
   );
 }
 
-function PointDetail({ model, point }: { model: Model; point: string }) {
+function PointDetail({ model, point, ids }: { model: Model; point: string; ids: Set<string> }) {
   const info = pointInfo(model.catalogue, point);
-  const conv = useMemo(() => pointGroups(model).flatMap((g) => g.points).find((p) => p.conv.point === point)?.conv ?? null, [model, point]);
+  const conv = useMemo(() => pointGroups(model, ids).flatMap((g) => g.points).find((p) => p.conv.point === point)?.conv ?? null, [model, point, ids]);
   const campaigns = model.campaigns.filter((c) => conv && conv.bestByCampaign[c.id] !== undefined);
   const series = conv ? [{ key: "s", label: "Value lost to weaker picks, per day", values: conv.daily.map((d) => (d.picks > 0 ? d.regretCents / 100 : null)), color: "var(--accent)" }] : [];
   const share = conv ? recentShare(conv) : null;
-  const chance = placeChance(model, point);
+  const chance = placeChance(model, point, ids);
   const first = conv ? conv.daily.slice(0, 10).reduce((a, d) => ({ p: a.p + d.picks, b: a.b + d.onBest }), { p: 0, b: 0 }) : null;
   return (
     <>
@@ -210,8 +212,8 @@ function MultiPlugged({ model }: { model: Model }) {
 }
 
 /** Strategies the split mechanism proposed from the tactics of the scripts picked at a Material. */
-function ProposedStrategies({ model }: { model: Model }) {
-  const proposals = model.session.proposals.filter((p) => p.kind === "strategy" && p.point);
+function ProposedStrategies({ model, ids }: { model: Model; ids: Set<string> }) {
+  const proposals = model.session.proposals.filter((p) => p.kind === "strategy" && p.point && (!p.campaignId || ids.has(p.campaignId)));
   return (
     <section className="mt-10">
       <SectionTitle count={proposals.length} right={<span>A split on scripts' tactics, kept only when the verdict is a conclusion</span>}>

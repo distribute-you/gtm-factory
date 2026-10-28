@@ -23,7 +23,9 @@ export function ApiCampaignsPage() {
       <Page>
         <Read read={read}>
           {(all) => {
-            const campaigns = brand ? all.filter((c) => c.brandId === brand) : all;
+            // Only the campaigns of the scope picked in the sidebar's switch.
+            const scoped = new Set((o?.campaigns ?? []).map((c) => c.id));
+            const campaigns = all.filter((c) => scoped.has(c.id) && (!brand || c.brandId === brand));
             const live = campaigns.filter((c) => c.status === "live").length;
             return (
             <>

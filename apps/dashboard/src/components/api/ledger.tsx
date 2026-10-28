@@ -3,13 +3,14 @@
 import type { ApiLedger, CatalogueData } from "@gtm-factory/core";
 import { BarSpark, CardTable, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, ToneDot, TopBar } from "@/components/ui";
 import { useApi } from "@/lib/api/client";
-import { useOverview } from "@/lib/api/overview";
+import { useOverview, useScopeQuery } from "@/lib/api/overview";
 import { engineTitle, outcomeName } from "@/lib/api/labels";
 import { formatCents, formatCentsExact, formatCount, formatUsd } from "@/lib/format";
 import { Read, RunsTable } from "./common";
 
 export function ApiLedgerPage() {
-  const read = useApi<ApiLedger>("/ledger");
+  const scopeQuery = useScopeQuery();
+  const read = useApi<ApiLedger>(scopeQuery ? `/ledger?${scopeQuery}` : null);
   const { data: o } = useOverview();
   return (
     <>

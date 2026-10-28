@@ -20,8 +20,10 @@ export function ApiLeadsPage() {
   const qs = new URLSearchParams();
   if (campaign) qs.set("campaignId", campaign);
   if (state) qs.set("state", state);
-  const read = useApi<ApiLead[]>(`/leads${qs.toString() ? `?${qs}` : ""}`);
+  const raw = useApi<ApiLead[]>(`/leads${qs.toString() ? `?${qs}` : ""}`);
   const { data: o } = useOverview();
+  // Only the people of the brands picked in the sidebar's switch.
+  const read = { ...raw, data: raw.data && o ? raw.data.filter((l) => o.brands.some((b) => b.id === l.brandId)) : raw.data };
   const setFilter = (key: "campaign" | "state", value: string) => {
     const next = new URLSearchParams(search.toString());
     if (value) next.set(key, value);

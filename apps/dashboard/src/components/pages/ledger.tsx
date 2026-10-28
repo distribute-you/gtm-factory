@@ -4,25 +4,27 @@ import { useMemo } from "react";
 import { Mark } from "@/components/mark";
 import { CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle, StatTile, TD, TDN, TH, TopBar } from "@/components/ui";
 import { PageSkeleton } from "./today";
-import { engineName, outcomeLabel, type Model } from "@/lib/model";
+import { engineName, outcomeLabel, scopedLedger, scopedRuns, type Model } from "@/lib/model";
 import { mostReused, performerFigures } from "@/lib/engine-pages";
 import { formatCents, formatCentsExact, formatCount, formatRatePct, formatUsd } from "@/lib/format";
 import { useSim } from "@/lib/sim";
 
 export function LedgerPage() {
-  const { model } = useSim();
+  const { model, scope, offer } = useSim();
   return (
     <>
       <TopBar crumbs={[{ label: "Ledger" }]} />
-      <Page>{model ? <Ledger model={model} /> : <PageSkeleton />}</Page>
+      <Page>{model ? <Ledger model={model} scope={scope} offer={offer} /> : <PageSkeleton />}</Page>
     </>
   );
 }
 
-function Ledger({ model }: { model: Model }) {
-  const l = model.session.ledger();
-  const performers = useMemo(() => performerFigures(model), [model]);
-  const reused = useMemo(() => mostReused(model), [model]);
+function Ledger({ model, scope, offer }: { model: Model; scope: string | null; offer: string | null }) {
+  // The scope picked at the top of the sidebar: its runs only, reconciled the same way.
+  const l = scopedLedger(model, scope, offer);
+  const runs = useMemo(() => scopedRuns(model, scope, offer), [model, scope, offer]);
+  const performers = useMemo(() => performerFigures(model, runs), [model, runs]);
+  const reused = useMemo(() => mostReused(model, 6, l), [model, l]);
   const ours = performers.filter((f) => f.ours).reduce((s, f) => s + f.spendCents, 0);
   const other = performers.filter((f) => !f.ours).reduce((s, f) => s + f.spendCents, 0);
   const c = model.catalogue;
@@ -31,7 +33,7 @@ function Ledger({ model }: { model: Model }) {
       <PageHeader
         title={<>{l.reconciles ? "The books reconcile to the cent" : "The books do not reconcile"}</>}
         sub="Every run is a production order: it consumes Units, produces Units, and costs money. The ledger is the common conveyor belt every run writes to."
-        right={<span>{formatCount(model.session.runs.length)} runs</span>}
+        right={<span>{formatCount(runs.length)} runs</span>}
       />
 
       <div className="k-card px-4 py-4">

@@ -36,7 +36,7 @@ import {
 } from "@gtm-factory/core";
 import { one, q } from "./db";
 import { FACTORIES, OUTCOMES, performerOfRow } from "./catalogue-seed";
-import { shownBrand } from "./visibility";
+import { inScope, shownBrand } from "./visibility";
 import { CAUSED_BY_US, loadCatalogue, loadEvidence, milestoneValue, planOf, milestoneLine, type Brand, type CampaignRow, type EvidenceState, type PlanNode, type Unit } from "./factory";
 
 export const cents = (micro: number) => Math.round(micro / 100) / 100;
@@ -584,19 +584,19 @@ export function evidenceForReads(catalogue: Catalogue): Promise<EvidenceState> {
   return evidenceCache.ev;
 }
 
-export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, brandFilter?: string): Promise<ApiCandidates[]> {
+export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, brandFilter?: string, brandIds: string[] | null = brandFilter ? [brandFilter] : null): Promise<ApiCandidates[]> {
   const e = ev ?? (await evidenceForReads(catalogue));
   const objectNames = new Map((await q<{ dynasty: string; name: string }>(`SELECT DISTINCT ON (dynasty) dynasty, name FROM units WHERE dynasty IS NOT NULL ORDER BY dynasty, version DESC`)).map((r) => [r.dynasty, r.name]));
   const anyBrand = brandFilter ?? (await one<{ id: string }>(`SELECT id FROM brands WHERE ${shownBrand("id")} ORDER BY created_at LIMIT 1`))?.id ?? "none";
   // Each candidate's share of the picks made at its place over the last 7 days.
-  const recent = await q<{ point: string; chosen: string; n: number }>(`SELECT point, chosen, count(*)::int AS n FROM choices WHERE created_at > now() - interval '7 days' AND ${shownBrand("brand_id")} GROUP BY 1, 2`);
+  const recent = await q<{ point: string; chosen: string; n: number }>(`SELECT point, chosen, count(*)::int AS n FROM choices WHERE created_at > now() - interval '7 days' AND ${inScope("brand_id", brandIds)} GROUP BY 1, 2`);
   const brand = await one<Brand>(`SELECT * FROM brands WHERE id = $1`, [anyBrand]);
   const value = brand ? milestoneValue(brand) : 200;
   // The brand inputs each script used over the last 7 days (its runs' consumed brand Units).
-  const recentRuns = await q<RunLite>(`SELECT id, script_id, engine, lead_id, spend_micro::bigint AS spend_micro, consumed FROM runs WHERE created_at > now() - interval '7 days' AND (brand_id IS NULL OR ${shownBrand("brand_id")})${brandFilter ? " AND brand_id = $1" : ""}`, brandFilter ? [brandFilter] : []);
+  const recentRuns = await q<RunLite>(`SELECT id, script_id, engine, lead_id, spend_micro::bigint AS spend_micro, consumed FROM runs WHERE created_at > now() - interval '7 days' AND ${brandIds ? inScope("brand_id", brandIds) : `(brand_id IS NULL OR ${shownBrand("brand_id")})`}`);
   const inputIds = [...new Set(recentRuns.flatMap((r) => r.consumed))];
   const inputUnits = new Map((inputIds.length > 0 ? await q<UnitLite>(`SELECT id, outcome, subject_kind, run_id, dynasty, name FROM units WHERE id = ANY($1) AND subject_kind = 'brand'`, [inputIds]) : []).map((u) => [u.id, u]));
-  const daily = await researchDaily();
+  const daily = await researchDaily(brandIds);
   const points: ApiCandidates[] = [];
   for (const [point, held] of e.book.pointCandidates) {
     // A brand input's versions compete inside each script's row, never as a place of their own.
@@ -646,12 +646,12 @@ export async function researchOut(catalogue: Catalogue, ev?: EvidenceState, bran
  * pick): the shares, the value lost to candidates it believed weaker than its best, and the
  * margin on its best. A pick stored without its belief (before this was recorded) counts no regret.
  */
-async function researchDaily(): Promise<Map<string, ApiCandidates["daily"]>> {
+async function researchDaily(brandIds: string[] | null): Promise<Map<string, ApiCandidates["daily"]>> {
   const counts = await q<{ point: string; day: string; chosen: string; n: number }>(
-    `SELECT point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, chosen, count(*)::int AS n FROM choices WHERE ${shownBrand("brand_id")} GROUP BY 1, 2, 3`,
+    `SELECT point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, chosen, count(*)::int AS n FROM choices WHERE ${inScope("brand_id", brandIds)} GROUP BY 1, 2, 3`,
   );
   const beliefs = await q<{ point: string; day: string; options: { id: string; meanScore?: number; rate?: number; rateSd?: number; costCents?: number }[] }>(
-    `SELECT DISTINCT ON (point, 2) point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, options FROM choices WHERE ${shownBrand("brand_id")} ORDER BY point, 2, created_at DESC`,
+    `SELECT DISTINCT ON (point, 2) point, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, options FROM choices WHERE ${inScope("brand_id", brandIds)} ORDER BY point, 2, created_at DESC`,
   );
   const out = new Map<string, ApiCandidates["daily"]>();
   for (const b of beliefs) {
@@ -747,8 +747,9 @@ export function unitOut(o: Unit): ApiUnit {
 // ---------------------------------------------------------------------------
 
 /** The every-path report from the engine, computed in micro-dollars (exact), served in cents. */
-export async function ledgerOut(catalogue: Catalogue): Promise<ApiLedger> {
-  const shown = `(brand_id IS NULL OR ${shownBrand("brand_id")})`;
+export async function ledgerOut(catalogue: Catalogue, brandIds: string[] | null = null): Promise<ApiLedger> {
+  // The scope asked for: its brands only; every shown brand, and work for no brand, otherwise.
+  const shown = brandIds ? inScope("brand_id", brandIds) : `(brand_id IS NULL OR ${shownBrand("brand_id")})`;
   const runs = await q<{ id: string; engine: string; spend_micro: number; consumed: string[]; inputs: number; campaign_id: string | null; script_id: string; created_at: string; status: string }>(
     `SELECT id, coalesce(engine, pipe_id) AS engine, spend_micro, consumed, inputs, campaign_id, script_id, created_at, status FROM runs WHERE status <> 'running' AND ${shown}`,
   );
@@ -802,6 +803,6 @@ export async function ledgerOut(catalogue: Catalogue): Promise<ApiLedger> {
     byVendor: byVendor.map((v) => ({ vendor: v.vendor, item: v.item, quantity: v.qty, cents: cents(v.m) })),
     byCampaign: byCampaign.map((c) => ({ campaignId: c.id, name: c.name, spentCents: cents(c.m) })),
     report: scaled,
-    runs: await runsOut(catalogue, "", [], 100),
+    runs: await runsOut(catalogue, brandIds ? inScope("brand_id", brandIds) : "", [], 100),
   };
 }

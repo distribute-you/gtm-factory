@@ -8,8 +8,10 @@
 import {
   OURS,
   START,
+  buildLedger,
   chanceOfBest,
   estimatedRegret,
+  type LedgerReport,
   type Campaign,
   type Catalogue,
   type PickRecord,
@@ -247,6 +249,24 @@ export function scopedCampaigns(model: Model, brandId: string | null, offerId: s
   return model.campaigns.filter((c) => (!brandId || c.brandId === brandId) && (!offerId || c.offerId === offerId));
 }
 
+/** The runs of a scope: those of its campaigns, and the work for no campaign done for its brands. */
+export function scopedRuns(model: Model, brandId: string | null, offerId: string | null = null): SimulationSession["runs"] {
+  if (!brandId) return model.session.runs;
+  const ids = new Set(scopedCampaigns(model, brandId, offerId).map((c) => c.id));
+  const runBrand = memo(model, "runBrand", () => new Map(model.session.units.map((u) => [u.runId, u.brandId])));
+  return model.session.runs.filter((r) => (r.campaignId ? ids.has(r.campaignId) : runBrand.get(r.id) === brandId));
+}
+
+/** The ledger of a scope, reconciled the same way as the whole one. */
+export function scopedLedger(model: Model, brandId: string | null, offerId: string | null = null): LedgerReport {
+  if (!brandId) return model.session.ledger();
+  return memo(model, `ledger:${brandId}:${offerId ?? "*"}`, () => {
+    const runs = scopedRuns(model, brandId, offerId);
+    const ids = new Set(runs.map((r) => r.id));
+    return buildLedger(runs, model.session.units.filter((u) => u.runId === null || ids.has(u.runId)));
+  });
+}
+
 /** Where a campaign starts: Start (it pulls), or the outcome whose Units it pushes. */
 export function startOf(_model: Model, campaign: Campaign): OutcomeId {
   return campaign.start;
@@ -431,10 +451,12 @@ export interface PointConvergence {
 }
 
 /** The settling of every candidate place (cached per day). */
-export function convergenceOf(model: Model): PointConvergence[] {
-  return memo(model, "convergence", () => {
+export function convergenceOf(model: Model, campaignIds: ReadonlySet<string> | null = null): PointConvergence[] {
+  const key = campaignIds ? [...campaignIds].sort().join(",") : "*";
+  return memo(model, `convergence:${key}`, () => {
     const by = new Map<string, PointConvergence>();
     for (const r of model.session.pickLog) {
+      if (campaignIds && !campaignIds.has(r.campaignId)) continue;
       let pc = by.get(r.point);
       if (!pc) by.set(r.point, (pc = { point: r.point, picks: 0, bestByCampaign: {}, daily: Array.from({ length: model.day }, () => ({ picks: 0, onBest: 0, regretCents: 0 })) }));
       const picks = r.candidates.reduce((x, c) => x + c.picks, 0);
@@ -455,9 +477,10 @@ export function shareSeries(pc: PointConvergence): (number | null)[] {
 }
 
 /** The chance the favourite of a place is the best, over the campaigns that use it. */
-export function placeChance(model: Model, point: string): number | null {
+export function placeChance(model: Model, point: string, campaignIds: ReadonlySet<string> | null = null): number | null {
   let best: number | null = null;
   for (const c of model.campaigns) {
+    if (campaignIds && !campaignIds.has(c.id)) continue;
     if (!model.session.candidatePlaces().some((p) => p.campaignId === c.id && p.point === point)) continue;
     const top = Math.max(0, ...pointRow(model, c, point).candidates.map((x) => x.chanceBest));
     best = best === null ? top : Math.max(best, top);

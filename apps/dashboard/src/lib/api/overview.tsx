@@ -7,7 +7,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ApiOverview } from "@gtm-factory/core";
-import { readScope, resolveScope, writeScope, type ScopeOrg, type ScopeValue } from "../scope";
+import { readScope, resolveScope, scopeBrandIds, writeScope, type ScopeOrg, type ScopeValue } from "../scope";
 import { useApi, type ApiRead } from "./client";
 
 interface OverviewValue {
@@ -50,23 +50,31 @@ function useValue(): OverviewValue {
   return v;
 }
 
-/** The overview, scoped: the picked brand, its campaigns on the picked offer, their picks and runs. */
+/** The overview, scoped: the picked brand (or every brand of the picked organization), its campaigns on the picked offer, their picks and runs. */
 export function useOverview(): ApiRead<ApiOverview> {
-  const { read, scope } = useValue();
+  const { read, scope, orgs } = useValue();
   const data = useMemo(() => {
     const o = read.data;
-    if (!o || !scope.brandId) return o;
-    const campaigns = o.campaigns.filter((c) => c.brandId === scope.brandId && (!scope.offerId || !c.offerId || c.offerId === scope.offerId));
+    if (!o || !scope.orgId) return o;
+    const brands = new Set(scopeBrandIds(orgs, scope));
+    const campaigns = o.campaigns.filter((c) => brands.has(c.brandId) && (!scope.offerId || !c.offerId || c.offerId === scope.offerId));
     const ids = new Set(campaigns.map((c) => c.id));
     return {
       ...o,
-      brands: o.brands.filter((b) => b.id === scope.brandId),
+      brands: o.brands.filter((b) => brands.has(b.id)),
       campaigns,
       recentPicks: o.recentPicks.filter((p) => ids.has(p.campaignId)),
-      recentRuns: o.recentRuns.filter((r) => r.campaignId === null || ids.has(r.campaignId)),
+      recentRuns: o.recentRuns.filter((r) => (r.campaignId ? ids.has(r.campaignId) : r.brandId !== null && brands.has(r.brandId))),
     };
-  }, [read.data, scope.brandId, scope.offerId]);
+  }, [read.data, orgs, scope.orgId, scope.brandId, scope.offerId]);
   return { ...read, data };
+}
+
+/** The query that scopes a read to the brands picked in the sidebar's switch (empty before the overview answers). */
+export function useScopeQuery(): string {
+  const { scope, orgs } = useValue();
+  const ids = scopeBrandIds(orgs, scope);
+  return ids.length > 0 ? `brandIds=${ids.map(encodeURIComponent).join(",")}` : "";
 }
 
 /** The organization, brand and offer picked, and every one the selector lists. */
