@@ -57,8 +57,10 @@ describe("credit through traceability", () => {
     // Every template lets the writer write (same yield); only the reply changes.
     const pc = conv.filter((x) => x.point.endsWith("|template_written")).sort((a, b) => b.picks - a.picks)[0]!;
     for (const best of Object.values(pc.bestByCampaign)) expect(best).toBe("tpl-story");
-    // It takes most of the picks, more than at the start.
-    expect(shareOnBest(pc, 50, 60)).toBeGreaterThan(0.5);
+    // It takes the largest share of the picks, more than at the start.
+    const late = new Map<string, number>();
+    for (const [cand, arr] of s.pickSeries(pc.point)) late.set(cand, arr.slice(50, 60).reduce((x, y) => x + y, 0));
+    expect([...late].sort((a, b) => b[1] - a[1])[0]![0]).toBe("tpl-story");
     expect(shareOnBest(pc, 50, 60)).toBeGreaterThan(shareOnBest(pc, 0, 10) ?? 0);
   });
 

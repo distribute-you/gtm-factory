@@ -25,8 +25,8 @@ describe("the words", () => {
   });
 
   it("defines every object of the model and states the six decisions", () => {
-    for (const o of ["Outcome", "Unit", "Engine", "Script", "Provider", "Run", "Campaign", "Plan", "Track"]) expect(doc).toContain(`| **${o}** |`);
-    expect(doc).toContain("# GTM Factory v7");
+    for (const o of ["Outcome", "Unit", "Engine", "Script", "Provider", "Run", "Campaign", "Plan", "Connected account", "Track"]) expect(doc).toContain(`| **${o}** |`);
+    expect(doc).toContain("# GTM Factory v10");
     expect(doc).toContain("1. **One Engine per outcome.**");
     expect(doc).toContain("2. **No written manifest.**");
     expect(doc).toContain("`get()`, with no argument");

@@ -32,7 +32,7 @@ export interface TrackPlace {
  * What a Unit of a brand or run outcome holds, as data: a reader shows it
  * with one renderer per content type, whatever the outcome is.
  */
-export type ContentType = "text_with_variables" | "text" | "audience" | "rating" | "list" | "record" | "image";
+export type ContentType = "text_with_variables" | "text" | "audience" | "rating" | "list" | "record" | "image" | "account";
 
 export interface Outcome {
   id: OutcomeId;
@@ -175,6 +175,12 @@ export function defaultStrategyId(outcome: OutcomeId): string {
 
 /** The tactic every script carries: who performs it (ours, the client's team, the mailbox...). */
 export const PERFORMED_BY = "performed_by";
+
+/** The tactic a sending or reading script carries: which role of the brand's accounts it works through (Personal, Pro, AI agent...). */
+export const ACCOUNT_ROLE = "account_role";
+
+/** The tactic naming the channel a script works on (a connected account names its channel too). */
+export const CHANNEL = "channel";
 /** The value of "Performed by" that is ours: its runs spend the budget and count in its return. */
 export const OURS = "Ours";
 

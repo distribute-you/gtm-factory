@@ -63,3 +63,8 @@ A script a person performs (a closing call) declares a short form. Each run of i
 The dashboard shows one organization, one of its brands and one offer at a time, picked at the top of the sidebar. A new campaign sells the offer picked there.
 
 A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashboard shows those words.
+
+## Connected accounts
+
+`GET /accounts?brandId=` lists the brand's connected accounts (`ApiConnectedAccount`): channel, address or number, role, status, and counts (sent today, sent and read this week). `PATCH /accounts/:id` with `{ role }` gives an account another role: the next run follows it. `POST /accounts/connect` with `{ brandId, channel, role }` answers `{ url }`, the backend's own page that connects an account (a mailbox login, a WhatsApp link). The backend holds the accounts, roles and counts; the scripts pick the account.
+

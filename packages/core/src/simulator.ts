@@ -16,19 +16,19 @@
  * traceability is credited. Deterministic: one seed, one history.
  */
 
-import { OURS, PERFORMED_BY, START, defaultStrategyId, isOurs, type Catalogue, type OutcomeId, type Script, type Strategy } from "./catalogue";
+import { ACCOUNT_ROLE, CHANNEL, OURS, PERFORMED_BY, START, defaultStrategyId, isOurs, type Catalogue, type OutcomeId, type Script, type Strategy } from "./catalogue";
 import { chainCostPerTarget, costForwardLine, targetBreakdown, valueBackwardLine } from "./calculations";
 import { EvidenceBook, SEP, bumpCell, cohortCountsOf, cohortEstimateOf, type Cell, type CellStore } from "./evidence";
 import { buildLedger, type LedgerReport, type LedgerRun, type LedgerUnit } from "./ledger";
 import { prioritize, type PricedCandidate } from "./prioritizer";
 import { measureReliability, type Attestation, type ProducerReliability } from "./reliability";
 import { createRng, type Rng } from "./rng";
-import { Waiting, type ScriptCode, type ScriptContext, type ScriptResult, type UnitView, type Vendor, type VendorAnswer } from "./script";
+import { Waiting, type AccountView, type ScriptCode, type ScriptContext, type ScriptResult, type UnitView, type Vendor, type VendorAnswer } from "./script";
 import { studySplits, type SplitRecord, type SplitStudy } from "./splits";
 import { betaMean, betaVariance } from "./stats";
 import { StorageHouse, type StorageReport } from "./storage";
 import { describeCondition, meetsAll, type Condition, type TacticValue } from "./tactics";
-import { covers, personOf, segmentMultiplier, type Campaign, type Person, type ScriptTruth, type WorldClient, type WorldSpec } from "./world";
+import { covers, personOf, segmentMultiplier, type Campaign, type ConnectedAccount, type Person, type ScriptTruth, type WorldClient, type WorldSpec } from "./world";
 
 // ---------------------------------------------------------------------------
 // Records
@@ -337,6 +337,10 @@ export class SimulationSession {
   private readonly byBrand = new Map<string, Unit[]>();
   private readonly stockRead = new Map<string, number>();
   private readonly brandUnits = new Map<string, Unit[]>();
+  /** Per account, messages sent and read per day (from the Units that name it). */
+  /** Spend made after a day's budget was used (a split's proposal), taken from the next day's budget. */
+  private readonly carried = new Map<string, number>();
+  private readonly accountStats = new Map<string, { sent: number[]; read: number[] }>();
   private readonly inFlight = new Set<string>();
   /** Milestones and lead outcomes reached: subject -> outcome -> first day. */
   private readonly reached = new Map<string, Map<OutcomeId, number>>();
@@ -483,10 +487,71 @@ export class SimulationSession {
       Object.assign(u, { dynasty: s.dynasty, version: s.version, name: s.name, text: s.text, content: { text: s.text }, ...(s.parentDynasty ? { parentDynasty: s.parentDynasty } : {}), ...(s.conditions ? { conditions: s.conditions } : {}) });
       this.addUnit(u);
     }
+    for (const a of c.accounts ?? []) this.connectAccount(c.brand.id, a);
     for (const camp of c.campaigns) {
       this.spent.set(camp.id, this.spent.get(camp.id) ?? 0);
       this.judgeBrief(camp);
     }
+  }
+
+  // ---- connected accounts ----------------------------------------------------------
+
+  /** The outcome whose Units are the brand's connected accounts (content type "account"). */
+  accountOutcome(): OutcomeId | null {
+    return this.catalogue.outcomes.find((o) => o.contentType === "account" && !o.retired)?.id ?? null;
+  }
+
+  /** Connect an account: it lands as a Unit of the account outcome (its dynasty is the account's id). Connecting it again changes nothing. */
+  connectAccount(brandId: string, a: ConnectedAccount): Unit {
+    const outcome = this.accountOutcome();
+    if (!outcome) throw new Error("the catalogue has no account outcome (content type account)");
+    const known = this.objectHead(brandId, outcome, a.id);
+    if (known) return known;
+    const script = this.catalogue.scripts.find((x) => x.outcome === outcome);
+    if (!script) throw new Error("no script connects accounts");
+    const run = this.newRun(this.dayIndex, null, script);
+    const u = this.makeUnit(run, outcome, `${brandId}:${a.id}`, brandId, null, {}, []);
+    Object.assign(u, { dynasty: a.id, version: 1, name: a.address, content: { ...a } });
+    this.addUnit(u);
+    return u;
+  }
+
+  /** Give an account another role: a new version of its Unit, the counts kept. */
+  setAccountRole(brandId: string, accountId: string, role: string): Unit {
+    const outcome = this.accountOutcome();
+    const head = outcome ? this.objectHead(brandId, outcome, accountId) : undefined;
+    if (!head) throw new Error(`no account "${accountId}" for ${brandId}`);
+    const script = head.scriptId ? this.catalogue.script(head.scriptId) : undefined;
+    if (!script) throw new Error("the account names no script");
+    const run = this.newRun(this.dayIndex, null, script);
+    run.consumed.push(head.id);
+    const version = (head.version ?? 1) + 1;
+    const u = this.makeUnit(run, head.outcome, `${brandId}:${accountId}:v${version}`, brandId, null, { [head.outcome]: head.id }, []);
+    Object.assign(u, { dynasty: accountId, version, name: head.name, content: { ...(head.content ?? {}), role } });
+    this.addUnit(u);
+    return u;
+  }
+
+  /** Every account of a brand (each at its latest version), with its counts. */
+  accountsOf(brandId: string): AccountView[] {
+    const outcome = this.accountOutcome();
+    if (!outcome) return [];
+    return this.objectDynasties(brandId, outcome).map((d) => {
+      const u = this.objectHead(brandId, outcome, d)!;
+      const c = (u.content ?? {}) as Partial<ConnectedAccount>;
+      const st = this.accountStats.get(d);
+      const sum = (arr: number[] | undefined, from: number) => (arr ?? []).slice(Math.max(0, from)).reduce((x, y) => x + y, 0);
+      return {
+        id: d,
+        channel: String(c.channel ?? ""),
+        address: String(c.address ?? u.name ?? d),
+        role: String(c.role ?? ""),
+        status: c.status === "to_reconnect" ? "to_reconnect" : "connected",
+        sentToday: st?.sent[this.dayIndex] ?? 0,
+        sentWeek: sum(st?.sent, this.dayIndex - 6),
+        readWeek: sum(st?.read, this.dayIndex - 6),
+      };
+    });
   }
 
   /**
@@ -576,9 +641,15 @@ export class SimulationSession {
     const snap: DaySnapshot = { day, spendCents: {}, otherCents: {}, outcomes: {}, valueOurs: {}, valueOther: {}, attempts: {}, pushes: 0 };
     this.today = snap;
     this.spentToday.clear();
+    for (const [cid, cents] of this.carried) {
+      this.spentToday.set(cid, cents);
+      snap.spendCents[cid] = (snap.spendCents[cid] ?? 0) + cents;
+    }
+    this.carried.clear();
     for (const c of this.campaigns()) if (c.endDay !== undefined && day >= c.endDay) c.status = "paused";
     const tpd = this.ticksPerDay;
     this.rate(day);
+
     const order = this.campaigns().filter((c) => c.status === "running");
     for (let t = 0; t < tpd; t++) {
       this.tickIndex = day * tpd + t;
@@ -1063,6 +1134,9 @@ export class SimulationSession {
       tactics: script.tactics,
       storage: this.storage.forEngine(script.outcome),
       vendor,
+      accounts(channel: string, role: string): AccountView[] {
+        return self.accountsOf(o.client.brand.id).filter((a) => a.channel === channel && a.role === role);
+      },
       get(m: OutcomeId): UnitView {
         const n = nth.get(m) ?? 0;
         nth.set(m, n + 1);
@@ -1435,6 +1509,15 @@ export class SimulationSession {
   /** A Unit lands in the stock: record it, credit the trace, push reactive campaigns, call the webhooks that report on it. */
   private land(u: Unit, day: number): void {
     this.addUnit(u);
+    const account = u.content?.account;
+    const via = u.content?.via;
+    if (typeof account === "string" && (via === "sent" || via === "read")) {
+      let st = this.accountStats.get(account);
+      if (!st) this.accountStats.set(account, (st = { sent: [], read: [] }));
+      const arr = via === "sent" ? st.sent : st.read;
+      while (arr.length <= day) arr.push(0);
+      arr[day]! += 1;
+    }
     const out = this.catalogue.outcome(u.outcome);
     if (out?.subject === "lead" || out?.subject === "company") {
       const k = `${u.subject}${SEP}${u.outcome}`;
@@ -1562,7 +1645,10 @@ export class SimulationSession {
         const about = this.unitById.get(c.about);
         if (!script || !about) continue;
         const run = this.newRun(day, null, script);
-        this.land(this.makeUnit(run, script.outcome, about.subject, about.brandId, null, {}, about.trace), day);
+        const u = this.makeUnit(run, script.outcome, about.subject, about.brandId, null, {}, about.trace);
+        // The report names the account the message went through.
+        if (typeof about.content?.account === "string") u.content = { account: about.content.account };
+        this.land(u, day);
       }
     }
     if (!firstTick) return;
@@ -1573,7 +1659,12 @@ export class SimulationSession {
       const truth = this.truthOf(script, null);
       for (const client of this.world.clients) {
         if (wh.creates) {
-          const n = this.rng.binomial(Math.round(client.organicPerDay * 4), 0.25);
+          // A script reading one role's accounts reports the people who wrote to them: none without such an account.
+          const role = script.tactics[ACCOUNT_ROLE];
+          const channel = script.tactics[CHANNEL];
+          const accounts = role === undefined ? [] : this.accountsOf(client.brand.id).filter((a) => a.role === role && a.channel === channel && a.status === "connected");
+          if (role !== undefined && accounts.length === 0) continue;
+          const n = this.rng.binomial(Math.round((wh.perDay ?? client.organicPerDay) * 4), 0.25);
           for (let i = 0; i < n; i++) {
             const index = this.rng.int(this.world.settings.marketSize);
             const person = personOf(this.world, client.brand.id, index);
@@ -1581,7 +1672,13 @@ export class SimulationSession {
             this.persons.set(person.id, person);
             if (!this.rootParty.has(person.id)) this.rootParty.set(person.id, this.performerOf(script));
             const run = this.newRun(day, null, script);
-            this.land(this.makeUnit(run, script.outcome, person.id, client.brand.id, null, {}, []), day);
+            const u = this.makeUnit(run, script.outcome, person.id, client.brand.id, null, {}, []);
+            // Which account the person wrote to is a fact of the world (the hidden truth draws it), not a pick.
+            if (accounts.length > 0) {
+              const a = accounts[this.rng.int(accounts.length)]!;
+              u.content = { account: a.id, via: "read", role: a.role, channel: a.channel };
+            }
+            this.land(u, day);
           }
           continue;
         }
@@ -2217,11 +2314,14 @@ export class SimulationSession {
       const finder = this.catalogue.script(this.world.settings.icpFinderScript);
       if (!finder) continue;
       const cost = Math.round(this.truthOf(finder, null).costCents);
+      // The daily budget is a hard cap: a proposal that would pass it waits for the next study.
+
       const run = this.newRun(day, campaign.id, finder);
       run.spendCents += cost;
       run.consumed.push(parent.id);
       this.spent.set(campaign.id, (this.spent.get(campaign.id) ?? 0) + cost);
-      if (this.today) this.today.spendCents[campaign.id] = (this.today.spendCents[campaign.id] ?? 0) + cost;
+      // Studied once the day's budget is spent: the proposal is paid from tomorrow's budget, which stays a hard cap.
+      this.carried.set(campaign.id, (this.carried.get(campaign.id) ?? 0) + cost);
       const dynasty = `${parentDyn}-fork-${day}`;
       const text = `${parent.text ?? ""} ${study.proposal.conditions.map((c) => describeCondition(c, this.catalogue).toLowerCase()).join(", ")}.`.replace(/\.\s/, ", ").trim();
       const u = this.makeUnit(run, audience, `${brandId}:${dynasty}:v1`, brandId, campaign.id, { [audience]: parent.id }, []);

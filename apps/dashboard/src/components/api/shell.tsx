@@ -14,6 +14,7 @@ import {
   SquaresFourIcon,
   StackIcon,
   StorefrontIcon,
+  PlugsConnectedIcon,
   UserListIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
@@ -149,6 +150,7 @@ function Sidebar() {
         <Group title="Production">
           <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
           <NavItem href="/team/" label="Done by your team" icon={<UserListIcon size={15} />} active={at("/team")} />
+          <NavItem href="/accounts/" label="Connected accounts" icon={<PlugsConnectedIcon size={15} />} active={at("/accounts")} />
           <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
           <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
         </Group>

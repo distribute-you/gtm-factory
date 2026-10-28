@@ -1,4 +1,4 @@
-# GTM Factory v7: the framework
+# GTM Factory v10: the framework
 
 Revenue made easy. This document describes the open framework behind it: how to model a go-to-market operation as an industrial plant, with the plant's own words and its own cost accounting. Everything here is implemented in [`packages/core`](../packages/core), the scripts are code in [`scripts/`](../scripts), and every number in the worked examples is checked by a test ([`docs.test.ts`](../packages/core/test/docs.test.ts)).
 
@@ -41,6 +41,7 @@ flowchart LR
 | **Run** | A production order: one script executed, one Unit or none. |
 | **Campaign** | Orders production: a Target, a start, a budget and a strategy written as a brief. |
 | **Plan** | The tree a campaign runs, recomputed at every tick: each outcome, its Engine, the script that Engine picks now, and the Plan of each outcome that script calls. It is shown as what actually ran this week: at each Engine every script that made Units is a branch, with its share and cost, the pick of this tick highlighted. Nothing about it is frozen. |
+| **Connected account** | A mailbox, a WhatsApp number, a LinkedIn profile the brand connected, kept as a Unit of the brand. It names its channel and the role the brand gave it: Personal, Pro or AI agent. Several accounts may share a role on a channel. |
 | **Track** | An ordered ladder of states. The CRM lifecycle track holds Lead interested, Meeting booked, Meeting attended, Paid client. The Conversation track holds Reply received. The Website visits track holds Lead visited. A state of a track is a **milestone**. Tracks are never added together. |
 
 **Every API call output is an outcome.** A cold email is several outcomes: the writer makes a Message written; our send call makes a Message queued; the mailbox reports a Message sent and reads each Reply received. Each can be measured, priced and consumed.
@@ -48,6 +49,8 @@ flowchart LR
 **A channel is a tactic.** Cold email and LinkedIn are two scripts of the Reply received Engine; each carries the value of the tactic "Channel". A client who wants only some channels says so in the brief.
 
 **Who performs a script is a tactic.** "Performed by" says Ours, Client's team, Mailbox, CRM or Organic market. Budget and return read only "Performed by = Ours". A script of the client's team costs us nothing; its limit is its capacity (section 6).
+
+**A script asks for a role, never for an account.** A sending script carries the tactic "Account role" (AI agent, Pro, Personal). It receives every connected account of the brand with that role on its channel, with each one's counts (sent today, sent and read this week), and its own code picks one: the cold email queue takes the mailbox that sent the least today; a follow-up leaves from the mailbox the first message left from (same thread, same address). The host only holds the accounts, their roles and their counts. Another way to spread the load is a new version of that script, rated like any other. A reading script runs per role with no filter, so every account is read. A campaign that wants every message from its AI agent says so in its brief, and the judge keeps the strategy "Account role is AI agent" on its sending Engines. In the fictional world, a new client gets one welcome from the Pro number, and anyone who writes to the Pro number becomes a task for the client's team, never an answer from the agent.
 
 **The ICP is an outcome like any other.** An ICP is a plain sentence, written by the client or by an AI. Several ICPs compete as Units of the brand. A judge reads who fits a sentence: an AI in production, the hidden truth in the simulator.
 
@@ -119,19 +122,19 @@ It passes through Lead visited, Lead interested and Meeting booked. Per mileston
 
 | Milestone | Attempts per Meeting booked | Cost from Start |
 |---|---|---|
-| Lead visited | **79.4** | **$0.41** |
-| Lead interested | **48.0** | **$8.47** |
-| Meeting booked | **2.3** | **$19.92** |
+| Lead visited | **115.7** | **$0.40** |
+| Lead interested | **70.1** | **$9.10** |
+| Meeting booked | **3.1** | **$28.66** |
 
-One meeting costs **$19.92** from Start, so the expected return is $600 / $19.92 = **30.1** dollars per dollar. The signups cost nothing to us: the client's team performs them, and their cost of this outcome is $0.
+One meeting costs **$28.66** from Start, so the expected return is $600 / $28.66 = **20.9** dollars per dollar. The signups cost nothing to us: the client's team performs them, and their cost of this outcome is $0.
 
 ### Worked example: a push
 
 Northwind's follow-up campaign starts from Message sent and has the Target Lead interested; its brief reads: "Follow up once on every cold email that got no answer, four days later." It is reactive. The outbound campaign writes and sends; this one receives every Message sent. The next Engine its Plan names is Follow-up queued. Follow Lea, the first lead it won.
 
-- Day **0**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
-- Day **4**: the follow-up is queued.
-- Day **6**: the mailbox reads Lea's reply and the reply judge marks her interested.
+- Day **7**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
+- Day **11**: the follow-up is queued.
+- Day **12**: the mailbox reads Lea's reply and the reply judge marks her interested.
 - The follow-up campaign spent **$0.16** on Lea.
 
 The judge kept the strategy "Only people who have not answered nor asked to stop" for the Follow-up queued Engine: someone who already replied to the first email gets no follow-up.
