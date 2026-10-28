@@ -309,7 +309,7 @@ const MIGRATIONS: { id: string; sql: string }[] = [
       ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_status_check;
       ALTER TABLE accounts ADD CONSTRAINT accounts_status_check CHECK (status IN ('connecting','connected','to_reconnect','failed'));
       ALTER TABLE accounts ADD COLUMN connector text, ADD COLUMN credentials text, ADD COLUMN meta jsonb NOT NULL DEFAULT '{}',
-        ADD COLUMN step jsonb, ADD COLUMN error text, ADD COLUMN last_read_at timestamptz;
+        ADD COLUMN shown jsonb, ADD COLUMN error text, ADD COLUMN last_read_at timestamptz;
       CREATE INDEX IF NOT EXISTS accounts_state ON accounts ((meta->>'state')) WHERE status = 'connecting';
       CREATE TABLE IF NOT EXISTS account_items (
         id bigserial PRIMARY KEY, account_id text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, external_id text NOT NULL,

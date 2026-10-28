@@ -571,8 +571,8 @@ export interface ApiConnectField {
   placeholder?: string;
   /** Masked, never shown back. */
   secret?: boolean;
-  /** A closed choice, shown as a picker. */
-  options?: { value: string; label: string }[];
+  /** A closed list, shown as a picker. */
+  pickFrom?: { value: string; label: string }[];
   optional?: boolean;
 }
 
@@ -610,7 +610,7 @@ export interface ApiConnectStart {
 export interface ApiConnectAttempt {
   accountId: string;
   status: ApiAccountStatus;
-  step:
+  next:
     | { type: "redirect"; url: string }
     /** `data`: the code to scan, as an image (a data URL). */
     | { type: "qr"; data: string; instructions?: string }

@@ -7,7 +7,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { one } from "../db";
-import { keepItem, markConnected, markFailed, setStep, type ConnectRow } from "./store";
+import { keepItem, markConnected, markFailed, setShown, type ConnectRow } from "./store";
 
 export const GOOGLE_ENV = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"] as const;
 const AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -41,7 +41,7 @@ export async function startGoogle(row: ConnectRow): Promise<void> {
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  await setStep(row.id, { type: "redirect", url: `${AUTHORIZE}?${qs.toString()}` }, { state, verifier });
+  await setShown(row.id, { type: "redirect", url: `${AUTHORIZE}?${qs.toString()}` }, { state, verifier });
 }
 
 async function token(params: Record<string, string>): Promise<{ access_token: string; refresh_token?: string; expires_in: number }> {

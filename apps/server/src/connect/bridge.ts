@@ -15,7 +15,7 @@ import QRCode from "qrcode";
 import type { ApiConnectAttempt, ApiConnectField } from "@gtm-factory/core";
 import { q } from "../db";
 import { seal } from "./secrets";
-import { accountRow, keepItem, markFailed, setStep, type ConnectRow } from "./store";
+import { accountRow, keepItem, markFailed, setShown, type ConnectRow } from "./store";
 
 export type BridgeChannel = "whatsapp" | "telegram" | "linkedin";
 export type BridgeMethod = "qr" | "phone" | "password" | "cookies";
@@ -115,21 +115,21 @@ async function handle(row: ConnectRow, channel: BridgeChannel, mxid: string, ste
   if (step.type === "complete") {
     const who = await prov<{ logins?: { id: string; name?: string }[] }>(channel, mxid, "GET", "/whoami").catch(() => ({ logins: [] as { id: string; name?: string }[] }));
     const login = who.logins?.find((l) => l.id === step.complete?.user_login_id) ?? who.logins?.[0];
-    await q(`UPDATE accounts SET status = 'connected', address = $2, step = NULL, error = NULL, meta = meta || $3::jsonb, updated_at = now() WHERE id = $1`, [row.id, login?.name || step.complete?.user_login_id || "linked", JSON.stringify({ loginId: login?.id ?? null })]);
+    await q(`UPDATE accounts SET status = 'connected', address = $2, shown = NULL, error = NULL, meta = meta || $3::jsonb, updated_at = now() WHERE id = $1`, [row.id, login?.name || step.complete?.user_login_id || "linked", JSON.stringify({ loginId: login?.id ?? null })]);
     return;
   }
   if (step.type === "user_input" || step.type === "cookies") {
     const fields = fieldsOf(step);
     // The phone number was given at the start: answer the bridge's first question with it.
     if (phone && fields.length === 1 && /phone/i.test(fields[0]!.id)) return next(row, channel, mxid, prov<LoginStep>(channel, mxid, "POST", `/login/step/${enc(step.login_id)}/${enc(step.step_id)}/${step.type}`, { [fields[0]!.id]: phone }), null);
-    const s: ApiConnectAttempt["step"] = { type: "input", fields, instructions: step.instructions };
-    await setStep(row.id, s, meta);
+    const s: ApiConnectAttempt["next"] = { type: "input", fields, instructions: step.instructions };
+    await setShown(row.id, s, meta);
     return;
   }
   if (step.type === "display_and_wait") {
     const d = step.display_and_wait;
-    const s: ApiConnectAttempt["step"] = d?.type === "qr" ? { type: "qr", data: await QRCode.toDataURL(d.data ?? "", { margin: 1, width: 240 }), instructions: step.instructions } : { type: "code", data: d?.data ?? "", instructions: step.instructions };
-    await setStep(row.id, s, meta);
+    const s: ApiConnectAttempt["next"] = d?.type === "qr" ? { type: "qr", data: await QRCode.toDataURL(d.data ?? "", { margin: 1, width: 240 }), instructions: step.instructions } : { type: "code", data: d?.data ?? "", instructions: step.instructions };
+    await setShown(row.id, s, meta);
     return next(row, channel, mxid, prov<LoginStep>(channel, mxid, "POST", `/login/step/${enc(step.login_id)}/${enc(step.step_id)}/display_and_wait`, {}, 5 * 60_000), null);
   }
   await markFailed(row.id, `${LABEL[channel]} asked for a step GTM Factory cannot show (${step.type}).`);
@@ -145,7 +145,7 @@ async function next(row: ConnectRow, channel: BridgeChannel, mxid: string, p: Pr
     await markFailed(row.id, e instanceof Error ? e.message : String(e));
   } finally {
     const r = await accountRow(row.id);
-    if (!r || r.status !== "connecting" || r.step?.type === "input") drivers.delete(row.id);
+    if (!r || r.status !== "connecting" || r.shown?.type === "input") drivers.delete(row.id);
   }
 }
 
@@ -157,7 +157,7 @@ export async function startBridge(row: ConnectRow, channel: BridgeChannel, metho
   void next(row, channel, mxid, Promise.resolve(first), phone);
   for (let i = 0; i < 20; i++) {
     const r = await accountRow(row.id);
-    if (!r || r.step || r.status !== "connecting") return;
+    if (!r || r.shown || r.status !== "connecting") return;
     await new Promise((res) => setTimeout(res, 250));
   }
 }
@@ -166,7 +166,7 @@ export async function answerBridge(row: ConnectRow, values: Record<string, strin
   const channel = row.meta.channel as BridgeChannel;
   const mxid = String(row.meta.mxid);
   const step = `/login/step/${enc(String(row.meta.loginId))}/${enc(String(row.meta.stepId))}/${String(row.meta.stepType)}`;
-  await setStep(row.id, null);
+  await setShown(row.id, null);
   await next(row, channel, mxid, prov<LoginStep>(channel, mxid, "POST", step, values), null);
 }
 

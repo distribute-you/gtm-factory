@@ -34,7 +34,7 @@ const TOOL: Record<ToolId, { label: string; blurb: string; fields: ApiConnectFie
     fields: [
       { id: "token", label: "Personal API key", secret: true, placeholder: "phx_...", help: "In PostHog: Settings, then Personal API keys. Create one with the Query read scope." },
       { id: "projectId", label: "Project ID", placeholder: "171095", help: "In PostHog: Settings, then Project." },
-      { id: "region", label: "Region", options: [{ value: "eu", label: "EU" }, { value: "us", label: "US" }], help: "eu.posthog.com is EU, app.posthog.com is US." },
+      { id: "region", label: "Region", pickFrom: [{ value: "eu", label: "EU" }, { value: "us", label: "US" }], help: "eu.posthog.com is EU, app.posthog.com is US." },
     ],
   },
   stripe: {

@@ -1,7 +1,7 @@
 /**
  * The account rows a connection writes: created "connecting" with its role, moved to "connected"
  * with its address and sealed credentials, or "failed" with the reason in plain words. What a page
- * shows next (a code to scan, a question) is the row's step; a page polls it.
+ * shows next (a code to scan, a question) is the row's "shown"; a page polls it.
  */
 
 import { randomBytes } from "node:crypto";
@@ -19,7 +19,7 @@ export interface ConnectRow {
   connector: string | null;
   credentials: string | null;
   meta: Record<string, unknown>;
-  step: ApiConnectAttempt["step"];
+  shown: ApiConnectAttempt["next"];
   error: string | null;
   last_read_at: Date | null;
 }
@@ -36,19 +36,19 @@ export async function accountRow(id: string): Promise<ConnectRow | null> {
   return one<ConnectRow>(`SELECT * FROM accounts WHERE id = $1`, [id]);
 }
 
-export async function setStep(id: string, step: ApiConnectAttempt["step"], meta?: Record<string, unknown>): Promise<void> {
-  await q(`UPDATE accounts SET step = $2, meta = meta || $3::jsonb, updated_at = now() WHERE id = $1`, [id, step ? JSON.stringify(step) : null, JSON.stringify(meta ?? {})]);
+export async function setShown(id: string, step: ApiConnectAttempt["next"], meta?: Record<string, unknown>): Promise<void> {
+  await q(`UPDATE accounts SET shown = $2, meta = meta || $3::jsonb, updated_at = now() WHERE id = $1`, [id, step ? JSON.stringify(step) : null, JSON.stringify(meta ?? {})]);
 }
 
 export async function markConnected(id: string, address: string, credentials: unknown, meta: Record<string, unknown> = {}): Promise<void> {
   await q(
-    `UPDATE accounts SET status = 'connected', address = $2, credentials = $3, meta = meta || $4::jsonb, step = NULL, error = NULL, updated_at = now() WHERE id = $1`,
+    `UPDATE accounts SET status = 'connected', address = $2, credentials = $3, meta = meta || $4::jsonb, shown = NULL, error = NULL, updated_at = now() WHERE id = $1`,
     [id, address, credentials === null ? null : seal(credentials), JSON.stringify(meta)],
   );
 }
 
 export async function markFailed(id: string, error: string, status: ApiAccountStatus = "failed"): Promise<void> {
-  await q(`UPDATE accounts SET status = $2, error = $3, step = NULL, updated_at = now() WHERE id = $1`, [id, status, error]);
+  await q(`UPDATE accounts SET status = $2, error = $3, shown = NULL, updated_at = now() WHERE id = $1`, [id, status, error]);
 }
 
 export function credentialsOf<T>(row: ConnectRow): T {
@@ -57,7 +57,7 @@ export function credentialsOf<T>(row: ConnectRow): T {
 }
 
 export function attemptOf(row: ConnectRow): ApiConnectAttempt {
-  return { accountId: row.id, status: row.status, step: row.step ?? null, error: row.error };
+  return { accountId: row.id, status: row.status, next: row.shown ?? null, error: row.error };
 }
 
 /** One thing read from an account (a message, a contact, a payment): kept once, by its id at the vendor. */

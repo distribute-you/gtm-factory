@@ -128,7 +128,7 @@ describe.runIf(!!url)("connecting a real account", () => {
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = "s";
     const r = await api("POST", "/accounts/connect", { brandId: "b1", channel: "gmail", role: "Personal" });
     expect(r.json.status).toBe("connecting");
-    const step = r.json.step as { type: string; url: string };
+    const step = r.json.next as { type: string; url: string };
     expect(step.type).toBe("redirect");
     expect(step.url).toContain("accounts.google.com");
     expect(step.url).toContain(encodeURIComponent("https://factory.distribute.you/api/connect/google/callback"));

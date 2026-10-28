@@ -17,7 +17,7 @@ const ICON: Record<string, React.ReactNode> = {
 const METHOD_LABEL: Record<string, string> = { qr: "Scan a code", phone: "Pairing code by phone number", password: "Email and password", cookies: "Browser cookies" };
 
 /**
- * Connect an account: pick what to connect, give it a role, then follow its own steps (a Google
+ * Connect an account: pick what to connect, give it a role, then do what it asks (a Google
  * sign-in, a code to scan on the phone, a login form). The new account is read once connected.
  */
 export function ConnectDrawer({ brandId, roles, channels, onClose }: { brandId: string; roles: string[]; channels: ApiConnectChannel[]; onClose: () => void }) {
@@ -31,7 +31,7 @@ export function ConnectDrawer({ brandId, roles, channels, onClose }: { brandId: 
 
   // While a code is on screen, the account is asked again until it connects, fails or asks something.
   useEffect(() => {
-    if (!attempt || attempt.status !== "connecting" || attempt.step?.type === "input" || attempt.step?.type === "redirect") return;
+    if (!attempt || attempt.status !== "connecting" || attempt.next?.type === "input" || attempt.next?.type === "redirect") return;
     const t = window.setInterval(async () => {
       try {
         setAttempt(await apiGet<ApiConnectAttempt>(`/accounts/${encodeURIComponent(attempt.accountId)}/connect`));
@@ -43,7 +43,7 @@ export function ConnectDrawer({ brandId, roles, channels, onClose }: { brandId: 
   }, [attempt]);
 
   useEffect(() => {
-    if (attempt?.step?.type === "redirect") window.location.href = attempt.step.url;
+    if (attempt?.next?.type === "redirect") window.location.href = attempt.next.url;
   }, [attempt]);
 
   const start = async () => {
@@ -132,7 +132,7 @@ export function ConnectDrawer({ brandId, roles, channels, onClose }: { brandId: 
           {picked.kind === "bridge" && method === "phone" && <Fields fields={[{ id: "phone", label: "Phone number", placeholder: "+33 6 12 34 56 78", help: "With its country code." }]} values={values} onChange={setValues} />}
           {picked.kind === "fields" && <Fields fields={picked.fields ?? []} values={values} onChange={setValues} />}
           <button type="button" className="k-btn-strong w-full justify-center" disabled={busy || !role} onClick={start}>
-            {picked.kind === "oauth" ? `Sign in with ${picked.label === "Gmail" ? "Google" : picked.label}` : picked.kind === "bridge" ? `Link ${picked.label}` : `Connect ${picked.label}`}
+            {picked.kind === "oauth" ? `Sign in with ${picked.label === "Gmail" ? "Google" : picked.label}` : picked.kind === "bridge" ? `Link ${picked.label}` : picked.id === "imap" ? "Connect the mailbox" : `Connect ${picked.label}`}
           </button>
         </div>
       )}
@@ -164,7 +164,7 @@ function AttemptView({ attempt, label, busy, onAnswer, onDone, onRetry }: { atte
         </button>
       </div>
     );
-  const s = attempt.step;
+  const s = attempt.next;
   if (!s) return <p className="k-fg2 text-[13px]">Connecting {label}...</p>;
   if (s.type === "redirect") return <p className="k-fg2 text-[13px]">Opening the sign-in page...</p>;
   if (s.type === "qr")
@@ -209,10 +209,10 @@ function Fields({ fields, values, onChange }: { fields: ApiConnectField[]; value
     <div className="space-y-3">
       {fields.map((f) => (
         <Field key={f.id} label={f.optional ? `${f.label} (optional)` : f.label} help={f.help}>
-          {f.options ? (
+          {f.pickFrom ? (
             <select className="k-input w-full px-2" style={{ font: "inherit" }} value={values[f.id] ?? ""} onChange={(e) => onChange({ ...values, [f.id]: e.target.value })}>
               <option value="">Pick one</option>
-              {f.options.map((o) => (
+              {f.pickFrom.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

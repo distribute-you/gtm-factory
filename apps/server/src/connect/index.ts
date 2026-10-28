@@ -49,7 +49,7 @@ export async function startConnect(b: ApiConnectStart): Promise<ConnectRow> {
 }
 
 export async function answerConnect(row: ConnectRow, values: Record<string, string>): Promise<ConnectRow> {
-  if (row.status !== "connecting" || row.step?.type !== "input") throw new Error("This account asks nothing right now.");
+  if (row.status !== "connecting" || row.shown?.type !== "input") throw new Error("This account asks nothing right now.");
   await answerBridge(row, values);
   return (await accountRow(row.id))!;
 }
@@ -57,7 +57,7 @@ export async function answerConnect(row: ConnectRow, values: Record<string, stri
 /** A connecting bridge row whose driver died with a restart says so instead of waiting forever. */
 export async function connectState(row: ConnectRow) {
   const isBridge = BRIDGES.includes(row.connector as BridgeChannel);
-  if (row.status === "connecting" && isBridge && row.step?.type !== "input" && !driving(row.id)) {
+  if (row.status === "connecting" && isBridge && row.shown?.type !== "input" && !driving(row.id)) {
     await markFailed(row.id, "The link was interrupted. Start it again.");
     return attemptOf((await accountRow(row.id))!);
   }
