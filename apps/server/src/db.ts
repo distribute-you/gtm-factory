@@ -283,6 +283,21 @@ const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE VIEW tasks AS SELECT * FROM tasks_all WHERE NOT mocked;
     `,
   },
+  {
+    // A vendor that answers in minutes (the client's own Claude): its requests wait here, keyed so
+    // the retry of the same work finds its answer, and each app's last poll says it is online.
+    id: "009_pending_vendor_answers",
+    sql: `
+      CREATE TABLE IF NOT EXISTS vendor_requests (
+        id text PRIMARY KEY, vendor text NOT NULL, key text NOT NULL, brand_id text, request jsonb NOT NULL,
+        status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','answered','taken','abandoned')),
+        answer jsonb, created_at timestamptz NOT NULL DEFAULT now(), answered_at timestamptz, taken_at timestamptz
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS vendor_requests_open ON vendor_requests(vendor, key) WHERE status IN ('pending','answered');
+      CREATE INDEX IF NOT EXISTS vendor_requests_waiting ON vendor_requests(vendor, created_at) WHERE status = 'pending';
+      CREATE TABLE IF NOT EXISTS vendor_presence (vendor text PRIMARY KEY, last_seen_at timestamptz NOT NULL);
+    `,
+  },
 ];
 
 /** The v5 legs whose storage schemas the v4 migration (002) still reads on a database created before it. */

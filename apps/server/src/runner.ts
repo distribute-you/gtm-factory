@@ -6,8 +6,11 @@
  * its Providers for what it needs (`ctx.get`): the stock first (this subject's latest Unit, the
  * brand's Unit of its picked dynasty, today's Rating), else the Provider orders a new piece from
  * that outcome's Engine (a run of its picked script, nested). A piece that only another milestone
- * can bring stops the run: it waits for that milestone. A script runs only when every vendor its
- * code calls has a real adapter (vendors.ts); until then the Plan is computed and nothing runs.
+ * can bring stops the run: it waits for that milestone. A run hands what it wants written to the
+ * pieces it orders whose subject is the run (`ctx.ask`, read there as `ctx.request`). A vendor that
+ * answers in minutes (pending.ts) stops the run the same way, and the run is tried again at a later
+ * tick; a run tried again keeps the picks it was made under. A script runs only when every vendor
+ * its code calls has a real adapter (vendors.ts); until then the Plan is computed and nothing runs.
  *
  * A script the client's team performs is never run here: the Plan's order becomes a task the
  * person answers (tasks.ts), whose answer becomes the Unit.
@@ -22,6 +25,7 @@ import { personOfKey, unitHash } from "./mock-vendor";
 import { adapterOf, anyAdapter } from "./vendors";
 import type { BridgeAnswer, BridgeOp } from "./sandbox";
 import { openTask } from "./tasks";
+import { flushPending } from "./pending";
 import { storageFor } from "./storage";
 import { accountsOf } from "./accounts";
 
@@ -187,11 +191,32 @@ async function waitingAt(ctx: CampaignCtx, material: string, engine: string): Pr
   return out;
 }
 
-/** The Rating's pick among the scripts that may run (one recorded pick, credited later through traceability). */
+/**
+ * The Rating's pick at a candidate place (one recorded pick, credited later through traceability).
+ * A run that stopped before it was recorded (a missing milestone, a vendor answering later) keeps
+ * its pick: tried again for the same subject, it is made under the same pick, so the same work is
+ * asked again.
+ */
+async function pickAt(ctx: CampaignCtx, point: string, options: { id: string; label: string }[], lot: Lot): Promise<string> {
+  if (lot.lead) {
+    const open = await one<{ id: string; chosen: string }>(
+      `SELECT id, chosen FROM choices WHERE campaign_id = $1 AND lead_id = $2 AND point = $3 AND run_id IS NULL AND created_at > now() - interval '1 day' ORDER BY created_at DESC LIMIT 1`,
+      [ctx.campaign.id, lot.lead.id, point],
+    );
+    if (open && !lot.choices.includes(open.id) && options.some((o) => o.id === open.chosen)) {
+      lot.choices.push(open.id);
+      return open.chosen;
+    }
+  }
+  const { choiceId, chosen } = await choose(ctx.ev, { point, options, campaign: ctx.campaign, brand: ctx.brand, leadId: lot.lead?.id ?? null });
+  lot.choices.push(choiceId);
+  return chosen;
+}
+
+/** The Rating's pick among the scripts that may run. */
 async function pick(ctx: CampaignCtx, point: string, candidates: Script[], lot: Lot): Promise<Script> {
   const heads = candidates.map((s) => ctx.catalogue.headOf(s.dynasty) ?? s);
-  const { choiceId, chosen } = await choose(ctx.ev, { point, options: heads.map((s) => ({ id: s.dynasty, label: s.name })), campaign: ctx.campaign, brand: ctx.brand, leadId: lot.lead?.id ?? null });
-  lot.choices.push(choiceId);
+  const chosen = await pickAt(ctx, point, heads.map((s) => ({ id: s.dynasty, label: s.name })), lot);
   return heads.find((s) => s.dynasty === chosen)!;
 }
 
@@ -248,9 +273,11 @@ const view = (u: Unit, day: number) => ({ id: u.id, outcome: u.outcome, subject:
  * Run a script's code for one subject (or none, for a script that finds its subject). Passes of
  * the code replay until every piece it asks for is in hand; then the run is recorded, its Unit
  * lands, and the webhooks that report on that outcome run. Returns the Unit, null (nothing made,
- * or not ready), or "waiting" (a task, or the script's own wait).
+ * or not ready: a missing milestone, a vendor answering later), or "waiting" (a task, or the
+ * script's own wait). `request` is the Request of the run that ordered this one, for a piece
+ * whose subject is the run.
  */
-export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, depth: number, subjectKind?: "brand" | "run" | "company"): Promise<Unit | null | "waiting"> {
+export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, depth: number, subjectKind?: "brand" | "run" | "company", request: Record<string, unknown> | null = null): Promise<Unit | null | "waiting"> {
   if (depth > MAX_DEPTH) return null;
   if (isTeam(script)) {
     await openTask(ctx, script, lot.lead, lot.choices);
@@ -274,8 +301,10 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
   for (let pass = 0; ; pass++) {
     if (pass >= MAX_PASSES) return null;
     const nth = new Map<string, number>();
-    let need: { outcome: string; n: number } | null = null;
+    let need: { outcome: string; n: number; request: Record<string, unknown> | null } | null = null;
     let waitDays: number | null = null;
+    let asked: Record<string, unknown> | null = null;
+    let later = false;
     const bridge = (op: BridgeOp, args: unknown[]): BridgeAnswer => {
       const key = `${String(args[0])}\u0000${String(args[1])}`;
       switch (op) {
@@ -285,14 +314,22 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
           nth.set(o, n + 1);
           const u = served.get(`${o}#${n}`);
           if (u) return { v: view(u, day) };
-          need = { outcome: o, n };
+          need = { outcome: o, n, request: asked };
           return { stop: "need" };
         }
+        case "ask":
+          asked = args[0] && typeof args[0] === "object" ? (args[0] as Record<string, unknown>) : null;
+          return { v: null };
         case "vendor": {
           const name = String(args[0]);
           const adapter = adapterOf(name);
           if (!adapter) throw new NoOption(`no adapter for the vendor ${name}`);
-          return { v: adapter({ script, name, args: (args[1] ?? null) as Record<string, unknown> | null, subject, brandId: ctx.brand.id, day, draw: draw++, unit: (id) => [...served.values()].find((u) => u.id === id), providedList: list, brand: ctx.brand }) };
+          const answer = adapter({ script, name, args: (args[1] ?? null) as Record<string, unknown> | null, subject, brandId: ctx.brand.id, day, draw: draw++, unit: (id) => [...served.values()].find((u) => u.id === id), providedList: list, brand: ctx.brand });
+          if (answer.pending) {
+            later = true;
+            return { stop: "pending" };
+          }
+          return { v: { ok: answer.ok, data: answer.data } };
         }
         case "accounts":
           return { v: accounts.filter((a) => a.channel === String(args[0]) && a.role === String(args[1])) };
@@ -316,7 +353,10 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
         }
       }
     };
-    const out = code.run({ subject, brand: ctx.brand.id, day, tactics: script.tactics }, bridge);
+    const out = code.run({ subject, brand: ctx.brand.id, day, tactics: script.tactics, request }, bridge);
+    await flushPending();
+    // A vendor answers later: the run stops like a run missing a milestone, and a later tick tries it again.
+    if (later) return null;
     if (out.kind === "done") {
       result = out.result;
       break;
@@ -331,11 +371,11 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
       if (lot.lead) await storageFor(script.outcome).set("wake", `${ctx.campaign.id}:${lot.lead.id}`, Date.now() + Math.max(1, waitDays) * 86_400_000);
       return "waiting";
     }
-    const asked = need as { outcome: string; n: number } | null;
-    if (!asked) return null;
-    const got = await obtain(ctx, script, asked.outcome, asked.n, lot, depth);
+    const wanted = need as { outcome: string; n: number; request: Record<string, unknown> | null } | null;
+    if (!wanted) return null;
+    const got = await obtain(ctx, script, wanted.outcome, wanted.n, lot, depth, wanted.request);
     if (!got) return null;
-    served.set(`${asked.outcome}#${asked.n}`, got);
+    served.set(`${wanted.outcome}#${wanted.n}`, got);
   }
 
   // The code ran to its end with every piece in hand: the run is recorded, its notes kept.
@@ -351,11 +391,11 @@ export async function runScript(ctx: CampaignCtx, script: Script, lot: Lot, dept
     await store.delete(t, key);
   }
   if (!result) {
-    await finishRun(run, "no_outcome", "Ran on mocked vendors: no outcome this time.", null);
+    await finishRun(run, "no_outcome", "No outcome this time.", null);
     return null;
   }
   const unit = await landUnit(ctx, script, run, lot, result, subjectKind);
-  await finishRun(run, "ok", "Ran on mocked vendors: no spend.", null);
+  await finishRun(run, "ok", "No metered spend.", null);
   // The webhooks reporting on this outcome (the mailbox reporting a send) report now.
   if (lot.lead && unit.subject_kind === "lead") for (const r of reportersOn(ctx.catalogue, unit.outcome)) await runScript(ctx, r, { lead: lot.lead, choices: [] }, depth + 1);
   return unit;
@@ -383,7 +423,7 @@ async function landUnit(ctx: CampaignCtx, script: Script, run: RunHandle, lot: L
  * new one from that outcome's Engine. A milestone, or what the script works on, is never ordered
  * here: the run waits for it.
  */
-async function obtain(ctx: CampaignCtx, consumer: Script, outcome: string, n: number, lot: Lot, depth: number): Promise<Unit | null> {
+async function obtain(ctx: CampaignCtx, consumer: Script, outcome: string, n: number, lot: Lot, depth: number, request: Record<string, unknown> | null = null): Promise<Unit | null> {
   const out = ctx.catalogue.outcome(outcome);
   if (!out) return null;
   if (outcome === OUTCOMES.rating || out.contentType === "rating") return todaysRating(ctx.brand.id);
@@ -413,20 +453,20 @@ async function obtain(ctx: CampaignCtx, consumer: Script, outcome: string, n: nu
     if (held.length > 0) {
       if (held.length === 1) return held[0]!;
       const named = held.map((u) => ({ id: u.dynasty ?? u.id, label: u.name ?? u.dynasty ?? u.id }));
-      const { choiceId, chosen } = await choose(ctx.ev, { point, options: named, campaign: ctx.campaign, brand: ctx.brand, leadId: lot.lead?.id ?? null });
-      lot.choices.push(choiceId);
+      const chosen = await pickAt(ctx, point, named, lot);
       return held.find((u) => (u.dynasty ?? u.id) === chosen)!;
     }
   }
-  return order(ctx, point, outcome, lot, depth, out.subject === "brand" ? "brand" : "run");
+  // A piece whose subject is the run gets the Request the ordering run asked.
+  return order(ctx, point, outcome, lot, depth, out.subject === "brand" ? "brand" : "run", out.subject === "brand" ? null : request);
 }
 
 /** Order a new piece from an Engine: the Rating picks its script, which runs (nested) for the same subject. */
-async function order(ctx: CampaignCtx, point: string, outcome: string, lot: Lot, depth: number, subjectKind?: "brand" | "run" | "company"): Promise<Unit | null> {
+async function order(ctx: CampaignCtx, point: string, outcome: string, lot: Lot, depth: number, subjectKind?: "brand" | "run" | "company", request: Record<string, unknown> | null = null): Promise<Unit | null> {
   const scripts = orderable(ctx, outcome);
   if (scripts.length === 0) return null;
   const inner: Lot = { lead: lot.lead, choices: [] };
   const picked = await pick(ctx, point, scripts, inner);
-  const u = await runScript(ctx, picked, inner, depth + 1, subjectKind);
+  const u = await runScript(ctx, picked, inner, depth + 1, subjectKind, request);
   return u && u !== "waiting" ? u : null;
 }

@@ -9,6 +9,7 @@ import { one, q } from "./db";
 import { loadCatalogue, loadEvidence, todayUtc, todaysRating, type Brand, type CampaignRow } from "./factory";
 import { anyAdapter } from "./vendors";
 import { CapReached, runCampaign, type CampaignCtx } from "./runner";
+import { loadPending } from "./pending";
 
 export const TICK_SECONDS = 60;
 const MAX_FAILED_ATTEMPTS = 3;
@@ -53,6 +54,8 @@ async function runTick(): Promise<void> {
     await q(`UPDATE campaigns SET status = 'paused' WHERE status = 'live' AND factory = 'ours' AND ends_on IS NOT NULL AND ends_on <= (now() AT TIME ZONE 'UTC')::date`);
     const campaigns = await q<CampaignRow>(`SELECT * FROM campaigns WHERE status = 'live' AND factory = 'ours' ORDER BY launched_at`);
     if (campaigns.length > 0) {
+      // The answers vendors posted since the last tick (the client's Claude), and when each app was last seen.
+      await loadPending();
       const catalogue = await loadCatalogue();
       const ev = await loadEvidence(catalogue);
       for (const c of campaigns) {

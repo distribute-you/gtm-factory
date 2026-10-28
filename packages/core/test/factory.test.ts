@@ -141,11 +141,17 @@ describe("ICPs and strategies are proposed from splits", () => {
 
 describe("the pick lives on the Material", () => {
   it("the same LLM Engine called by two scripts converges to two different scripts", () => {
+    // Among our API's models (a client without the GTM Factory app: the client's Claude, at $0, is the best everywhere it runs).
+    const data = worldData();
+    for (const x of data.catalogue.scripts) if (x.tactics.runs_on !== undefined && x.tactics.runs_on !== "Our API") x.status = "retired";
+    const ours = new SimulationSession(worldFromData(data, LIBRARY));
+    ours.run(60);
+    const conv = convergence(ours);
     const writer = conv.find((x) => x.point === "reply_received|llm_completion")!;
     const judge = conv.find((x) => x.point === "lead_interested|llm_completion")!;
     expect(new Set(Object.values(writer.bestByCampaign))).not.toEqual(new Set(Object.values(judge.bestByCampaign)));
     expect(shareOnBest(judge, 50, 60)).toBeGreaterThan(0.5);
-  });
+  }, 180_000);
 });
 
 describe("the Supplier rating", () => {

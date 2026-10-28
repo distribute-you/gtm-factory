@@ -393,10 +393,11 @@
         "materials": [],
         "tactics": {
           "tier": "fast",
-          "performed_by": "Ours"
+          "performed_by": "Ours",
+          "runs_on": "Our API"
         },
         "costCents": 1,
-        "status": "active",
+        "status": "retired",
         "provider": {
           "name": "Zhipu",
           "color": "#3b5bdb"
@@ -414,10 +415,11 @@
         "materials": [],
         "tactics": {
           "tier": "fast",
-          "performed_by": "Ours"
+          "performed_by": "Ours",
+          "runs_on": "Our API"
         },
         "costCents": 2,
-        "status": "active",
+        "status": "retired",
         "provider": {
           "name": "Google",
           "color": "#1a73e8"
@@ -434,10 +436,11 @@
         "materials": [],
         "tactics": {
           "tier": "pro",
-          "performed_by": "Ours"
+          "performed_by": "Ours",
+          "runs_on": "Our API"
         },
         "costCents": 5,
-        "status": "active",
+        "status": "retired",
         "provider": {
           "name": "Google",
           "color": "#1a73e8"
@@ -636,7 +639,7 @@
           "performed_by": "Ours"
         },
         "costCents": 2,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "wr_research",
@@ -659,7 +662,7 @@
           "performed_by": "Ours"
         },
         "costCents": 3,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "ce_now",
@@ -837,7 +840,7 @@
           "account_role": "AI agent"
         },
         "costCents": 40,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "rj_ai",
@@ -856,7 +859,7 @@
           "performed_by": "Ours"
         },
         "costCents": 5,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "crm_sync",
@@ -947,7 +950,7 @@
           "account_role": "AI agent"
         },
         "costCents": 2,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "fu_angle",
@@ -990,7 +993,7 @@
           "account_role": "AI agent"
         },
         "costCents": 3,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "mb_fu_replies",
@@ -1243,7 +1246,7 @@
           "account_role": "AI agent"
         },
         "costCents": 10,
-        "status": "active"
+        "status": "retired"
       },
       {
         "id": "wa_inbox_personal",
@@ -1349,6 +1352,266 @@
             "type": "text"
           }
         ]
+      },
+      {
+        "id": "glm_v2",
+        "outcome": "llm_completion",
+        "dynasty": "glm",
+        "version": 2,
+        "name": "GLM",
+        "kind": "ai",
+        "code": "llm_completion/glm/v2",
+        "materials": [],
+        "tactics": {
+          "tier": "fast",
+          "performed_by": "Ours",
+          "runs_on": "Our API"
+        },
+        "costCents": 1,
+        "status": "active",
+        "provider": {
+          "name": "Zhipu",
+          "color": "#3b5bdb"
+        },
+        "description": "A fast, low-cost model."
+      },
+      {
+        "id": "gemini_flash_v2",
+        "outcome": "llm_completion",
+        "dynasty": "gemini_flash",
+        "version": 2,
+        "name": "Gemini Flash",
+        "kind": "ai",
+        "code": "llm_completion/gemini_flash/v2",
+        "materials": [],
+        "tactics": {
+          "tier": "fast",
+          "performed_by": "Ours",
+          "runs_on": "Our API"
+        },
+        "costCents": 2,
+        "status": "active",
+        "provider": {
+          "name": "Google",
+          "color": "#1a73e8"
+        }
+      },
+      {
+        "id": "gemini_pro_v2",
+        "outcome": "llm_completion",
+        "dynasty": "gemini_pro",
+        "version": 2,
+        "name": "Gemini Pro",
+        "kind": "ai",
+        "code": "llm_completion/gemini_pro/v2",
+        "materials": [],
+        "tactics": {
+          "tier": "pro",
+          "performed_by": "Ours",
+          "runs_on": "Our API"
+        },
+        "costCents": 5,
+        "status": "active",
+        "provider": {
+          "name": "Google",
+          "color": "#1a73e8"
+        }
+      },
+      {
+        "id": "wr_short_v2",
+        "outcome": "message_written",
+        "dynasty": "wr_short",
+        "version": 2,
+        "name": "Short writer",
+        "kind": "ai",
+        "code": "message_written/wr_short/v2",
+        "materials": [
+          "email_found",
+          "template_written",
+          "brand_context",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "researches_first": false,
+          "performed_by": "Ours"
+        },
+        "costCents": 2,
+        "status": "active"
+      },
+      {
+        "id": "wr_research_v2",
+        "outcome": "message_written",
+        "dynasty": "wr_research",
+        "version": 2,
+        "name": "Research-led writer",
+        "kind": "ai",
+        "code": "message_written/wr_research/v2",
+        "materials": [
+          "email_found",
+          "company_researched",
+          "template_written",
+          "brand_context",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "researches_first": true,
+          "performed_by": "Ours"
+        },
+        "costCents": 3,
+        "status": "active"
+      },
+      {
+        "id": "rj_ai_v2",
+        "outcome": "lead_interested",
+        "dynasty": "rj_ai",
+        "version": 2,
+        "name": "AI reply judge",
+        "kind": "ai",
+        "code": "lead_interested/rj_ai/v2",
+        "materials": [
+          "reply_received",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "performed_by": "Ours"
+        },
+        "costCents": 5,
+        "status": "active"
+      },
+      {
+        "id": "li_connect_v3",
+        "outcome": "reply_received",
+        "dynasty": "li_connect",
+        "version": 3,
+        "name": "Connect and message",
+        "kind": "rules",
+        "code": "reply_received/li_connect/v3",
+        "materials": [
+          "lead_identified",
+          "template_written",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "LinkedIn",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
+        },
+        "costCents": 40,
+        "status": "active"
+      },
+      {
+        "id": "wa_message_v2",
+        "outcome": "reply_received",
+        "dynasty": "wa_message",
+        "version": 2,
+        "name": "WhatsApp message",
+        "kind": "rules",
+        "code": "reply_received/wa_message/v2",
+        "materials": [
+          "lead_identified",
+          "template_written",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
+        },
+        "costCents": 10,
+        "status": "active"
+      },
+      {
+        "id": "fu_angle_v3",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_angle",
+        "version": 3,
+        "name": "New angle",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_angle/v3",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
+          "channel": "Cold email",
+          "account_role": "AI agent"
+        },
+        "costCents": 3,
+        "status": "active"
+      },
+      {
+        "id": "fu_bump_v3",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_bump",
+        "version": 3,
+        "name": "Short bump",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_bump/v3",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
+          "channel": "Cold email",
+          "account_role": "AI agent"
+        },
+        "costCents": 2,
+        "status": "active"
+      },
+      {
+        "id": "clients_claude",
+        "outcome": "llm_completion",
+        "dynasty": "clients_claude",
+        "version": 1,
+        "name": "Client's Claude",
+        "kind": "ai",
+        "code": "llm_completion/clients_claude/v1",
+        "materials": [],
+        "tactics": {
+          "tier": "pro",
+          "performed_by": "Ours",
+          "runs_on": "Client's Claude"
+        },
+        "costCents": 0,
+        "status": "active",
+        "provider": {
+          "name": "Anthropic",
+          "color": "#d97757"
+        },
+        "description": "The client's own Claude writes the answer on the client's subscription, at $0 to us. While the client's Mac is closed, the run waits."
+      },
+      {
+        "id": "clients_claude_first",
+        "outcome": "llm_completion",
+        "dynasty": "clients_claude_first",
+        "version": 1,
+        "name": "Client's Claude, else our API",
+        "kind": "ai",
+        "code": "llm_completion/clients_claude_first/v1",
+        "materials": [],
+        "tactics": {
+          "tier": "pro",
+          "performed_by": "Ours",
+          "runs_on": "Client's Claude, else our API"
+        },
+        "costCents": 1,
+        "status": "active",
+        "provider": {
+          "name": "Anthropic",
+          "color": "#d97757"
+        },
+        "description": "The client's own Claude first, at $0 to us. When the client's app has not been online for 10 minutes, our API writes the answer."
       }
     ],
     "tactics": [
@@ -1593,6 +1856,23 @@
         ],
         "source": "data",
         "description": "Which of the brand's accounts a script sends or reads through: its Personal, its Pro, or its AI agent. The script picks the account among those with that role."
+      },
+      {
+        "id": "runs_on",
+        "name": "Runs on",
+        "type": {
+          "kind": "list",
+          "values": [
+            "Our API",
+            "Client's Claude",
+            "Client's Claude, else our API"
+          ]
+        },
+        "describes": [
+          "script"
+        ],
+        "source": "data",
+        "description": "Where an LLM completion is written: through our API, by the client's own Claude (the run waits while the client's Mac is closed), or by the client's Claude first and our API after 10 minutes with no app online."
       }
     ],
     "strategies": [
@@ -1694,6 +1974,30 @@
             "op": "equals",
             "tactic": "account_role",
             "value": "Pro"
+          }
+        ]
+      },
+      {
+        "id": "llm_completion#clients-claude",
+        "name": "Runs on is Client's Claude",
+        "outcome": "llm_completion",
+        "conditions": [
+          {
+            "op": "equals",
+            "tactic": "runs_on",
+            "value": "Client's Claude"
+          }
+        ]
+      },
+      {
+        "id": "llm_completion#clients-claude-first",
+        "name": "Client's Claude first",
+        "outcome": "llm_completion",
+        "conditions": [
+          {
+            "op": "equals",
+            "tactic": "runs_on",
+            "value": "Client's Claude, else our API"
           }
         ]
       }
@@ -2378,6 +2682,18 @@
         "delayMeanDays": 3,
         "horizonDays": 12,
         "ownYield": 1.0
+      },
+      "clients_claude": {
+        "costCents": 0,
+        "base": 1,
+        "delayMeanDays": 0.1,
+        "horizonDays": 1
+      },
+      "clients_claude_first": {
+        "costCents": 1,
+        "base": 1,
+        "delayMeanDays": 0.02,
+        "horizonDays": 1
       }
     },
     "at": {
@@ -2389,6 +2705,12 @@
           "end": 0.6
         },
         "gemini_pro": {
+          "end": 1.05
+        },
+        "clients_claude": {
+          "end": 1.05
+        },
+        "clients_claude_first": {
           "end": 1.05
         }
       },
@@ -2404,6 +2726,14 @@
         "gemini_pro": {
           "recall": 0.97,
           "falsePositive": 0.005
+        },
+        "clients_claude": {
+          "recall": 0.97,
+          "falsePositive": 0.005
+        },
+        "clients_claude_first": {
+          "recall": 0.97,
+          "falsePositive": 0.005
         }
       },
       "follow_up_queued|llm_completion": {
@@ -2415,6 +2745,12 @@
         },
         "gemini_pro": {
           "end": 0.7
+        },
+        "clients_claude": {
+          "end": 1.0
+        },
+        "clients_claude_first": {
+          "end": 1.0
         }
       },
       "reply_received|llm_completion": {
@@ -2425,6 +2761,12 @@
           "end": 0.6
         },
         "gemini_pro": {
+          "end": 1.05
+        },
+        "clients_claude": {
+          "end": 1.05
+        },
+        "clients_claude_first": {
           "end": 1.05
         }
       }

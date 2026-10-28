@@ -29,30 +29,31 @@ describe("scripts are code", () => {
   });
 
   it("the simulator runs that code: a script whose code makes nothing makes nothing", () => {
-    const nothing = withCode("wr_short", () => null);
+    const nothing = withCode("wr_short_v2", () => null);
     nothing.run(10);
-    const runs = nothing.runs.filter((r) => r.scriptId === "wr_short");
+    const runs = nothing.runs.filter((r) => r.scriptId === "wr_short_v2");
     expect(runs.length).toBeGreaterThan(20);
-    expect(nothing.units.filter((u) => u.scriptId === "wr_short").length).toBe(0);
+    expect(nothing.units.filter((u) => u.scriptId === "wr_short_v2").length).toBe(0);
     const normal = new SimulationSession(defaultWorld());
     normal.run(10);
-    expect(normal.units.filter((u) => u.scriptId === "wr_short").length).toBeGreaterThan(10);
+    expect(normal.units.filter((u) => u.scriptId === "wr_short_v2").length).toBeGreaterThan(10);
   }, 120_000);
 
   it("the ledger measures what each run consumed, and an unexpected call joins the script's materials", () => {
-    const s = withCode("wr_short", (ctx) => {
+    const s = withCode("wr_short_v2", (ctx) => {
       ctx.get("email_found");
       ctx.get("template_written");
       ctx.get("brand_context");
+      ctx.ask({ prompt: "Write to this person." });
       ctx.get("llm_completion");
       ctx.get("company_researched");
       const r = ctx.vendor.call("llm.complete", {});
       return r.ok ? { content: {} } : null;
     });
-    expect(s.materialsOf(s.catalogue.script("wr_short")!)).not.toContain("company_researched");
+    expect(s.materialsOf(s.catalogue.script("wr_short_v2")!)).not.toContain("company_researched");
     s.run(8);
-    expect(s.materialsOf(s.catalogue.script("wr_short")!)).toContain("company_researched");
-    expect(s.materialsOf(s.catalogue.script("wr_short")!)).not.toContain("rating");
+    expect(s.materialsOf(s.catalogue.script("wr_short_v2")!)).toContain("company_researched");
+    expect(s.materialsOf(s.catalogue.script("wr_short_v2")!)).not.toContain("rating");
   }, 120_000);
 });
 
@@ -78,8 +79,8 @@ describe("Providers", () => {
     const s = new SimulationSession(defaultWorld());
     s.run(20);
     const consumed = (scriptId: string) => s.runs.filter((r) => r.scriptId === scriptId && r.consumed.length > 0).map((r) => r.consumed.map((id) => s.unit(id)!.outcome));
-    const short = consumed("wr_short");
-    const research = consumed("wr_research");
+    const short = consumed("wr_short_v2");
+    const research = consumed("wr_research_v2");
     expect(short.length).toBeGreaterThan(20);
     expect(research.length).toBeGreaterThan(20);
     for (const r of short) expect(r).not.toContain("company_researched");
@@ -87,23 +88,24 @@ describe("Providers", () => {
     // No company research is ordered for a subject only the short writer served.
     const researched = new Set(s.units.filter((u) => u.outcome === "company_researched").map((u) => u.subject));
     const companyOf = (r: { consumed: string[] }) => s.person(s.unit(r.consumed.find((id) => s.unit(id)!.outcome === "email_found")!)!.subject)?.companyId;
-    const shortOnly = s.runs.filter((r) => r.scriptId === "wr_short" && r.consumed.length > 0).map(companyOf);
+    const shortOnly = s.runs.filter((r) => r.scriptId === "wr_short_v2" && r.consumed.length > 0).map(companyOf);
     expect(shortOnly.filter((c) => c && researched.has(c)).length).toBeLessThan(shortOnly.length);
   }, 120_000);
 
   it("get() hands the caller a piece it has not received; calling it again makes a new one, as long as the run's budget lasts", () => {
     const greedy = withCode(
-      "wr_short",
+      "wr_short_v2",
       (ctx) => {
+        ctx.ask({ prompt: "Write to this person." });
         const a = ctx.get("llm_completion");
         const b = ctx.get("llm_completion");
         const r = ctx.vendor.call("llm.complete", {});
         return r.ok ? { content: { a: a.id, b: b.id } } : null;
       },
-      ["wr_research"],
+      ["wr_research_v2"],
     );
     greedy.run(6);
-    const written = greedy.units.filter((u) => u.scriptId === "wr_short");
+    const written = greedy.units.filter((u) => u.scriptId === "wr_short_v2");
     expect(written.length).toBeGreaterThan(10);
     for (const u of written) {
       const { a, b } = u.content as { a: string; b: string };
@@ -113,36 +115,65 @@ describe("Providers", () => {
     }
     // A script that never stops asking for a new piece stops where the budget ends: nothing is written, nothing overspent.
     const endless = withCode(
-      "wr_short",
+      "wr_short_v2",
       (ctx) => {
+        ctx.ask({ prompt: "Write to this person." });
         for (;;) ctx.get("llm_completion");
       },
-      ["wr_research"],
+      ["wr_research_v2"],
     );
     endless.run(3);
-    expect(endless.units.filter((u) => u.scriptId === "wr_short").length).toBe(0);
+    expect(endless.units.filter((u) => u.scriptId === "wr_short_v2").length).toBe(0);
     for (const d of endless.days) for (const c of endless.campaigns()) expect(d.spendCents[c.id] ?? 0).toBeLessThanOrEqual(c.dailyBudgetCents);
     expect(endless.units.filter((u) => u.outcome === "llm_completion").length).toBeGreaterThan(100);
   }, 120_000);
 
+  it("the Request: a writer asks what to write, and the LLM completion it ordered reads exactly that; a run nobody ordered reads none", () => {
+    const seen: unknown[] = [];
+    const echo = withCode(
+      "clients_claude",
+      (ctx) => {
+        seen.push(ctx.request);
+        return { content: { model: "echo", text: `echo: ${String(ctx.request?.prompt ?? "")}` } };
+      },
+      ["glm_v2", "gemini_flash_v2", "gemini_pro_v2", "clients_claude_first"],
+    );
+    echo.run(8);
+    const written = echo.units.filter((u) => u.scriptId === "wr_short_v2" || u.scriptId === "wr_research_v2");
+    expect(written.length).toBeGreaterThan(10);
+    for (const u of written) expect(String(u.content?.body)).toMatch(/^echo: Write a (short )?cold email to /);
+    expect(seen.length).toBeGreaterThan(10);
+    for (const r of seen) expect(r).not.toBeNull();
+    const lookups: unknown[] = [];
+    const lookup = withCode("ef_lookup", (ctx) => {
+      lookups.push(ctx.request);
+      ctx.get("lead_identified");
+      return { content: { email: "x@example.com", verified: true } };
+    });
+    lookup.run(3);
+    expect(lookups.length).toBeGreaterThan(0);
+    for (const r of lookups) expect(r).toBeNull();
+  }, 120_000);
+
   it("freshness is the script's call: a script unhappy with an old piece asks again and a new one is made", () => {
     const fresh = withCode(
-      "wr_short",
+      "wr_short_v2",
       (ctx) => {
         ctx.get("email_found");
         ctx.get("template_written");
         let context = ctx.get("brand_context");
         for (let k = 0; k < 4 && context.ageDays > 5; k++) context = ctx.get("brand_context");
+        ctx.ask({ prompt: "Write to this person." });
         ctx.get("llm_completion");
         const r = ctx.vendor.call("llm.complete", {});
         return r.ok ? { content: { context: context.id } } : null;
       },
-      ["wr_research"],
+      ["wr_research_v2"],
     );
     fresh.run(20);
     const contexts = fresh.units.filter((u) => u.outcome === "brand_context" && u.brandId === fresh.clients[0]!.brand.id).sort((x, y) => x.day - y.day);
     expect(contexts.length).toBeGreaterThanOrEqual(3);
-    for (const u of fresh.units.filter((x) => x.scriptId === "wr_short")) {
+    for (const u of fresh.units.filter((x) => x.scriptId === "wr_short_v2")) {
       const used = fresh.unit((u.content as { context: string }).context)!;
       expect(u.day - used.day).toBeLessThanOrEqual(6);
     }

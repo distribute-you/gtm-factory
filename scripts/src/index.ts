@@ -56,6 +56,18 @@ import s52 from "./follow_up_queued/fu_angle/v2";
 import s53 from "./follow_up_queued/fu_bump/v2";
 import s54 from "./reply_received/mb_replies/v2";
 import s55 from "./reply_received/li_connect/v2";
+import s56 from "./llm_completion/glm/v2";
+import s57 from "./llm_completion/gemini_flash/v2";
+import s58 from "./llm_completion/gemini_pro/v2";
+import s59 from "./llm_completion/clients_claude/v1";
+import s60 from "./llm_completion/clients_claude_first/v1";
+import s61 from "./message_written/wr_short/v2";
+import s62 from "./message_written/wr_research/v2";
+import s63 from "./lead_interested/rj_ai/v2";
+import s64 from "./reply_received/li_connect/v3";
+import s65 from "./reply_received/wa_message/v2";
+import s66 from "./follow_up_queued/fu_angle/v3";
+import s67 from "./follow_up_queued/fu_bump/v3";
 
 export const LIBRARY: ScriptLibrary = {
   "rating/rating_pooled/v1": s0,
@@ -114,6 +126,18 @@ export const LIBRARY: ScriptLibrary = {
   "follow_up_queued/fu_bump/v2": s53,
   "reply_received/mb_replies/v2": s54,
   "reply_received/li_connect/v2": s55,
+  "llm_completion/glm/v2": s56,
+  "llm_completion/gemini_flash/v2": s57,
+  "llm_completion/gemini_pro/v2": s58,
+  "llm_completion/clients_claude/v1": s59,
+  "llm_completion/clients_claude_first/v1": s60,
+  "message_written/wr_short/v2": s61,
+  "message_written/wr_research/v2": s62,
+  "lead_interested/rj_ai/v2": s63,
+  "reply_received/li_connect/v3": s64,
+  "reply_received/wa_message/v2": s65,
+  "follow_up_queued/fu_angle/v3": s66,
+  "follow_up_queued/fu_bump/v3": s67,
 };
 
 export { SOURCES } from "./sources";

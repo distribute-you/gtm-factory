@@ -14,7 +14,7 @@
  */
 
 import type { OutcomeId } from "./catalogue";
-import type { AccountView, ScriptCode, ScriptContext, ScriptResult, VendorAnswer } from "./script";
+import type { AccountView, RunRequest, ScriptCode, ScriptContext, ScriptResult, VendorAnswer } from "./script";
 import { StorageHouse } from "./storage";
 import type { TacticValue } from "./tactics";
 
@@ -34,6 +34,10 @@ export interface ReplayCase {
   subject?: string | null;
   tactics?: Record<string, TacticValue>;
   day?: number;
+  /** For a script whose outcome's subject is the run: the Request the run that ordered it handed it. */
+  request?: Record<string, unknown>;
+  /** The Requests the work handed to the pieces it ordered, in order, when the record holds them: the replay requires the same. */
+  asks?: Record<string, unknown>[];
   /** The brand's connected accounts as they stood at that moment (a sending or reading script picks among them). */
   accounts?: AccountView[];
   /** Every vendor call, in the order it was made. */
@@ -90,10 +94,15 @@ class ReplayStop extends Error {}
 /** Run one script on one case and compare. */
 export function replayCase(code: ScriptCode, c: ReplayCase): ReplayReport {
   const diffs: string[] = [];
-  const asked = new Map<OutcomeId, number>();
+  const gotten = new Map<OutcomeId, number>();
   let next = 0;
+  const asked: RunRequest[] = [];
   const ctx: ScriptContext = {
     subject: c.subject ?? null,
+    request: c.request ?? null,
+    ask(request) {
+      asked.push(request);
+    },
     brand: "replay",
     day: c.day ?? 0,
     tactics: c.tactics ?? {},
@@ -107,8 +116,8 @@ export function replayCase(code: ScriptCode, c: ReplayCase): ReplayReport {
         diffs.push(`asked for ${outcome}, which the case does not hold`);
         throw new ReplayStop();
       }
-      const n = asked.get(outcome) ?? 0;
-      asked.set(outcome, n + 1);
+      const n = gotten.get(outcome) ?? 0;
+      gotten.set(outcome, n + 1);
       const list = Array.isArray(held) ? held : [held];
       const content = list[Math.min(n, list.length - 1)]!;
       return { id: `${c.id}:${outcome}:${n}`, outcome, subject: c.subject ?? "", ageDays: 0, content };
@@ -142,6 +151,7 @@ export function replayCase(code: ScriptCode, c: ReplayCase): ReplayReport {
     if (e instanceof ReplayStop) return { id: c.id, match: false, diffs };
     failed = e instanceof Error ? e.message : String(e);
   }
+  if (c.asks !== undefined && !sameJson(asked, c.asks)) diffs.push(firstDiff("asks", asked, c.asks));
   if (next < c.calls.length) diffs.push(`made ${next} calls, the record made ${c.calls.length} (next: ${c.calls[next]!.name})`);
   const want = c.expect;
   if (want.fails !== undefined) {

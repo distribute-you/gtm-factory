@@ -39,6 +39,7 @@ flowchart LR
 | **Script** | Code that makes one Unit of its Engine's outcome, or none. Scripts of one Engine compete; each belongs to a **dynasty** of versions. |
 | **Provider** | One per outcome, never in competition: the stores of that outcome. A script asks a Provider for what it needs. |
 | **Run** | A production order: one script executed, one Unit or none. |
+| **Request** | What a run hands to the pieces it orders whose subject is the run itself. The writer asks for the email it wants (`ctx.ask({ prompt })`), then calls `ctx.get("llm_completion")`; the LLM completion script reads that Request (`ctx.request`) and writes it. `get()` keeps no argument: the Request travels beside it. |
 | **Campaign** | Orders production: a Target, a start, a budget and a strategy written as a brief. |
 | **Plan** | The tree a campaign runs, recomputed at every tick: each outcome, its Engine, the script that Engine picks now, and the Plan of each outcome that script calls. It is shown as what actually ran this week: at each Engine every script that made Units is a branch, with its share and cost, the pick of this tick highlighted. Nothing about it is frozen. |
 | **Connected account** | A mailbox, a WhatsApp number, a LinkedIn profile the brand connected, kept as a Unit of the brand. It names its channel and the role the brand gave it: Personal, Pro or AI agent. Several accounts may share a role on a channel. |
@@ -49,6 +50,8 @@ flowchart LR
 **A channel is a tactic.** Cold email and LinkedIn are two scripts of the Reply received Engine; each carries the value of the tactic "Channel". A client who wants only some channels says so in the brief.
 
 **Who performs a script is a tactic.** "Performed by" says Ours, Client's team, Mailbox, CRM or Organic market. Budget and return read only "Performed by = Ours". A script of the client's team costs us nothing; its limit is its capacity (section 6).
+
+**Where an LLM completion is written is a tactic.** "Runs on" says Our API, Client's Claude or Client's Claude, else our API. Each value is carried by its own scripts of the LLM completion Engine. Client's Claude is the client's own Claude subscription, through the GTM Factory app on the client's Mac: it costs us $0, and while the Mac is closed the run waits. The third script asks the client's Claude first and, after 10 minutes with no app online, calls our API: the fallback lives in that script's code. A client who wants only their Claude, or their Claude first, says so in the brief, and the judge keeps the strategy "Runs on is Client's Claude" or "Client's Claude first" on that Engine, from the next tick.
 
 **A script asks for a role, never for an account.** A sending script carries the tactic "Account role" (AI agent, Pro, Personal). It receives every connected account of the brand with that role on its channel, with each one's counts (sent today, sent and read this week), and its own code picks one: the cold email queue takes the mailbox that sent the least today; a follow-up leaves from the mailbox the first message left from (same thread, same address). The host only holds the accounts, their roles and their counts. Another way to spread the load is a new version of that script, rated like any other. A reading script runs per role with no filter, so every account is read. A campaign that wants every message from its AI agent says so in its brief, and the judge keeps the strategy "Account role is AI agent" on its sending Engines. In the fictional world, a new client gets one welcome from the Pro number, and anyone who writes to the Pro number becomes a task for the client's team, never an answer from the agent.
 
@@ -67,7 +70,7 @@ flowchart LR
 
 ## 4. Scripts are code
 
-A script lives in `scripts/<outcome>/<dynasty>/v<n>.ts`. Its default export `run(ctx)` receives its subject, `ctx.get(outcome)` on the Providers, its Engine's storage, the vendor client and its tactics, and returns one Unit content or none. The email lookup, in full:
+A script lives in `scripts/<outcome>/<dynasty>/v<n>.ts`. Its default export `run(ctx)` receives its subject, `ctx.get(outcome)` on the Providers, `ctx.ask(request)` and the Request it was handed (`ctx.request`), its Engine's storage, the vendor client and its tactics, and returns one Unit content or none. The email lookup, in full:
 
 ```ts
 export default function run(ctx: ScriptContext): ScriptResult {
@@ -93,6 +96,8 @@ A script that wants a fresh piece asks again: `if (context.ageDays > 90) context
 **Storage.** An Engine's storage holds only its scripts' notes ("no email found for this lead", "picked this person on day 12") and references to ledger Units, never copies. It is shared by the scripts of that Engine and read by nobody else. Business rules such as "Days before recontact" or "Days before retry" are tactics the script reads and enforces in its own code.
 
 **Replay: porting existing code without losing anything.** Code moved into a script from another system is proven against what that system really did. A recorded case holds the Units the work started from, every vendor call it made in order (the answer, and the request when it was recorded) and what it produced. `replayCase(code, case)` runs the script on those Units with a vendor that answers from the record, then checks the same calls, in the same order, with the same requests, and the same result. A ported script is done only when every one of its cases matches. Cases from a real system hold real personal data: a hosted GTM Factory keeps them in its database, never in this repository.
+
+**An answer that takes minutes.** A run lasts a moment, but some vendors answer later: the client's Claude answers in seconds to minutes, or not while the Mac sleeps. Such a vendor answers "later"; the run stops, like a run missing a milestone, and is tried again at a later tick under the same picks, so the same Request is asked again and finds its answer.
 
 **One run, one script.** When a run does not produce its outcome, no other script is tried on that subject. A script may embed a fallback of its own, and it is then simply a different script.
 
@@ -122,20 +127,20 @@ It passes through Lead visited, Lead interested and Meeting booked. Per mileston
 
 | Milestone | Attempts per Meeting booked | Cost from Start |
 |---|---|---|
-| Lead visited | **115.7** | **$0.40** |
-| Lead interested | **70.1** | **$9.10** |
-| Meeting booked | **3.1** | **$28.66** |
+| Lead visited | **96.5** | **$0.39** |
+| Lead interested | **60.8** | **$8.51** |
+| Meeting booked | **2.8** | **$24.16** |
 
-One meeting costs **$28.66** from Start, so the expected return is $600 / $28.66 = **20.9** dollars per dollar. The signups cost nothing to us: the client's team performs them, and their cost of this outcome is $0.
+One meeting costs **$24.16** from Start, so the expected return is $600 / $24.16 = **24.8** dollars per dollar. The signups cost nothing to us: the client's team performs them, and their cost of this outcome is $0.
 
 ### Worked example: a push
 
 Northwind's follow-up campaign starts from Message sent and has the Target Lead interested; its brief reads: "Follow up once on every cold email that got no answer, four days later." It is reactive. The outbound campaign writes and sends; this one receives every Message sent. The next Engine its Plan names is Follow-up queued. Follow Lea, the first lead it won.
 
-- Day **7**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
-- Day **11**: the follow-up is queued.
-- Day **12**: the mailbox reads Lea's reply and the reply judge marks her interested.
-- The follow-up campaign spent **$0.16** on Lea.
+- Day **2**: Lea's Message sent lands. The campaign pushes it to the Follow-up queued Engine. The new angle script reads its tactic "Days since last message" and waits.
+- Day **6**: the follow-up is queued.
+- Day **8**: the mailbox reads Lea's reply and the reply judge marks her interested.
+- The follow-up campaign spent **$0.10** on Lea.
 
 The judge kept the strategy "Only people who have not answered nor asked to stop" for the Follow-up queued Engine: someone who already replied to the first email gets no follow-up.
 

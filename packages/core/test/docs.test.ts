@@ -42,7 +42,7 @@ describe("scripts are code", () => {
     const lookup = readFileSync(`${SCRIPTS_DIR}email_found/ef_lookup/v1.ts`, "utf8");
     const body = lookup.slice(lookup.indexOf("export default function"));
     expect(doc).toContain(body.trim());
-    expect(readFileSync(`${SCRIPTS_DIR}message_written/wr_short/v1.ts`, "utf8")).toContain('if (context.ageDays > 90) context = ctx.get("brand_context")');
+    expect(readFileSync(`${SCRIPTS_DIR}message_written/wr_short/v2.ts`, "utf8")).toContain('if (context.ageDays > 90) context = ctx.get("brand_context")');
     expect(doc).toContain('`if (context.ageDays > 90) context = ctx.get("brand_context")`');
   });
 });

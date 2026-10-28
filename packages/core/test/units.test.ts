@@ -38,14 +38,14 @@ describe("the catalogue", () => {
 
   it("upgrades a dynasty (same dynasty, next version runs) and forks one (new dynasty, its parent named, its code copied)", () => {
     const c = new Catalogue(worldData().catalogue);
-    const v2 = c.upgrade("glm", { id: "glm-v2", name: "GLM 2" });
-    expect(v2.version).toBe(2);
-    expect(c.headOf("glm")?.id).toBe("glm-v2");
-    expect(c.scriptsOf("llm_completion").map((s) => s.dynasty)).toEqual(["glm", "gemini_flash", "gemini_pro"]);
+    const v3 = c.upgrade("glm", { id: "glm-v3", name: "GLM 3" });
+    expect(v3.version).toBe(3);
+    expect(c.headOf("glm")?.id).toBe("glm-v3");
+    expect(c.scriptsOf("llm_completion").map((s) => s.dynasty)).toEqual(["glm", "gemini_flash", "gemini_pro", "clients_claude", "clients_claude_first"]);
     const fork = c.fork("gemini_pro", { id: "pro-short", dynasty: "pro-short", name: "Gemini Pro, short prompts", kind: "ai", tactics: { tier: "pro" }, costCents: 3 });
     expect(fork.parentDynasty).toBe("gemini_pro");
-    expect(fork.code).toBe(c.script("gemini_pro")!.code);
-    expect(c.scriptsOf("llm_completion")).toHaveLength(4);
+    expect(fork.code).toBe(c.headOf("gemini_pro")!.code);
+    expect(c.scriptsOf("llm_completion")).toHaveLength(6);
   });
 });
 
@@ -113,6 +113,8 @@ describe("Engine storage", () => {
       brand: "b",
       day,
       tactics,
+      request: null,
+      ask: () => undefined,
       storage: house.forEngine(engine),
       get: (o) => view(o, o === "lead_identified" ? "b:p9" : "b"),
       vendor: { call: (name, args) => answer(name, args ?? {}) },

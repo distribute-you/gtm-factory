@@ -26,6 +26,7 @@ import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
 import { IS_API } from "@/lib/data-source";
 import { timeAgo } from "./common";
+import { ClaudeBridge, ClaudeMark } from "./claude";
 
 /** The one frame: Keel's canvas and sidebar, every page in one inset panel; a plain line above it when nothing runs. */
 export function ApiShell({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
             <main className="k-panel k-scroll relative mb-2 ml-2 mr-2 min-w-0 flex-1 overflow-y-auto lg:ml-0">{children}</main>
           </div>
           <div id="portal" />
+          <ClaudeBridge />
         </div>
       </NavContext.Provider>
     </OverviewProvider>
@@ -114,6 +116,7 @@ function Sidebar() {
           <PlusIcon size={14} weight="bold" />
           New campaign
         </Link>
+        <ClaudeMark />
       </div>
       <nav className="k-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-3">
         <div className="space-y-px">

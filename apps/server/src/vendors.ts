@@ -2,7 +2,8 @@
  * Vendor adapters: the only way a script's `ctx.vendor.call(name, args)` reaches a vendor. A
  * script runs only when every vendor its code calls has a real adapter registered here; until
  * then the scheduler computes Plans and runs nothing (owner 2026-10-28: nothing fake on factory).
- * No adapter is registered in production yet. Tests register stand-ins to exercise the runner.
+ * In production: the client's own Claude (vendors/claude-local.ts). Tests register stand-ins for
+ * the others to exercise the runner.
  */
 
 import type { Script } from "@gtm-factory/core";
@@ -28,6 +29,12 @@ export interface VendorCall {
 export interface VendorAnswer {
   ok: boolean;
   data: Record<string, unknown>;
+  /**
+   * The vendor will answer later (minutes): the run stops, like a run missing a milestone, and
+   * is tried again at a later tick, when the answer is waiting (pending.ts). The script never
+   * sees it.
+   */
+  pending?: true;
 }
 
 export type VendorAdapter = (call: VendorCall) => VendorAnswer;

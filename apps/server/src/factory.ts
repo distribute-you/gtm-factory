@@ -216,6 +216,9 @@ export async function loadCatalogue(): Promise<Catalogue> {
       if (!list.some((x) => x.id === item.id)) {
         list.push(JSON.parse(JSON.stringify(item)));
         changed = true;
+        // A new version of a dynasty is an upgrade: it retires the versions before it that still run.
+        const s = item as Script;
+        if (kind === "scripts" && s.status === "active") for (const x of list as Script[]) if (x.dynasty === s.dynasty && x.version < s.version && x.status === "active") x.status = "retired";
       }
     }
   }

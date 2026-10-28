@@ -12,9 +12,11 @@ import { seedCode } from "./code";
 import { seedAccounts, seedDemo } from "./demo";
 import { handle } from "./api";
 import { startScheduler } from "./scheduler";
+import { registerProductionVendors } from "./vendors/claude-local";
 
 async function main(): Promise<void> {
   await migrate(SEED_CATALOGUE.outcomes.map((o) => o.id));
+  registerProductionVendors();
   await loadCatalogue();
   const code = await seedCode();
   const retired = await retirePreV7Scripts();

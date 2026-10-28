@@ -19,6 +19,8 @@ import { companiesOut, objectFigures, proposalsOut, seriesOut } from "./views";
 import { WAITING, anyAdapter } from "./vendors";
 import { isTicking, tickNow, TICK_SECONDS } from "./scheduler";
 import { storageReport } from "./storage";
+import { answerRequest, markSeen, pendingRequests, presenceOf } from "./pending";
+import { CLAUDE_LOCAL } from "./vendors/claude-local";
 
 class HttpError extends Error {
   constructor(readonly status: number, message: string) {
@@ -477,6 +479,29 @@ route("POST", "/api/accounts/connect", async () => {
 });
 
 /** A script version's code, as stored (immutable). */
+// The client's own Claude (the GTM Factory Mac app). Its loop polls the waiting requests (each
+// poll says the app is online), has the client's Claude write each one, and posts the text back;
+// the next tick lands it as an LLM completion, at $0. This host has one owner login, so the app
+// serves every brand of this host.
+route("GET", "/api/claude/requests", async () => {
+  await markSeen(CLAUDE_LOCAL);
+  const list = await pendingRequests(CLAUDE_LOCAL);
+  return { requests: list.map((r) => ({ id: r.id, brandId: r.brandId, prompt: String(r.request.prompt ?? ""), askedAt: r.askedAt })) };
+});
+
+route("POST", "/api/claude/requests/:id/answer", async (req, [id]) => {
+  const b = await body<{ text?: unknown; model?: unknown }>(req);
+  const answer = text(b.text, "Text", 100_000);
+  const model = typeof b.model === "string" && b.model.trim() ? b.model.trim().slice(0, 100) : "claude";
+  await markSeen(CLAUDE_LOCAL);
+  const r = await answerRequest(CLAUDE_LOCAL, id!, { text: answer, model });
+  if (r === "missing") throw new HttpError(404, "No such request.");
+  if (r === "closed") throw new HttpError(409, "This request no longer waits for an answer.");
+  return { id, status: "answered" };
+});
+
+route("GET", "/api/claude/status", async () => presenceOf(CLAUDE_LOCAL));
+
 route("GET", "/api/scripts/:id/code", async (_req, [id]) => {
   const s = (await loadCatalogue()).script(id!);
   if (!s) throw new HttpError(404, "No such script.");
