@@ -1,7 +1,8 @@
 /**
  * GTM Factory in production. One process: the API (port 8080) and the scheduler. Boot:
  * migrations, the catalogue merged with its seed, the code seeded into the database, scripts of
- * the pre-v7 app code retired, the demo brand, templates; listen; then the first tick ~60 s later.
+ * the pre-v7 app code retired, templates (and the fictional demo brand only with SEED_DEMO=on: a
+ * hosted GTM Factory shows real brands only); listen; then the first tick ~60 s later.
  */
 
 import { createServer } from "node:http";
@@ -21,10 +22,11 @@ async function main(): Promise<void> {
   await loadCatalogue();
   const code = await seedCode();
   const retired = await retirePreV7Scripts();
-  const demo = await seedDemo();
+  const withDemo = process.env.SEED_DEMO === "on";
+  const demo = withDemo ? await seedDemo() : false;
   await seedTemplates();
-  const accounts = await seedAccounts();
-  console.log(`[boot] code: ${code} new versions; ${retired} pre-v7 scripts retired; demo brand ${demo ? "seeded" : "present"}; ${accounts} demo campaigns added`);
+  const accounts = withDemo ? await seedAccounts() : 0;
+  console.log(`[boot] code: ${code} new versions; ${retired} pre-v7 scripts retired; demo brand ${withDemo ? (demo ? "seeded" : "present") : "off"}; ${accounts} demo campaigns added`);
   const port = Number(process.env.PORT ?? 8080);
   createServer((req, res) => void handle(req, res)).listen(port, () => console.log(`[boot] listening on ${port}`));
   if (process.env.SCHEDULER !== "off") startScheduler();
