@@ -18,8 +18,9 @@
  *   GET  /campaigns/:id                 -> ApiCampaignDetail
  *   POST /campaigns/:id/launch          -> ApiCampaign
  *   POST /campaigns/:id/pause           -> ApiCampaign
- *   PATCH /campaigns/:id  { dailyBudgetCents } | { verdict: { outcome, strategyId } } -> ApiCampaign
- *                                       (strategyId "none" routes around that Engine)
+ *   PATCH /campaigns/:id  ApiCampaignPatch -> ApiCampaign (a new strategy rewrites the name and description;
+ *                                       a verdict { outcome, strategyId }, "none" routes around that Engine)
+ *   POST /outcomes        ApiNewOutcome -> CatalogueData (a new event no script makes yet)
  *   GET  /leads?campaignId=&brandId=&state= -> ApiLead[]
  *   GET  /leads/:id                     -> ApiLeadDetail
  *   POST /leads/:id/outcomes { outcome } -> ApiLeadDetail (an outcome reported by another party)
@@ -199,16 +200,38 @@ export interface ApiMilestoneFlow {
 export interface ApiNewCampaign {
   brandId: string;
   offerId: string;
-  /** "start" (the market) or the outcome whose Units it pushes. */
+  /** "start" (the market: proactive) or the event (an outcome) whose Units it pushes (reactive). */
   start: OutcomeId;
   /** The outcome it orders. */
   target: OutcomeId;
-  /** At most this many new subjects per period. */
-  volume?: { units: number; periodDays: number } | null;
-  /** Hard daily cap: no run starts once today's spend would pass it. */
+  /** Required: the most dollars it spends per budget period. */
   dailyBudgetCents: number;
-  /** Its strategy, in the client's words ("cold email and LinkedIn, at most 30 a day in email, a 30-day test"). */
+  /** Days of one budget period (1 = a day, 7 = a week, 30 = a month); 1 when absent. */
+  budgetPeriodDays?: number;
+  /** Optional: at most this many new subjects per period; whichever limit is hit first stops it for the period. */
+  volume?: { units: number; periodDays: number } | null;
+  /** Its strategy, in the client's words, long free text. The name and description are written from it. */
   brief?: string;
+  /** Typed by hand; else written from the strategy. */
+  name?: string;
+  description?: string;
+}
+
+/** A change to a campaign: a new strategy (its name and description are rewritten from it), a hand edit, its budget, or a verdict. */
+export interface ApiCampaignPatch {
+  brief?: string;
+  name?: string;
+  description?: string;
+  dailyBudgetCents?: number;
+  budgetPeriodDays?: number;
+  volume?: { units: number; periodDays: number } | null;
+  verdict?: { outcome: OutcomeId; strategyId: string };
+}
+
+/** A new outcome, for an event no script makes yet: a reactive campaign on it waits for one. */
+export interface ApiNewOutcome {
+  label: string;
+  description?: string;
 }
 
 export type ApiCampaignStatus = "paused" | "live";
@@ -222,6 +245,10 @@ export interface ApiCampaign {
   /** The offer it sells. */
   offerId: string;
   name: string;
+  /** What it does, in one or two sentences, written from its strategy (editable). */
+  description: string;
+  /** Reactive on an event no script makes yet: it waits for one. */
+  noScript?: boolean;
   /** The milestones its Plan passes through most this week, start excluded, Target last (empty before its first tick). */
   line: OutcomeId[];
   /** START (the market: the campaign pulls), or the outcome whose Units it pushes. */
@@ -229,7 +256,10 @@ export interface ApiCampaign {
   /** The outcome it orders. */
   target: OutcomeId;
   status: ApiCampaignStatus;
+  /** The most dollars it spends per budget period. */
   dailyBudgetCents: number;
+  /** Days of one budget period (1 = a day). */
+  budgetPeriodDays: number;
   volume: { units: number; periodDays: number } | null;
   spentTodayCents: number;
   spentTotalCents: number;

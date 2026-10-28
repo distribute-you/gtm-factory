@@ -294,7 +294,12 @@ export interface CampaignRow {
   line: string[];
   plays: string[];
   status: "paused" | "live";
+  /** The most dollars it spends per budget period, cents. */
   daily_budget_cents: number;
+  /** Days of one budget period (1 = a day). */
+  budget_period_days?: number;
+  /** What it does, written from its strategy (editable). */
+  description?: string;
   /** The outcome it orders. */
   target: string;
   /** Its strategy, in the client's words. */
@@ -720,6 +725,27 @@ export function milestoneLine(catalogue: Catalogue, plan: PlanNode, start: Outco
 export async function spentTodayMicro(campaignId: string): Promise<number> {
   const r = await one<{ m: number }>(`SELECT coalesce(sum(spend_micro), 0)::bigint AS m FROM runs WHERE campaign_id = $1 AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, [campaignId]);
   return r?.m ?? 0;
+}
+
+/** Days since the epoch (UTC) at which a campaign's current budget period began. */
+function periodStartDay(periodDays: number): number {
+  const today = Math.floor(Date.now() / 86_400_000);
+  return today - (today % Math.max(1, periodDays));
+}
+
+/** Our spend of a campaign since its current budget period began (a day, a week, a month). */
+export async function spentInPeriodMicro(c: Pick<CampaignRow, "id" | "budget_period_days">): Promise<number> {
+  const from = periodStartDay(c.budget_period_days ?? 1) * 86_400;
+  const r = await one<{ m: number }>(`SELECT coalesce(sum(spend_micro), 0)::bigint AS m FROM runs WHERE campaign_id = $1 AND created_at >= to_timestamp($2)`, [c.id, from]);
+  return r?.m ?? 0;
+}
+
+/** New subjects a campaign found since its current volume period began. */
+export async function foundInVolumePeriod(c: Pick<CampaignRow, "id" | "volume">): Promise<number> {
+  if (!c.volume) return 0;
+  const from = periodStartDay(c.volume.periodDays) * 86_400;
+  const r = await one<{ n: number }>(`SELECT count(*)::int AS n FROM leads WHERE campaign_id = $1 AND created_at >= to_timestamp($2)`, [c.id, from]);
+  return r?.n ?? 0;
 }
 
 /** Expected spend of one run of a script: its measured mean over its last 20 finished runs, else its prior. */

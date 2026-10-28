@@ -9,7 +9,7 @@ import { BarSpark, CardTable, EmptyNote, Figure, Page, PageHeader, SectionTitle,
 import { useApi } from "@/lib/api/client";
 import { useOverview } from "@/lib/api/overview";
 import { engineTitle, outcomeName, outcomePluralName, scriptTitle } from "@/lib/api/labels";
-import { formatCents, formatCount, formatRatePct, plural } from "@/lib/format";
+import { formatCents, formatCount, formatRatePct, formatVolume, plural } from "@/lib/format";
 import { BudgetButton, CampaignStatusButton, CapBar, PicksTable, CountsAlong, PointsList, Read, RunsTable, formatTime, otherPerformer, timeAgo } from "./common";
 
 export function ApiCampaignsPage() {
@@ -29,7 +29,7 @@ export function ApiCampaignsPage() {
             const live = campaigns.filter((c) => c.status === "live").length;
             return (
             <>
-              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub={`${formatCount(live)} live. Each campaign orders a Target for one brand under a daily cap; its Plan is recomputed at every tick.`} />
+              <PageHeader title={plural(campaigns.length, "campaign", "campaigns")} sub={`${formatCount(live)} live. Each campaign orders a Target for one brand under a dollar budget; its Plan is recomputed at every tick.`} />
               {campaigns.length === 0 ? (
                 <div className="k-card">
                   <EmptyNote>
@@ -41,8 +41,10 @@ export function ApiCampaignsPage() {
                   <thead>
                     <tr className="k-line-subtle border-b">
                       <th className={`${TH} w-full`}>Campaign</th>
+                      <th className={TH}>Type</th>
+                      <th className={TH}>Target</th>
                       <th className={TH}>Status</th>
-                      <th className={TH}>Daily cap</th>
+                      <th className={TH}>Budget</th>
                       <th className={TH}>Today</th>
                       <th className={`${TH} text-right`}>Spent</th>
                       <th className={`${TH} text-right`}>Created</th>
@@ -56,17 +58,24 @@ export function ApiCampaignsPage() {
                             <Mark kind="outcome" id={c.target} size={28} />
                             <span className="min-w-0">
                               <span className="block truncate font-medium">{c.name}</span>
-                              <span className="k-fg3 block truncate text-[12px]">
-                                {brandName(c.brandId)} · Goal: {outcomeName(o?.catalogue, c.target)}
-                              </span>
+                              <span className="k-fg3 block truncate text-[12px]">{brandName(c.brandId)}</span>
+                              {c.description && <span className="k-fg2 mt-0.5 block text-[12px] leading-5">{c.description}</span>}
                             </span>
                           </Link>
+                        </td>
+                        <td className={TD}>
+                          <span className="k-fg2 whitespace-nowrap text-[12px]">{c.start === START ? "Proactive" : `Reactive: on ${outcomeName(o?.catalogue, c.start)}`}</span>
+                          {c.noScript && <span className="k-fg3 block whitespace-nowrap text-[12px]">No script makes this yet</span>}
+                        </td>
+                        <td className={TD}>
+                          <span className="k-fg2 whitespace-nowrap text-[12px]">{outcomeName(o?.catalogue, c.target)}</span>
                         </td>
                         <td className={TD}>
                           <CampaignStatusButton campaign={c} />
                         </td>
                         <td className={TD}>
                           <BudgetButton campaign={c} />
+                          {c.volume && <span className="k-fg3 block whitespace-nowrap text-[12px] tabular-nums">{formatVolume(c.volume)}</span>}
                         </td>
                         <td className={TD}>
                           <CapBar campaign={c} />

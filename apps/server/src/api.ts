@@ -5,11 +5,12 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { PERFORMED_BY, START, type ApiCapacity, type ApiNewBrand, type ApiNewCampaign, type ApiNewObjectVersion, type ApiObjectDynasty, type ApiScriptStats, type ApiTaskAnswer, type ApiConnectStart } from "@gtm-factory/core";
+import { PERFORMED_BY, START, type ApiCapacity, type ApiNewBrand, type ApiCampaignPatch, type ApiNewCampaign, type ApiNewObjectVersion, type ApiNewOutcome, type ApiObjectDynasty, type ApiScriptStats, type ApiTaskAnswer, type ApiConnectStart } from "@gtm-factory/core";
 import { one, q } from "./db";
 import { OUTCOMES, FACTORIES, PERFORMERS, performerOfRow } from "./catalogue-seed";
 import { loadCatalogue, newId, planOf, produce, milestoneLine, saveCatalogue, type Brand, type CampaignRow, type Unit } from "./factory";
 import { judgeBrief } from "./brief";
+import { writeCampaignText } from "./campaign-text";
 import { brandOut, brandsOut, campaignFlows, campaignMilestones, campaignOut, campaignsOut, cents, evidenceForReads, ledgerOut, leadsOut, picksOut, placeLabel, planOut, plansFor, researchOut, runsOut, totalCounts, unitOut } from "./read";
 import { answerTask, tasksOut } from "./tasks";
 import { forkFromCode, somethingCanRun, sourceOf, upgradeFromCode } from "./code";
@@ -159,11 +160,11 @@ route("POST", "/api/campaigns", async (req) => {
   const target = text(b.target, "Target", 200);
   if (!catalogue.outcome(target)) throw new HttpError(400, "No such Target.");
   if (start !== START && !catalogue.outcome(start)) throw new HttpError(400, "No such start outcome.");
-  const budget = Math.round(Number(b.dailyBudgetCents ?? 1000));
-  if (!(budget >= 1 && budget <= 100_000)) throw new HttpError(400, "The daily cap must be between 1 cent and $1,000.");
-  const volume = b.volume ? { units: Math.round(Number(b.volume.units)), periodDays: Math.round(Number(b.volume.periodDays)) } : null;
-  if (volume && !(volume.units >= 1 && volume.periodDays >= 1)) throw new HttpError(400, "A volume is at least 1 new subject over at least 1 day.");
-  const brief = typeof b.brief === "string" ? b.brief.trim().slice(0, 4000) : "";
+  // A reactive campaign starts on an event something makes or reads, else it would never fire.
+  if (start !== START && !catalogue.canStartOn(start))
+    throw new HttpError(400, `Nothing makes or reads "${catalogue.outcome(start)?.label ?? start}" yet, so this campaign would never start. Pick another event, or create it as a new outcome first.`);
+  const { budget, periodDays, volume } = budgetOf(b);
+  const brief = typeof b.brief === "string" ? b.brief.trim().slice(0, 8000) : "";
   const id = newId("camp");
   let read;
   try {
@@ -176,15 +177,53 @@ route("POST", "/api/campaigns", async (req) => {
   const draft = { id, brand_id: brand.id, factory: FACTORIES.ours, target, start_outcome: start, verdicts: read.verdicts } as CampaignRow;
   const plan = planOf(catalogue, await evidenceForReads(catalogue), draft, brand);
   const line = milestoneLine(catalogue, plan, start);
-  if (line.length === 0 || line[line.length - 1] !== target) throw new HttpError(400, "No Plan reaches that Target from that start for this brand.");
+  // A reactive campaign on a created event no script makes yet waits for one: it has no Plan until then.
+  const waits = start !== START && !catalogue.isMade(start) && catalogue.outcome(start)?.event === true;
+  if (!waits && (line.length === 0 || line[line.length - 1] !== target)) throw new HttpError(400, "No Plan reaches that Target from that start for this brand.");
   const n = await one<{ n: number }>(`SELECT count(*)::int AS n FROM campaigns WHERE brand_id = $1`, [brand.id]);
+  // Name and description: typed by hand, else written from the strategy.
+  const typedName = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 120) : null;
+  const typedDescription = typeof b.description === "string" ? b.description.trim().slice(0, 600) : null;
+  let written = { name: typedName ?? `${brand.name} ${(n?.n ?? 0) + 1}`, description: typedDescription ?? "" };
+  if (brief && (!typedName || typedDescription === null)) {
+    try {
+      const t = await writeCampaignText(catalogue, { strategy: brief, target, start, brandName: brand.name });
+      written = { name: typedName ?? t.name, description: typedDescription ?? t.description };
+    } catch (e) {
+      throw new HttpError(502, `The name and description could not be written from the strategy: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   await q(
-    `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, volume, target, brief, verdicts, caps, ends_on, plan, test_days)
-     VALUES ($1,$2,$16,$3,$4,$5,$6,'[]','paused',$7,'{}',$8,$9,$10,$11,$12,$13,$14,$15,$17)`,
-    [id, brand.id, `${brand.name} ${(n?.n ?? 0) + 1}`, "", "", JSON.stringify([start, ...line]), budget, start, volume ? JSON.stringify(volume) : null, target, brief, JSON.stringify(read.verdicts), JSON.stringify(read.caps), null, JSON.stringify(plan), offerId, read.days],
+    `INSERT INTO campaigns (id, brand_id, offer_id, name, funnel_id, funnel_name, line, plays, status, daily_budget_cents, strategies, start_outcome, volume, target, brief, verdicts, caps, ends_on, plan, test_days, description, budget_period_days)
+     VALUES ($1,$2,$16,$3,$4,$5,$6,'[]','paused',$7,'{}',$8,$9,$10,$11,$12,$13,$14,$15,$17,$18,$19)`,
+    [id, brand.id, written.name, "", "", JSON.stringify([start, ...line]), budget, start, volume ? JSON.stringify(volume) : null, target, brief, JSON.stringify(read.verdicts), JSON.stringify(read.caps), null, JSON.stringify(plan), offerId, read.days, written.description, periodDays],
   );
-  await q(`INSERT INTO campaign_events (campaign_id, kind, detail) VALUES ($1, 'created', $2)`, [id, JSON.stringify({ dailyBudgetCents: budget, brief, verdicts: read.verdicts, caps: read.caps, days: read.days, confidence: read.confidence })]);
+  await q(`INSERT INTO campaign_events (campaign_id, kind, detail) VALUES ($1, 'created', $2)`, [id, JSON.stringify({ budgetCents: budget, budgetPeriodDays: periodDays, brief, verdicts: read.verdicts, caps: read.caps, days: read.days, confidence: read.confidence })]);
   return campaignOut(await campaignOr404(id));
+});
+
+/** The budget of a new or changed campaign: dollars per period, always; an optional volume. */
+function budgetOf(b: { dailyBudgetCents?: number; budgetPeriodDays?: number; volume?: { units: number; periodDays: number } | null }): { budget: number; periodDays: number; volume: { units: number; periodDays: number } | null } {
+  const budget = Math.round(Number(b.dailyBudgetCents));
+  if (!(budget >= 1 && budget <= 3_000_000)) throw new HttpError(400, "A dollar budget is required: between 1 cent and $30,000 per period.");
+  const periodDays = Math.round(Number(b.budgetPeriodDays ?? 1));
+  if (!(periodDays >= 1 && periodDays <= 31)) throw new HttpError(400, "A budget period is 1 to 31 days.");
+  const volume = b.volume ? { units: Math.round(Number(b.volume.units)), periodDays: Math.round(Number(b.volume.periodDays)) } : null;
+  if (volume && !(volume.units >= 1 && volume.periodDays >= 1 && volume.periodDays <= 31)) throw new HttpError(400, "A volume is at least 1 new person over 1 to 31 days.");
+  return { budget, periodDays, volume };
+}
+
+/** A new outcome for an event no script makes yet: a reactive campaign may start on it and waits for a script. */
+route("POST", "/api/outcomes", async (req) => {
+  const b = await body<ApiNewOutcome>(req);
+  const label = text(b.label, "Name", 80);
+  const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60);
+  if (!id) throw new HttpError(400, "That name has no letter or digit.");
+  const catalogue = await loadCatalogue();
+  if (catalogue.outcome(id)) throw new HttpError(409, `"${label}" already exists.`);
+  catalogue.add("outcomes", { id, label, subject: "lead", event: true, ...(typeof b.description === "string" && b.description.trim() ? { description: b.description.trim().slice(0, 300) } : {}) });
+  await saveCatalogue(catalogue);
+  return catalogue.snapshot();
 });
 
 route("GET", "/api/campaigns/:id", async (_req, [id]) => {
@@ -231,11 +270,56 @@ route("POST", "/api/campaigns/:id/pause", async (_req, [id]) => {
 
 route("PATCH", "/api/campaigns/:id", async (req, [id]) => {
   const c = await ownCampaignOr409(id!);
-  const b = await body<{ dailyBudgetCents?: number }>(req);
-  const budget = Math.round(Number(b.dailyBudgetCents));
-  if (!(budget >= 1 && budget <= 100_000)) throw new HttpError(400, "The daily cap must be between 1 cent and $1,000.");
-  await q(`UPDATE campaigns SET daily_budget_cents = $2, cap_reached_on = NULL WHERE id = $1`, [c.id, budget]);
-  await q(`INSERT INTO campaign_events (campaign_id, kind, detail) VALUES ($1, 'cap_changed', $2)`, [c.id, JSON.stringify({ dailyBudgetCents: budget })]);
+  const b = await body<ApiCampaignPatch>(req);
+  const catalogue = await loadCatalogue();
+  // The budget: dollars per period, always; the volume, optional.
+  if (b.dailyBudgetCents !== undefined || b.budgetPeriodDays !== undefined || b.volume !== undefined) {
+    const { budget, periodDays, volume } = budgetOf({
+      dailyBudgetCents: b.dailyBudgetCents ?? Number(c.daily_budget_cents),
+      budgetPeriodDays: b.budgetPeriodDays ?? c.budget_period_days ?? 1,
+      volume: b.volume === undefined ? c.volume : b.volume,
+    });
+    await q(`UPDATE campaigns SET daily_budget_cents = $2, budget_period_days = $3, volume = $4, cap_reached_on = NULL WHERE id = $1`, [c.id, budget, periodDays, volume ? JSON.stringify(volume) : null]);
+    await q(`INSERT INTO campaign_events (campaign_id, kind, detail) VALUES ($1, 'cap_changed', $2)`, [c.id, JSON.stringify({ budgetCents: budget, budgetPeriodDays: periodDays, volume })]);
+  }
+  // A new strategy: read again per Engine, and the name and description rewritten from it.
+  if (typeof b.brief === "string") {
+    const brief = b.brief.trim().slice(0, 8000);
+    const brand = await brandOr404(c.brand_id);
+    let read;
+    try {
+      read = await judgeBrief(catalogue, brief);
+    } catch (e) {
+      throw new HttpError(502, `The strategy could not be read: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (brand.test) read.verdicts[OUTCOMES.leadFound] = "lead_found#provided_list";
+    let t = { name: c.name, description: c.description ?? "" };
+    if (brief) {
+      try {
+        t = await writeCampaignText(catalogue, { strategy: brief, target: c.target, start: c.start_outcome, brandName: brand.name });
+      } catch (e) {
+        throw new HttpError(502, `The name and description could not be written from the strategy: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    await q(`UPDATE campaigns SET brief = $2, verdicts = $3, caps = $4, test_days = $5, name = $6, description = $7 WHERE id = $1`, [c.id, brief, JSON.stringify(read.verdicts), JSON.stringify(read.caps), read.days, t.name, t.description]);
+    await q(`INSERT INTO campaign_events (campaign_id, kind, detail) VALUES ($1, 'strategy_changed', $2)`, [c.id, JSON.stringify({ brief, verdicts: read.verdicts, caps: read.caps, days: read.days, name: t.name })]);
+  }
+  // A hand edit of the name or the description (after a strategy save, it wins).
+  if (typeof b.name === "string" || typeof b.description === "string") {
+    const name = typeof b.name === "string" ? text(b.name, "Name", 120) : null;
+    const description = typeof b.description === "string" ? b.description.trim().slice(0, 600) : null;
+    await q(`UPDATE campaigns SET name = coalesce($2, name), description = coalesce($3, description) WHERE id = $1`, [c.id, name, description]);
+  }
+  // A verdict changed by hand on one Engine ("none" routes around it).
+  if (b.verdict) {
+    const { outcome, strategyId } = b.verdict;
+    if (!catalogue.outcome(outcome)) throw new HttpError(400, "No such Engine.");
+    if (strategyId !== "none" && catalogue.strategy(strategyId)?.outcome !== outcome) throw new HttpError(400, "That strategy is not one of this Engine's.");
+    const verdicts = { ...(c.verdicts ?? {}) };
+    if (strategyId.endsWith("#default")) delete verdicts[outcome];
+    else verdicts[outcome] = strategyId;
+    await q(`UPDATE campaigns SET verdicts = $2 WHERE id = $1`, [c.id, JSON.stringify(verdicts)]);
+  }
   return campaignOut(await campaignOr404(c.id));
 });
 

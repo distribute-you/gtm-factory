@@ -48,6 +48,8 @@ export interface Outcome {
   description?: string;
   icon?: string;
   retired?: boolean;
+  /** Created as an event a reactive campaign starts on, before any script makes it: it waits for one. */
+  event?: boolean;
 }
 
 /** An ordered ladder of milestones (a CRM lifecycle, website visits). */
@@ -293,6 +295,22 @@ export class Catalogue {
   /** The script running for a dynasty today (its active head), if any. */
   headOf(dynasty: string): Script | undefined {
     return this.versionsOf(dynasty).filter((s) => s.status === "active").pop();
+  }
+
+  /**
+   * Can a reactive campaign start on this event? Only an outcome that at least one active script
+   * makes (or another party reports) or reads: an event nothing makes or reads would never fire.
+   */
+  canStartOn(outcome: OutcomeId): boolean {
+    const o = this.outcome(outcome);
+    if (!o || o.retired) return false;
+    if (o.event || this.scriptsOf(outcome).length > 0) return true;
+    return this.data.scripts.some((s) => s.status === "active" && s.materials.includes(outcome));
+  }
+
+  /** Does at least one active script make this outcome? */
+  isMade(outcome: OutcomeId): boolean {
+    return this.scriptsOf(outcome).length > 0;
   }
 
   strategiesOf(outcome: OutcomeId): Strategy[] {
