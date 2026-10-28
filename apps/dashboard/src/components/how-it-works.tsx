@@ -3,7 +3,7 @@
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { Mark, type MarkKind } from "@/components/mark";
 import { Page, PageHeader, TopBar } from "@/components/ui";
-import { REPO_URL } from "@/components/shell";
+import { REPO_URL } from "@/lib/data-source";
 
 const SECTIONS: { kind: MarkKind; title: string; lines: string[] }[] = [
   {

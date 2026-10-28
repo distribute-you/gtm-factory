@@ -68,3 +68,7 @@ A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashb
 
 `GET /accounts?brandId=` lists the brand's connected accounts (`ApiConnectedAccount`): channel, address or number, role, status, and counts (sent today, sent and read this week). `PATCH /accounts/:id` with `{ role }` gives an account another role: the next run follows it. `POST /accounts/connect` with `{ brandId, channel, role }` answers `{ url }`, the backend's own page that connects an account (a mailbox login, a WhatsApp link). The backend holds the accounts, roles and counts; the scripts pick the account.
 
+## One dashboard, two data sources
+
+Every page of the dashboard reads this API and nothing else. The public demo answers the same routes in the browser from the simulator (`apps/dashboard/src/lib/sim-backend.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. Fields only a simulator can know (the hidden truth behind each candidate) are optional and shown only when served.
+

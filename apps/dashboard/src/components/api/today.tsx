@@ -31,7 +31,7 @@ function Today({ o }: { o: ApiOverview }) {
     <>
       <PageHeader
         title={`${live} of ${plural(o.campaigns.length, "campaign", "campaigns")} live`}
-        sub="Every script runs for real here. Each pick and each cent is below."
+        sub="Each pick and each cent is below."
         right={
           o.scheduler.running ? (
             <span className="inline-flex items-center gap-1.5">
@@ -115,7 +115,7 @@ function Today({ o }: { o: ApiOverview }) {
       </section>
 
       <section className="mt-8">
-        <SectionTitle count={o.recentPicks.length}>Why each pick was made</SectionTitle>
+        <SectionTitle count={o.recentPicks.length}>Why each one was picked</SectionTitle>
         <PicksTable picks={o.recentPicks} empty="No pick yet. Launch a campaign and the first tick makes them." />
       </section>
 

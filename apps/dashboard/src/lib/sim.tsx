@@ -11,6 +11,8 @@ import type { SimulationSession, WorldSpec } from "@gtm-factory/core";
 import { buildModel, type Model } from "./model";
 import { WORLD, applyAction, replay, type LoggedAction, type SimAction } from "./world";
 import { DEFAULT_PINS, readPins, writePins, type Pin } from "./pins";
+import { setSimBackend } from "./api/client";
+import { simRoute } from "./sim-backend";
 
 const STORAGE_KEY = "gtm-factory:v6";
 export const SPEEDS = [1, 2, 4, 8] as const;
@@ -145,6 +147,11 @@ export function SimProvider({ children }: { children: React.ReactNode }) {
     setVersion((v) => v + 1);
     return null;
   }, []);
+
+  // The simulator answers the factory API: every page reads it, the demo and a running GTM Factory alike.
+  useEffect(() => {
+    if (model) setSimBackend((method, path, body) => simRoute({ model, dispatch }, method, path, body));
+  }, [model, dispatch]);
 
   const value: SimContextValue = {
     model,

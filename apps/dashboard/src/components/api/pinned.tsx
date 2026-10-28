@@ -267,6 +267,14 @@ export function ScriptCard({ s, catalogue }: { s: ApiScriptStats; catalogue?: im
             {formatCount(s.runs)} runs · {formatCents(s.spentCents)} spent · {formatCents(s.costCentsPrior)} expected per run · performed by {performerTitle(s.performedBy)}
           </p>
           <p className="k-fg3 mt-0.5 font-mono text-[12px]">scripts/src/{s.code}.ts</p>
+          {s.source && (
+            <details className="mt-1.5">
+              <summary className="k-fg2 cursor-pointer text-[12px]">Read its code</summary>
+              <pre className="k-inset k-scroll mt-1.5 max-h-[360px] overflow-auto rounded-[8px] p-3 font-mono text-[12px] leading-[18px]" data-testid="script-code">
+                {s.source}
+              </pre>
+            </details>
+          )}
           <p className="k-fg2 mt-1 text-[12px]">
             {s.materials.length > 0 ? `Calls ${s.materials.map((m) => outcomeName(catalogue, m)).join(", ")}` : "Calls nothing"}
             <span className="k-fg3"> · {s.materialsLabel === "measured" ? "measured on its runs" : "read from its code"}</span>

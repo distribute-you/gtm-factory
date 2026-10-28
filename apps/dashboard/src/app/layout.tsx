@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Shell } from "@/components/shell";
+import { SimulatorBar } from "@/components/sim-bar";
 import { SimProvider } from "@/lib/sim";
 import { ApiShell } from "@/components/api/shell";
 import { IS_API } from "@/lib/data-source";
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ApiShell>{children}</ApiShell>
         ) : (
           <SimProvider>
-            <Shell>{children}</Shell>
+            <ApiShell top={<SimulatorBar />}>{children}</ApiShell>
           </SimProvider>
         )}
       </body>

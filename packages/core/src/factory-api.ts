@@ -444,6 +444,8 @@ export interface ApiScriptStats {
   tactics: Record<string, string | number | boolean>;
   /** Its code: the file of scripts/ it runs. */
   code: string;
+  /** The text of its code, when the backend serves it (a hosted GTM Factory keeps it in its database). */
+  source?: string;
   /** The outcomes it calls: read from its code by a judge, then what the ledger measured each run consumed. */
   materials: OutcomeId[];
   materialsLabel: "judged" | "measured";
