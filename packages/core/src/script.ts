@@ -30,6 +30,25 @@ export interface VendorAnswer {
   data: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * A connected account of the brand (a mailbox, a WhatsApp number, a LinkedIn
+ * profile), as a sending or reading script sees it: its role and what it did.
+ * The host holds the accounts, their roles and their counts; the script picks.
+ */
+export interface AccountView {
+  id: string;
+  channel: string;
+  /** Its address or number. */
+  address: string;
+  /** The role the brand gave it (Personal, Pro, AI agent...). */
+  role: string;
+  status: "connected" | "to_reconnect";
+  /** Messages it sent today, over the last 7 days, and messages it read over the last 7 days. */
+  sentToday: number;
+  sentWeek: number;
+  readWeek: number;
+}
+
 /** The metered vendor client: every call is priced on the run that makes it. */
 export interface Vendor {
   call(name: string, args?: Readonly<Record<string, unknown>>): VendorAnswer;
@@ -63,6 +82,11 @@ export interface ScriptContext {
    */
   get(outcome: OutcomeId): UnitView;
   readonly vendor: Vendor;
+  /**
+   * The brand's connected accounts on a channel that carry a role, every one of
+   * them, with their counts. The script picks which one to use: the host never does.
+   */
+  accounts(channel: string, role: string): AccountView[];
   /** Come back in this many days (a follow-up waiting its days since the last message). */
   wait(days: number): never;
 }

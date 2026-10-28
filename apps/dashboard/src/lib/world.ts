@@ -5,7 +5,7 @@
  * byte for byte. No scenario number lives here: tuning is the world's data.
  */
 
-import { SimulationSession, worldFromData, type Capacity, type CatalogueData, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/core";
+import { SimulationSession, worldFromData, type Capacity, type CatalogueData, type ConnectedAccount, type Script, type WorldClient, type WorldData, type WorldSpec } from "@gtm-factory/core";
 import { LIBRARY } from "@gtm-factory/scripts";
 import worldJson from "../../../../seed/fictional-world.json";
 
@@ -20,6 +20,8 @@ export type SimAction =
   | { type: "budget"; campaignId: string; dailyBudgetCents: number }
   | { type: "verdict"; campaignId: string; outcome: string; strategyId: string }
   | { type: "capacity"; scriptId: string; capacity: Capacity }
+  | { type: "accountRole"; brandId: string; accountId: string; role: string }
+  | { type: "connectAccount"; brandId: string; account: ConnectedAccount }
   | { type: "answerTask"; taskId: string; values: Record<string, string | number | boolean> }
   | { type: "retire"; kind: CatalogueKind; id: string }
   | { type: "restore"; kind: CatalogueKind; id: string }
@@ -52,6 +54,12 @@ export function applyAction(world: WorldSpec, session: SimulationSession, action
       return;
     case "verdict":
       session.setVerdict(action.campaignId, action.outcome, action.strategyId);
+      return;
+    case "accountRole":
+      session.setAccountRole(action.brandId, action.accountId, action.role);
+      return;
+    case "connectAccount":
+      session.connectAccount(action.brandId, action.account);
       return;
     case "capacity":
       c.setCapacity(action.scriptId, action.capacity);

@@ -25,7 +25,7 @@ describe("the catalogue", () => {
     for (const e of c.engines()) expect(c.strategy(`${e}#default`), e).toBeDefined();
     expect(c.engines()).toContain("reply_received");
     // Cold email and LinkedIn are two scripts of one Engine: a channel is a tactic of a script.
-    expect(new Set(c.scriptsOf("reply_received").map((s) => s.tactics.channel))).toEqual(new Set(["Cold email", "LinkedIn"]));
+    expect(new Set(c.scriptsOf("reply_received").map((s) => s.tactics.channel))).toEqual(new Set(["Cold email", "LinkedIn", "WhatsApp"]));
   });
 
   it("tells which scripts create their subject: those that call no Provider of a subject outcome", () => {
@@ -119,6 +119,7 @@ describe("Engine storage", () => {
       wait: () => {
         throw new Error("no wait here");
       },
+      accounts: () => [],
     });
     // Sourcing: the market draws person 1, 1, 2...; a person picked within the window is skipped.
     let i = 0;

@@ -210,6 +210,39 @@
         "subject": "lead",
         "icon": "prohibit",
         "description": "An end state: the person asked us to stop."
+      },
+      {
+        "id": "connected_account",
+        "label": "Connected account",
+        "plural": "Connected accounts",
+        "subject": "brand",
+        "contentType": "account",
+        "icon": "address-book",
+        "description": "An account the brand connected (a mailbox, a WhatsApp number, a LinkedIn profile) and the role it gave it: Personal, Pro or AI agent."
+      },
+      {
+        "id": "message_received",
+        "label": "Message received",
+        "plural": "Messages received",
+        "subject": "lead",
+        "icon": "chat-circle-text",
+        "description": "Someone wrote to one of the brand's accounts on their own: read on every account, whatever its role."
+      },
+      {
+        "id": "welcomed",
+        "label": "Welcomed",
+        "plural": "Welcomed",
+        "subject": "lead",
+        "icon": "hand-heart",
+        "description": "A one-time welcome sent from the Pro account: write here any time."
+      },
+      {
+        "id": "answered_by_you",
+        "label": "Answered by you",
+        "plural": "Answered by you",
+        "subject": "lead",
+        "icon": "user-check",
+        "description": "A person wrote to the Pro account and someone of the client's team answered, by hand."
       }
     ],
     "scripts": [
@@ -646,6 +679,27 @@
           "performed_by": "Ours"
         },
         "costCents": 4,
+        "status": "retired"
+      },
+      {
+        "id": "ce_now_v2",
+        "outcome": "message_queued",
+        "dynasty": "ce_now",
+        "version": 2,
+        "name": "Send now",
+        "kind": "rules",
+        "code": "message_queued/ce_now/v2",
+        "materials": [
+          "message_written",
+          "rating"
+        ],
+        "tactics": {
+          "send_window": "now",
+          "channel": "Cold email",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
+        },
+        "costCents": 4,
         "status": "active"
       },
       {
@@ -664,6 +718,27 @@
           "send_window": "morning",
           "channel": "Cold email",
           "performed_by": "Ours"
+        },
+        "costCents": 4,
+        "status": "retired"
+      },
+      {
+        "id": "ce_morning_v2",
+        "outcome": "message_queued",
+        "dynasty": "ce_morning",
+        "version": 2,
+        "name": "Send at local morning",
+        "kind": "rules",
+        "code": "message_queued/ce_morning/v2",
+        "materials": [
+          "message_written",
+          "rating"
+        ],
+        "tactics": {
+          "send_window": "morning",
+          "channel": "Cold email",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
         },
         "costCents": 4,
         "status": "active"
@@ -700,6 +775,25 @@
           "channel": "Cold email"
         },
         "costCents": 0,
+        "status": "retired"
+      },
+      {
+        "id": "mb_replies_v2",
+        "outcome": "reply_received",
+        "dynasty": "mb_replies",
+        "version": 2,
+        "name": "Mailbox inbox",
+        "kind": "rules",
+        "code": "reply_received/mb_replies/v2",
+        "materials": [
+          "message_queued"
+        ],
+        "tactics": {
+          "performed_by": "Mailbox",
+          "channel": "Cold email",
+          "account_role": "AI agent"
+        },
+        "costCents": 0,
         "status": "active"
       },
       {
@@ -719,6 +813,28 @@
         "tactics": {
           "channel": "LinkedIn",
           "performed_by": "Ours"
+        },
+        "costCents": 40,
+        "status": "retired"
+      },
+      {
+        "id": "li_connect_v2",
+        "outcome": "reply_received",
+        "dynasty": "li_connect",
+        "version": 2,
+        "name": "Connect and message",
+        "kind": "rules",
+        "code": "reply_received/li_connect/v2",
+        "materials": [
+          "lead_identified",
+          "template_written",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "LinkedIn",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
         },
         "costCents": 40,
         "status": "active"
@@ -809,6 +925,28 @@
           "channel": "Cold email"
         },
         "costCents": 2,
+        "status": "retired"
+      },
+      {
+        "id": "fu_bump_v2",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_bump",
+        "version": 2,
+        "name": "Short bump",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_bump/v2",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
+          "channel": "Cold email",
+          "account_role": "AI agent"
+        },
+        "costCents": 2,
         "status": "active"
       },
       {
@@ -828,6 +966,28 @@
           "wait_days": 4,
           "performed_by": "Ours",
           "channel": "Cold email"
+        },
+        "costCents": 3,
+        "status": "retired"
+      },
+      {
+        "id": "fu_angle_v2",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_angle",
+        "version": 2,
+        "name": "New angle",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_angle/v2",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
+          "channel": "Cold email",
+          "account_role": "AI agent"
         },
         "costCents": 3,
         "status": "active"
@@ -1047,6 +1207,148 @@
             "type": "text"
           }
         ]
+      },
+      {
+        "id": "acc_connect",
+        "outcome": "connected_account",
+        "dynasty": "acc_connect",
+        "version": 1,
+        "name": "Connect an account",
+        "kind": "human",
+        "code": "connected_account/acc_connect/v1",
+        "materials": [],
+        "tactics": {
+          "performed_by": "Client's team"
+        },
+        "costCents": 0,
+        "status": "active"
+      },
+      {
+        "id": "wa_message",
+        "outcome": "reply_received",
+        "dynasty": "wa_message",
+        "version": 1,
+        "name": "WhatsApp message",
+        "kind": "rules",
+        "code": "reply_received/wa_message/v1",
+        "materials": [
+          "lead_identified",
+          "template_written",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "Ours",
+          "account_role": "AI agent"
+        },
+        "costCents": 10,
+        "status": "active"
+      },
+      {
+        "id": "wa_inbox_personal",
+        "outcome": "message_received",
+        "dynasty": "wa_inbox_personal",
+        "version": 1,
+        "name": "WhatsApp inbox, Personal",
+        "kind": "rules",
+        "code": "message_received/wa_inbox_personal/v1",
+        "materials": [],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "WhatsApp",
+          "account_role": "Personal"
+        },
+        "costCents": 0,
+        "status": "active",
+        "webhook": true
+      },
+      {
+        "id": "wa_inbox_pro",
+        "outcome": "message_received",
+        "dynasty": "wa_inbox_pro",
+        "version": 1,
+        "name": "WhatsApp inbox, Pro",
+        "kind": "rules",
+        "code": "message_received/wa_inbox_pro/v1",
+        "materials": [],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "WhatsApp",
+          "account_role": "Pro"
+        },
+        "costCents": 0,
+        "status": "active",
+        "webhook": true
+      },
+      {
+        "id": "wa_inbox_agent",
+        "outcome": "message_received",
+        "dynasty": "wa_inbox_agent",
+        "version": 1,
+        "name": "WhatsApp inbox, AI agent",
+        "kind": "rules",
+        "code": "message_received/wa_inbox_agent/v1",
+        "materials": [],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "WhatsApp",
+          "account_role": "AI agent"
+        },
+        "costCents": 0,
+        "status": "active",
+        "webhook": true
+      },
+      {
+        "id": "wa_welcome",
+        "outcome": "welcomed",
+        "dynasty": "wa_welcome",
+        "version": 1,
+        "name": "Welcome from the Pro number",
+        "kind": "rules",
+        "code": "welcomed/wa_welcome/v1",
+        "materials": [
+          "paid_client",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "Ours",
+          "account_role": "Pro"
+        },
+        "costCents": 1,
+        "status": "active"
+      },
+      {
+        "id": "answer_on_pro",
+        "outcome": "answered_by_you",
+        "dynasty": "answer_on_pro",
+        "version": 1,
+        "name": "You answer on the Pro number",
+        "kind": "human",
+        "code": "answered_by_you/answer_on_pro/v1",
+        "materials": [
+          "message_received"
+        ],
+        "tactics": {
+          "channel": "WhatsApp",
+          "performed_by": "Client's team",
+          "account_role": "Pro"
+        },
+        "costCents": 0,
+        "status": "active",
+        "form": [
+          {
+            "key": "answered",
+            "label": "Did you answer?",
+            "type": "yesno"
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "text"
+          }
+        ]
       }
     ],
     "tactics": [
@@ -1060,7 +1362,8 @@
             "Client's team",
             "Mailbox",
             "CRM",
-            "Organic market"
+            "Organic market",
+            "WhatsApp"
           ]
         },
         "describes": [
@@ -1078,7 +1381,8 @@
             "Cold email",
             "LinkedIn",
             "Ads",
-            "Website"
+            "Website",
+            "WhatsApp"
           ]
         },
         "describes": [
@@ -1272,6 +1576,23 @@
         ],
         "source": "data",
         "description": "Days since a Unit landed in the stock."
+      },
+      {
+        "id": "account_role",
+        "name": "Account role",
+        "type": {
+          "kind": "list",
+          "values": [
+            "Personal",
+            "Pro",
+            "AI agent"
+          ]
+        },
+        "describes": [
+          "script"
+        ],
+        "source": "data",
+        "description": "Which of the brand's accounts a script sends or reads through: its Personal, its Pro, or its AI agent. The script picks the account among those with that role."
       }
     ],
     "strategies": [
@@ -1337,6 +1658,42 @@
             "op": "range",
             "tactic": "recontact_days",
             "min": 60
+          }
+        ]
+      },
+      {
+        "id": "message_queued#ai-agent",
+        "name": "Every message from our AI agent",
+        "outcome": "message_queued",
+        "conditions": [
+          {
+            "op": "equals",
+            "tactic": "account_role",
+            "value": "AI agent"
+          }
+        ]
+      },
+      {
+        "id": "reply_received#ai-agent",
+        "name": "Every message from our AI agent",
+        "outcome": "reply_received",
+        "conditions": [
+          {
+            "op": "equals",
+            "tactic": "account_role",
+            "value": "AI agent"
+          }
+        ]
+      },
+      {
+        "id": "welcomed#pro",
+        "name": "From the Pro number only",
+        "outcome": "welcomed",
+        "conditions": [
+          {
+            "op": "equals",
+            "tactic": "account_role",
+            "value": "Pro"
           }
         ]
       }
@@ -1446,7 +1803,10 @@
       "connected": [
         "crm_sync",
         "mb_send",
-        "mb_sync"
+        "mb_sync",
+        "wa_inbox_personal",
+        "wa_inbox_pro",
+        "wa_inbox_agent"
       ],
       "truthMultiplier": 1.0,
       "organicPerDay": 0.5,
@@ -1460,7 +1820,7 @@
           "target": "paid_client",
           "dailyBudgetCents": 4000,
           "status": "running",
-          "brief": "Find paid clients with cold email and LinkedIn. Never write again to someone who asked to stop."
+          "brief": "Find paid clients with cold email, LinkedIn and WhatsApp. Never write again to someone who asked to stop. Every message goes out from our AI agent."
         },
         {
           "id": "campaign-follow-ups",
@@ -1483,6 +1843,79 @@
           "dailyBudgetCents": 3000,
           "status": "running",
           "brief": "Test ads for 30 days, at most 120 visits a day, and book meetings from the signups."
+        },
+        {
+          "brandId": "brand-1",
+          "offerId": "offer-1",
+          "id": "campaign-welcome",
+          "name": "Welcome new clients",
+          "start": "paid_client",
+          "target": "welcomed",
+          "dailyBudgetCents": 500,
+          "status": "running",
+          "brief": "Send every new client one welcome from my WhatsApp Pro: they can write to me there any time."
+        },
+        {
+          "brandId": "brand-1",
+          "offerId": "offer-1",
+          "id": "campaign-pro-answers",
+          "name": "Answers on my Pro number",
+          "start": "message_received",
+          "target": "answered_by_you",
+          "dailyBudgetCents": 100,
+          "status": "running",
+          "brief": "When someone writes to my Pro number, I answer myself."
+        }
+      ],
+      "accounts": [
+        {
+          "id": "mb-alex",
+          "channel": "Email",
+          "address": "alex@northwind-mail.com",
+          "role": "AI agent",
+          "status": "connected"
+        },
+        {
+          "id": "mb-sam",
+          "channel": "Email",
+          "address": "sam@northwind-mail.com",
+          "role": "AI agent",
+          "status": "connected"
+        },
+        {
+          "id": "mb-jo",
+          "channel": "Email",
+          "address": "jo@northwind-mail.com",
+          "role": "AI agent",
+          "status": "connected"
+        },
+        {
+          "id": "li-agent",
+          "channel": "LinkedIn",
+          "address": "linkedin.com/in/northwind-alex",
+          "role": "AI agent",
+          "status": "connected"
+        },
+        {
+          "id": "wa-personal",
+          "channel": "WhatsApp",
+          "address": "+44 7700 900111",
+          "role": "Personal",
+          "status": "connected"
+        },
+        {
+          "id": "wa-pro",
+          "channel": "WhatsApp",
+          "address": "+44 7700 900222",
+          "role": "Pro",
+          "status": "connected"
+        },
+        {
+          "id": "wa-agent",
+          "channel": "WhatsApp",
+          "address": "+44 7700 900333",
+          "role": "AI agent",
+          "status": "connected"
         }
       ]
     }
@@ -1852,6 +2285,99 @@
         "base": 0.15,
         "delayMeanDays": 7,
         "horizonDays": 21
+      },
+      "acc_connect": {
+        "costCents": 0
+      },
+      "wa_message": {
+        "costCents": 10,
+        "base": 0.004,
+        "delayMeanDays": 1,
+        "horizonDays": 7,
+        "ownYield": 1.0
+      },
+      "wa_inbox_personal": {
+        "costCents": 0,
+        "base": 1,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "webhook": {
+          "creates": true,
+          "perDay": 1
+        }
+      },
+      "wa_inbox_pro": {
+        "costCents": 0,
+        "base": 1,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "webhook": {
+          "creates": true,
+          "perDay": 1
+        }
+      },
+      "wa_inbox_agent": {
+        "costCents": 0,
+        "base": 1,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "webhook": {
+          "creates": true,
+          "perDay": 1
+        }
+      },
+      "wa_welcome": {
+        "costCents": 1,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 1
+      },
+      "answer_on_pro": {
+        "costCents": 0,
+        "base": 0.9,
+        "delayMeanDays": 0.5,
+        "horizonDays": 3
+      },
+      "ce_morning_v2": {
+        "costCents": 4,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 1.0
+      },
+      "ce_now_v2": {
+        "costCents": 4,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 0.6
+      },
+      "fu_angle_v2": {
+        "costCents": 3,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 2.0
+      },
+      "fu_bump_v2": {
+        "costCents": 2,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 0.72
+      },
+      "mb_replies_v2": {
+        "costCents": 0,
+        "base": 0.025,
+        "delayMeanDays": 2.5,
+        "horizonDays": 12
+      },
+      "li_connect_v2": {
+        "costCents": 40,
+        "base": 0.02,
+        "delayMeanDays": 3,
+        "horizonDays": 12,
+        "ownYield": 1.0
       }
     },
     "at": {
@@ -1955,7 +2481,9 @@
       "campaign-outbound": {
         "verdicts": {
           "message_written": "message_written#no-opt-outs",
-          "lead_visited": "none"
+          "lead_visited": "none",
+          "message_queued": "message_queued#ai-agent",
+          "reply_received": "reply_received#ai-agent"
         }
       },
       "campaign-follow-ups": {
@@ -1971,6 +2499,11 @@
           "lead_visited": 120
         },
         "days": 30
+      },
+      "campaign-welcome": {
+        "verdicts": {
+          "welcomed": "welcomed#pro"
+        }
       }
     }
   },

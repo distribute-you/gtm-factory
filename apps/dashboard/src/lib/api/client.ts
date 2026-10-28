@@ -7,11 +7,27 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FACTORY_API_URL } from "@/lib/data-source";
+import { FACTORY_API_URL, IS_API } from "@/lib/data-source";
 
 const REFRESH_EVENT = "gtm-factory:refresh";
 
+/** In the demo, the simulator answers the factory API in the browser: the same pages, another data source. */
+export type SimHandler = (method: string, path: string, body: unknown) => unknown;
+let simHandler: SimHandler | null = null;
+const waiting: (() => void)[] = [];
+
+/** The simulator registers itself as the backend; every read refetches. */
+export function setSimBackend(h: SimHandler): void {
+  simHandler = h;
+  for (const w of waiting.splice(0)) w();
+  refreshAll();
+}
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (!IS_API) {
+    if (!simHandler) await new Promise<void>((r) => waiting.push(r));
+    return simHandler!(method, path, body) as T;
+  }
   const res = await fetch(`${FACTORY_API_URL}${path}`, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },

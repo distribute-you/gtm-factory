@@ -43,6 +43,19 @@ import s39 from "./meeting_booked/tb_rep/v1";
 import s40 from "./meeting_attended/rm_email/v1";
 import s41 from "./meeting_attended/rm_sms/v1";
 import s42 from "./paid_client/cl_call/v1";
+import s43 from "./connected_account/acc_connect/v1";
+import s44 from "./reply_received/wa_message/v1";
+import s45 from "./message_received/wa_inbox_personal/v1";
+import s46 from "./message_received/wa_inbox_pro/v1";
+import s47 from "./message_received/wa_inbox_agent/v1";
+import s48 from "./welcomed/wa_welcome/v1";
+import s49 from "./answered_by_you/answer_on_pro/v1";
+import s50 from "./message_queued/ce_morning/v2";
+import s51 from "./message_queued/ce_now/v2";
+import s52 from "./follow_up_queued/fu_angle/v2";
+import s53 from "./follow_up_queued/fu_bump/v2";
+import s54 from "./reply_received/mb_replies/v2";
+import s55 from "./reply_received/li_connect/v2";
 
 export const LIBRARY: ScriptLibrary = {
   "rating/rating_pooled/v1": s0,
@@ -88,6 +101,19 @@ export const LIBRARY: ScriptLibrary = {
   "meeting_attended/rm_email/v1": s40,
   "meeting_attended/rm_sms/v1": s41,
   "paid_client/cl_call/v1": s42,
+  "connected_account/acc_connect/v1": s43,
+  "reply_received/wa_message/v1": s44,
+  "message_received/wa_inbox_personal/v1": s45,
+  "message_received/wa_inbox_pro/v1": s46,
+  "message_received/wa_inbox_agent/v1": s47,
+  "welcomed/wa_welcome/v1": s48,
+  "answered_by_you/answer_on_pro/v1": s49,
+  "message_queued/ce_morning/v2": s50,
+  "message_queued/ce_now/v2": s51,
+  "follow_up_queued/fu_angle/v2": s52,
+  "follow_up_queued/fu_bump/v2": s53,
+  "reply_received/mb_replies/v2": s54,
+  "reply_received/li_connect/v2": s55,
 };
 
 export { SOURCES } from "./sources";

@@ -14,7 +14,7 @@
  */
 
 import type { OutcomeId } from "./catalogue";
-import type { ScriptCode, ScriptContext, ScriptResult, VendorAnswer } from "./script";
+import type { AccountView, ScriptCode, ScriptContext, ScriptResult, VendorAnswer } from "./script";
 import { StorageHouse } from "./storage";
 import type { TacticValue } from "./tactics";
 
@@ -34,6 +34,8 @@ export interface ReplayCase {
   subject?: string | null;
   tactics?: Record<string, TacticValue>;
   day?: number;
+  /** The brand's connected accounts as they stood at that moment (a sending or reading script picks among them). */
+  accounts?: AccountView[];
   /** Every vendor call, in the order it was made. */
   calls: RecordedCall[];
   /** What the work produced: the script must return a result with these fields (deep equal), or fail when `fails`. */
@@ -96,6 +98,9 @@ export function replayCase(code: ScriptCode, c: ReplayCase): ReplayReport {
     day: c.day ?? 0,
     tactics: c.tactics ?? {},
     storage: new StorageHouse().forEngine("replay"),
+    accounts(channel, role) {
+      return (c.accounts ?? []).filter((a) => a.channel === channel && a.role === role);
+    },
     get(outcome) {
       const held = c.units[outcome];
       if (held === undefined) {

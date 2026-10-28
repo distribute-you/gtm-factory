@@ -7,3 +7,6 @@
 export const DATA_SOURCE: "sim" | "api" = process.env.NEXT_PUBLIC_DATA_SOURCE === "api" ? "api" : "sim";
 export const IS_API = DATA_SOURCE === "api";
 export const FACTORY_API_URL = (process.env.NEXT_PUBLIC_FACTORY_API_URL ?? "/api").replace(/\/$/, "");
+
+/** The public repository of the framework. */
+export const REPO_URL = "https://github.com/distribute-you/gtm-factory";

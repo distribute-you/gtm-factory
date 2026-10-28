@@ -355,7 +355,7 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
         <td className={`${TD} whitespace-nowrap`}>
           <span className="inline-flex items-center gap-2">
             <Mark kind={pick.kind === "input" ? "material" : "engine"} id={pick.place} size={16} />
-            {pick.kind === "input" ? `${pick.placeLabel} used` : pick.placeLabel}
+            {pick.kind === "input" ? `${pick.placeLabel} used` : `${pick.placeLabel} · script`}
           </span>
         </td>
         <td className={`${TD} whitespace-nowrap font-medium`}>{pick.pickedLabel}</td>

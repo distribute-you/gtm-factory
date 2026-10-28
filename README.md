@@ -1,4 +1,4 @@
-# GTM Factory v7
+# GTM Factory v10
 
 An open framework for running go-to-market as an industrial plant, in a plant's own words. A Campaign orders a Target. One Engine per outcome makes it, with competing scripts written as code. A script asks Providers for what it needs, at run time. Every Unit lands in one ledger, the common stock, and a Supplier rating makes every pick with the best value per dollar. The Plan is recomputed at every tick.
 

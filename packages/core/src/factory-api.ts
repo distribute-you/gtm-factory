@@ -30,6 +30,9 @@
  *   GET  /research                      -> ApiCandidates[]
  *   GET  /picks?campaignId=&leadId=     -> ApiPick[]
  *   GET  /tasks?brandId=&status=        -> ApiTask[] (work the Plan ordered from the client's team)
+ *   GET  /accounts?brandId=              -> ApiConnectedAccount[] (the brand's accounts, their role and counts)
+ *   PATCH /accounts/:id  { role }         -> ApiConnectedAccount
+ *   POST /accounts/connect { brandId, channel, role } -> { url } (the host's own page that connects an account)
  *   POST /tasks/:id/answer ApiTaskAnswer -> ApiTask (the answer becomes the Unit's content)
  *   GET  /ledger                        -> ApiLedger
  *
@@ -441,6 +444,8 @@ export interface ApiScriptStats {
   tactics: Record<string, string | number | boolean>;
   /** Its code: the file of scripts/ it runs. */
   code: string;
+  /** The text of its code, when the backend serves it (a hosted GTM Factory keeps it in its database). */
+  source?: string;
   /** The outcomes it calls: read from its code by a judge, then what the ledger measured each run consumed. */
   materials: OutcomeId[];
   materialsLabel: "judged" | "measured";
@@ -500,4 +505,23 @@ export interface ApiTask {
 
 export interface ApiTaskAnswer {
   values: Record<string, string | number | boolean>;
+}
+
+/**
+ * An account the brand connected (a mailbox, a WhatsApp number, a LinkedIn
+ * profile), with the role it gave it. Sending and reading scripts ask for a
+ * role; each picks its account among the brand's accounts with that role.
+ */
+export interface ApiConnectedAccount {
+  id: string;
+  brandId: string;
+  channel: string;
+  /** Its address or number. */
+  address: string;
+  /** Personal, Pro, AI agent... (values of the "Account role" tactic). */
+  role: string;
+  status: "connected" | "to_reconnect";
+  sentToday: number;
+  sentWeek: number;
+  readWeek: number;
 }

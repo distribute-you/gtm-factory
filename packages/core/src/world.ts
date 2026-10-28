@@ -72,6 +72,15 @@ export interface Campaign {
   endDay?: number;
 }
 
+/** An account the brand connected (a mailbox, a WhatsApp number, a LinkedIn profile), with the role it gave it. */
+export interface ConnectedAccount {
+  id: string;
+  channel: string;
+  address: string;
+  role: string;
+  status: "connected" | "to_reconnect";
+}
+
 /** A Unit in the stock before the campaign runs: the client's ICP, a template. */
 export interface SeedUnit {
   outcome: OutcomeId;
@@ -97,6 +106,8 @@ export interface WorldClient {
   offer: Offer;
   campaigns: Campaign[];
   seeds: SeedUnit[];
+  /** Accounts the brand connected: each lands as a Unit of the account outcome. */
+  accounts?: ConnectedAccount[];
   /** Scripts another party performs that this client connected (its CRM import, its mailbox reports). */
   connected: string[];
   /** Hidden: how much this client's market answers, all else equal. */
@@ -143,7 +154,7 @@ export interface ScriptTruth {
    * at its recall); `on`, it reports on each Unit of that outcome landing (a
    * mailbox reporting a message sent), at its base rate and delay.
    */
-  webhook?: { creates?: boolean; attests?: boolean; on?: OutcomeId };
+  webhook?: { creates?: boolean; attests?: boolean; on?: OutcomeId; perDay?: number };
 }
 
 export interface WorldTruth {

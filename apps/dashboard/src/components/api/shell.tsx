@@ -14,6 +14,7 @@ import {
   SquaresFourIcon,
   StackIcon,
   StorefrontIcon,
+  PlugsConnectedIcon,
   UserListIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
@@ -24,8 +25,8 @@ import { ScopeSelector } from "@/components/scope-selector";
 import { formatCount } from "@/lib/format";
 import { timeAgo } from "./common";
 
-/** The frame in api mode: Keel's canvas and sidebar, every page in one inset panel, no simulator. */
-export function ApiShell({ children }: { children: React.ReactNode }) {
+/** The one frame: Keel's canvas and sidebar, every page in one inset panel; in the demo, the simulator bar above it. */
+export function ApiShell({ children, top }: { children: React.ReactNode; top?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
@@ -43,7 +44,8 @@ export function ApiShell({ children }: { children: React.ReactNode }) {
               <Sidebar />
             </Suspense>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col pt-2">
+          <div className={`flex min-w-0 flex-1 flex-col ${top ? "" : "pt-2"}`}>
+            {top}
             <main className="k-panel k-scroll relative mb-2 ml-2 mr-2 min-w-0 flex-1 overflow-y-auto lg:ml-0">{children}</main>
           </div>
           <div id="portal" />
@@ -149,6 +151,7 @@ function Sidebar() {
         <Group title="Production">
           <NavItem href="/research/" label="Research" icon={<FlaskIcon size={15} />} active={at("/research")} />
           <NavItem href="/team/" label="Done by your team" icon={<UserListIcon size={15} />} active={at("/team")} />
+          <NavItem href="/accounts/" label="Connected accounts" icon={<PlugsConnectedIcon size={15} />} active={at("/accounts")} />
           <NavItem href="/catalogue/" label="Catalogue" icon={<StackIcon size={15} />} active={at("/catalogue")} />
           <NavItem href="/ledger/" label="Ledger" icon={<ReceiptIcon size={15} />} active={at("/ledger")} />
         </Group>
