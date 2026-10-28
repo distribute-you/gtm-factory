@@ -1,0 +1,5 @@
+.git
+.context
+**/node_modules
+apps/dashboard/.next
+apps/dashboard/out
