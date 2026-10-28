@@ -7,8 +7,6 @@ export default function run(ctx: ScriptContext): ScriptResult {
   if (sent.ageDays < wait) ctx.wait(wait - sent.ageDays);
   const llm = ctx.get("llm_completion");
   ctx.get("rating");
-  // Same thread, same address: the follow-up leaves from the mailbox the first message left from.
-  const account = String(sent.content.account ?? "");
-  const r = ctx.vendor.call("smtp.reply", { thread: sent.id, account, model: llm.content.model, angle: "new angle" });
-  return r.ok ? { content: { angle: "new angle", account, via: "sent" } } : null;
+  const r = ctx.vendor.call("smtp.reply", { thread: sent.id, model: llm.content.model, angle: "new angle" });
+  return r.ok ? { content: { angle: "new angle" } } : null;
 }

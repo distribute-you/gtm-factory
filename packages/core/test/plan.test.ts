@@ -94,8 +94,8 @@ describe("the Plan is shown as what ran", () => {
     }
     // Two ways to a reply ran this week; the LinkedIn branch finds no email under it, the cold email branch does.
     const replies = all.filter((n) => n.outcome === "reply_received").flatMap((n) => n.branches);
-    const li = replies.find((b) => b.scriptId === "li_connect");
-    const mb = replies.find((b) => b.scriptId === "mb_replies");
+    const li = replies.find((b) => b.scriptId === "li_connect_v2");
+    const mb = replies.find((b) => b.scriptId === "mb_replies_v2");
     expect(li && mb).toBeTruthy();
     const below = (b: { children: PlanTreeNode[] }): string[] => b.children.flatMap((n) => [n.outcome, ...n.branches.flatMap(below)]);
     expect(below(li!)).not.toContain("email_found");

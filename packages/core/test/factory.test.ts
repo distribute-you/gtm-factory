@@ -48,7 +48,7 @@ describe("expected and measured return", () => {
 
 describe("credit through traceability", () => {
   it("every Unit at a milestone carries the picks that led to it", () => {
-    const reply = s.units.find((u) => u.outcome === "reply_received" && u.scriptId === "mb_replies" && u.campaignId === "campaign-outbound")!;
+    const reply = s.units.find((u) => u.outcome === "reply_received" && u.scriptId === "mb_replies_v2" && u.campaignId === "campaign-outbound")!;
     const points = reply.trace.map((d) => s.decisions[d]!.point);
     for (const p of ["lead_interested|reply_received", "lead_found|audience_built", "message_written|template_written", "message_written|llm_completion", "message_written|email_found"]) expect(points).toContain(p);
   });

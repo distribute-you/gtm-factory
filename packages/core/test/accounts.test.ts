@@ -24,7 +24,7 @@ describe("connected accounts", () => {
   });
 
   it("a sending script picks the account itself, among those with its role: the mailboxes share the load", () => {
-    const used = accountOf("ce_morning");
+    const used = accountOf("ce_morning_v2");
     expect(used.length).toBeGreaterThan(100);
     for (const id of new Set(used)) expect(roleOf(id)).toBe("AI agent");
     const counts = ["mb-alex", "mb-sam", "mb-jo"].map((id) => used.filter((x) => x === id).length);
@@ -76,7 +76,7 @@ describe("connected accounts", () => {
     t.setAccountRole(b, "mb-jo", "Personal");
     expect(t.accountsOf(b).find((a) => a.id === "mb-jo")?.role).toBe("Personal");
     t.run(3);
-    const after = t.units.filter((u) => u.scriptId === "ce_morning" && u.day >= 6).map((u) => u.content?.account);
+    const after = t.units.filter((u) => u.scriptId === "ce_morning_v2" && u.day >= 6).map((u) => u.content?.account);
     expect(after.length).toBeGreaterThan(0);
     expect(after).not.toContain("mb-jo");
   }, 120_000);

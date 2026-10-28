@@ -19,7 +19,7 @@ describe("the simulator answers the factory API", () => {
     expect(c.plan?.outcome).toBe("paid_client");
     expect(c.milestones.length).toBeGreaterThan(2);
     for (const path of ["/catalogue", "/brands", `/brands/${brand}/plans`, "/campaigns", "/leads", "/objects?outcome=template_written", "/scripts", "/research", "/picks", `/tasks?brandId=${brand}`, `/accounts?brandId=${brand}`, "/ledger"]) expect(() => get(path), path).not.toThrow();
-    expect(get<ApiScriptStats[]>("/scripts").find((s) => s.id === "ce_morning")?.source).toContain("ctx.accounts(");
+    expect(get<ApiScriptStats[]>("/scripts").find((s) => s.id === "ce_morning_v2")?.source).toContain("ctx.accounts(");
   });
 
   it("writes go through the logged actions: a role change shows in the next read", () => {

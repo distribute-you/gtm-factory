@@ -676,6 +676,26 @@
         "tactics": {
           "send_window": "now",
           "channel": "Cold email",
+          "performed_by": "Ours"
+        },
+        "costCents": 4,
+        "status": "retired"
+      },
+      {
+        "id": "ce_now_v2",
+        "outcome": "message_queued",
+        "dynasty": "ce_now",
+        "version": 2,
+        "name": "Send now",
+        "kind": "rules",
+        "code": "message_queued/ce_now/v2",
+        "materials": [
+          "message_written",
+          "rating"
+        ],
+        "tactics": {
+          "send_window": "now",
+          "channel": "Cold email",
           "performed_by": "Ours",
           "account_role": "AI agent"
         },
@@ -690,6 +710,26 @@
         "name": "Send at local morning",
         "kind": "rules",
         "code": "message_queued/ce_morning/v1",
+        "materials": [
+          "message_written",
+          "rating"
+        ],
+        "tactics": {
+          "send_window": "morning",
+          "channel": "Cold email",
+          "performed_by": "Ours"
+        },
+        "costCents": 4,
+        "status": "retired"
+      },
+      {
+        "id": "ce_morning_v2",
+        "outcome": "message_queued",
+        "dynasty": "ce_morning",
+        "version": 2,
+        "name": "Send at local morning",
+        "kind": "rules",
+        "code": "message_queued/ce_morning/v2",
         "materials": [
           "message_written",
           "rating"
@@ -732,6 +772,24 @@
         ],
         "tactics": {
           "performed_by": "Mailbox",
+          "channel": "Cold email"
+        },
+        "costCents": 0,
+        "status": "retired"
+      },
+      {
+        "id": "mb_replies_v2",
+        "outcome": "reply_received",
+        "dynasty": "mb_replies",
+        "version": 2,
+        "name": "Mailbox inbox",
+        "kind": "rules",
+        "code": "reply_received/mb_replies/v2",
+        "materials": [
+          "message_queued"
+        ],
+        "tactics": {
+          "performed_by": "Mailbox",
           "channel": "Cold email",
           "account_role": "AI agent"
         },
@@ -746,6 +804,27 @@
         "name": "Connect and message",
         "kind": "rules",
         "code": "reply_received/li_connect/v1",
+        "materials": [
+          "lead_identified",
+          "template_written",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "channel": "LinkedIn",
+          "performed_by": "Ours"
+        },
+        "costCents": 40,
+        "status": "retired"
+      },
+      {
+        "id": "li_connect_v2",
+        "outcome": "reply_received",
+        "dynasty": "li_connect",
+        "version": 2,
+        "name": "Connect and message",
+        "kind": "rules",
+        "code": "reply_received/li_connect/v2",
         "materials": [
           "lead_identified",
           "template_written",
@@ -843,6 +922,27 @@
         "tactics": {
           "wait_days": 4,
           "performed_by": "Ours",
+          "channel": "Cold email"
+        },
+        "costCents": 2,
+        "status": "retired"
+      },
+      {
+        "id": "fu_bump_v2",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_bump",
+        "version": 2,
+        "name": "Short bump",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_bump/v2",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
           "channel": "Cold email",
           "account_role": "AI agent"
         },
@@ -857,6 +957,27 @@
         "name": "New angle",
         "kind": "ai",
         "code": "follow_up_queued/fu_angle/v1",
+        "materials": [
+          "message_sent",
+          "llm_completion",
+          "rating"
+        ],
+        "tactics": {
+          "wait_days": 4,
+          "performed_by": "Ours",
+          "channel": "Cold email"
+        },
+        "costCents": 3,
+        "status": "retired"
+      },
+      {
+        "id": "fu_angle_v2",
+        "outcome": "follow_up_queued",
+        "dynasty": "fu_angle",
+        "version": 2,
+        "name": "New angle",
+        "kind": "ai",
+        "code": "follow_up_queued/fu_angle/v2",
         "materials": [
           "message_sent",
           "llm_completion",
@@ -2216,6 +2337,47 @@
         "base": 0.9,
         "delayMeanDays": 0.5,
         "horizonDays": 3
+      },
+      "ce_morning_v2": {
+        "costCents": 4,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 1.0
+      },
+      "ce_now_v2": {
+        "costCents": 4,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 0.6
+      },
+      "fu_angle_v2": {
+        "costCents": 3,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 2.0
+      },
+      "fu_bump_v2": {
+        "costCents": 2,
+        "base": 0.98,
+        "delayMeanDays": 0,
+        "horizonDays": 0,
+        "end": 0.72
+      },
+      "mb_replies_v2": {
+        "costCents": 0,
+        "base": 0.025,
+        "delayMeanDays": 2.5,
+        "horizonDays": 12
+      },
+      "li_connect_v2": {
+        "costCents": 40,
+        "base": 0.02,
+        "delayMeanDays": 3,
+        "horizonDays": 12,
+        "ownYield": 1.0
       }
     },
     "at": {

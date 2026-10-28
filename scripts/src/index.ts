@@ -50,6 +50,12 @@ import s46 from "./message_received/wa_inbox_pro/v1";
 import s47 from "./message_received/wa_inbox_agent/v1";
 import s48 from "./welcomed/wa_welcome/v1";
 import s49 from "./answered_by_you/answer_on_pro/v1";
+import s50 from "./message_queued/ce_morning/v2";
+import s51 from "./message_queued/ce_now/v2";
+import s52 from "./follow_up_queued/fu_angle/v2";
+import s53 from "./follow_up_queued/fu_bump/v2";
+import s54 from "./reply_received/mb_replies/v2";
+import s55 from "./reply_received/li_connect/v2";
 
 export const LIBRARY: ScriptLibrary = {
   "rating/rating_pooled/v1": s0,
@@ -102,6 +108,12 @@ export const LIBRARY: ScriptLibrary = {
   "message_received/wa_inbox_agent/v1": s47,
   "welcomed/wa_welcome/v1": s48,
   "answered_by_you/answer_on_pro/v1": s49,
+  "message_queued/ce_morning/v2": s50,
+  "message_queued/ce_now/v2": s51,
+  "follow_up_queued/fu_angle/v2": s52,
+  "follow_up_queued/fu_bump/v2": s53,
+  "reply_received/mb_replies/v2": s54,
+  "reply_received/li_connect/v2": s55,
 };
 
 export { SOURCES } from "./sources";
