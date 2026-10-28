@@ -5,9 +5,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CheckIcon, XIcon } from "@phosphor-icons/react";
 import { OURS, type ApiCampaign, type ApiPick, type ApiCandidates, type ApiRun, type CatalogueData, type OutcomeId } from "@gtm-factory/core";
-import { CardTable, EmptyNote, Meter, Shimmer, TD, TDN, TH, ToneDot } from "@/components/ui";
+import { CardTable, EmptyNote, Meter, Shimmer, SparkLine, TD, TDN, TH, ToneDot } from "@/components/ui";
 import { Mark } from "@/components/mark";
 import { InputsLine } from "@/components/plan-tree";
 import { apiSend, type ApiRead } from "@/lib/api/client";
@@ -392,16 +392,40 @@ function PickRow({ pick, open, onToggle }: { pick: ApiPick; open: boolean; onTog
 }
 
 /** Each candidate place and its candidates' beliefs, under a uniform title. Rows keep the served order. */
+/** Share of a place's picks on the hidden best over its last `days` days (null without picks). Simulator only. */
+export function recentOnBest(p: ApiCandidates, days = 7): number | null {
+  const tail = (p.onBest ?? []).slice(-days);
+  const picks = tail.reduce((x, d) => x + d.picks, 0);
+  return picks > 0 ? tail.reduce((x, d) => x + d.onBest, 0) / picks : null;
+}
+
 export function PointsList({ points, catalogue, empty = "No candidate place yet." }: { points: ApiCandidates[]; catalogue?: CatalogueData | null; empty?: string }) {
   if (points.length === 0) return <div className="k-card"><EmptyNote>{empty}</EmptyNote></div>;
   return (
     <div className="space-y-3">
       {points.map((p) => {
+        // The world's hidden truth, when the backend knows it (the simulator): never read by any pick.
+        const truth = p.candidates.some((o) => o.truth);
+        const onBest = recentOnBest(p);
+        const footer = (
+          <span className="flex items-center justify-between gap-3">
+            <span>{formatCount(p.candidates.length)} scripts compete here</span>
+            {p.onBest && (
+              <span className="inline-flex items-center gap-2">
+                <span>Picks on the hidden best, last 7 days</span>
+                <span className="w-16">
+                  <SparkLine className="h-5" values={p.onBest.map((d) => (d.picks > 0 ? d.onBest / d.picks : 0))} color={onBest != null && onBest >= 0.8 ? "var(--run)" : "var(--accent)"} />
+                </span>
+                <span className={`tabular-nums ${onBest != null && onBest >= 0.8 ? "text-[var(--run)]" : ""}`}>{formatRatePct(onBest)}</span>
+              </span>
+            )}
+          </span>
+        );
         return (
-          <CardTable key={p.id} footer={`${formatCount(p.candidates.length)} scripts compete here`}>
+          <CardTable key={p.id} footer={footer}>
             <thead>
               <tr className="k-line-subtle border-b">
-                <th className={`${TH} w-full`} colSpan={7}>
+                <th className={`${TH} w-full`} colSpan={truth ? 8 : 7}>
                   <ApiPointTitle point={p} catalogue={catalogue} />
                 </th>
               </tr>
@@ -413,21 +437,40 @@ export function PointsList({ points, catalogue, empty = "No candidate place yet.
                 <th className={`${TH} text-right`}>Picks</th>
                 <th className={`${TH} text-right`}>Reached</th>
                 <th className={`${TH} text-right`}>Spent</th>
+                {truth && (
+                  <th className={`${TH} text-right`} title="Outcomes per dollar, as the world really does, never read by any pick">
+                    True per $
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {p.candidates.map((o) => (
                 <tr key={o.id} className="k-row k-line-subtle border-b last:border-b-0">
-                  <td className={TD}>
-                    {o.label}
+                  <td className={`${TD} w-full max-w-0`}>
+                    <span className="flex items-center gap-2">
+                      <span className="truncate">{o.label}</span>
+                      {o.hiddenBest && (
+                        <span className="k-chip inline-flex shrink-0 items-center gap-1 text-[var(--run)]">
+                          <CheckIcon size={11} weight="bold" /> Hidden best
+                        </span>
+                      )}
+                    </span>
                     <InputsLine inputs={o.inputs.map((i) => ({ label: i.label, versions: i.versions.map((v) => ({ label: v.label, share: v.share })) }))} className="mt-0.5" />
                   </td>
                   <td className={TDN}>{formatRatePct(o.share)}</td>
-                  <td className={TDN}>{o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}</td>
-                  <td className={TDN}>{formatRatePct(o.rateMean)}</td>
+                  <td className={TDN}>
+                    {o.costMeanCents < 0.5 ? <span className="k-fg3">Costs us nothing</span> : o.rateMean > 0 ? formatCents(Math.round(o.costMeanCents / o.rateMean)) : <span className="k-fg4">—</span>}
+                    {o.truth && <span className="k-fg3 block text-[11px]">true {o.truth.rate > 0 ? formatCents(Math.round(o.truth.costCents / o.truth.rate)) : "none"}</span>}
+                  </td>
+                  <td className={TDN}>
+                    {formatRatePct(o.rateMean)}
+                    {o.truth && <span className="k-fg3 block text-[11px]">true {formatRatePct(o.truth.rate)}</span>}
+                  </td>
                   <td className={TDN}>{formatCount(o.picks)}</td>
                   <td className={TDN}>{formatCount(o.successes)}</td>
                   <td className={TDN}>{formatCents(o.spentCents)}</td>
+                  {truth && <td className={`${TDN} ${o.hiddenBest ? "text-[var(--run)]" : ""}`}>{o.truth ? o.truth.perDollar.toFixed(3) : <span className="k-fg4">—</span>}</td>}
                 </tr>
               ))}
             </tbody>

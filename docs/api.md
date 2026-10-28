@@ -38,11 +38,14 @@ Put the API on the same origin under `/api` (a reverse proxy sending `/api/*` to
 | GET | `/leads?campaignId=&brandId=&state=` | `ApiLead[]` |
 | GET | `/leads/:id` | `ApiLeadDetail` |
 | POST | `/leads/:id/outcomes` | `{ outcome }` reported by another party |
-| GET, POST | `/objects?outcome=` | `ApiObjectDynasty[]`; POST `ApiNewObjectVersion` (upgrade, fork or new dynasty) |
+| GET, POST | `/objects?outcome=` | `ApiObjectDynasty[]`, each with its picks, its share of the last 7 days, the script that wrote it and, when a split proposed it, when and on how many subjects (the ICPs page); POST `ApiNewObjectVersion` (upgrade, fork or new dynasty) |
 | GET | `/scripts?outcome=` | `ApiScriptStats[]`: the scripts of one Engine, with their code, materials and capacity |
 | POST | `/scripts/:id/retire`, `/scripts/:id/restore` | `ApiScriptStats` |
 | POST | `/scripts/:id/capacity` | `ApiCapacity` (`perDay`, `daysPerUnit`, null for no limit), typed by a person for a script a person performs; answers `ApiScriptStats` |
 | GET | `/research` | `ApiCandidates[]`: at each place an Engine calls an outcome, the scripts that compete, with the Rating's belief about each and, on each script, the versions of the brand inputs (ICPs, templates) it used |
+| GET | `/series?brandId=` | `ApiSeries`: spend, Units per outcome and value won, per UTC day (the Today charts) |
+| GET | `/companies?brandId=` | `ApiCompany[]`: the companies the leads belong to, their values, the furthest milestone and when they were researched |
+| GET | `/proposals?brandId=` | `ApiProposal[]`: what the splits proposed (a finer ICP, a strategy), with every split looked at |
 | GET | `/picks?campaignId=&leadId=` | `ApiPick[]`: each pick (a script, or the version of a brand input a script used: `kind`), the candidates as scored then, and why |
 | GET | `/tasks?brandId=&status=` | `ApiTask[]`: the work the Plan ordered from the client's team, one per run of a script a person performs |
 | POST | `/tasks/:id/answer` | `ApiTaskAnswer` (`values`, one per field of the task's form); answers `ApiTask`. The answer becomes the Unit's content |
@@ -70,5 +73,5 @@ A failed write answers 4xx or 5xx with `{ "error": "<plain words>" }`; the dashb
 
 ## One dashboard, two data sources
 
-Every page of the dashboard reads this API and nothing else. The public demo answers the same routes in the browser from the simulator (`apps/dashboard/src/lib/sim-backend.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. Fields only a simulator can know (the hidden truth behind each candidate) are optional and shown only when served.
+Every page of the dashboard reads this API and nothing else. The public demo answers the same routes in the browser from the simulator (`apps/dashboard/src/lib/sim-backend.ts`), so the demo and a running GTM Factory show the same pages; only the data differs. Fields only a simulator can know (the hidden truth behind each candidate: `truth`, `hiddenBest`, `onBest`) are optional and shown only when served: the Research page then says how many places back the hidden best.
 

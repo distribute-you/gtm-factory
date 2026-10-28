@@ -40,6 +40,8 @@ export const PAGES = [
   ["campaign-reactive", "/campaigns/view/?id=campaign-follow-ups"],
   ["campaign-ads", "/campaigns/view/?id=campaign-ads"],
   ["team", "/team/"],
+  ["audiences", "/audiences/"],
+  ["companies", "/companies/"],
   ["accounts", "/accounts/"],
   ["leads", "/leads/"],
   ["lead", "LEAD"],

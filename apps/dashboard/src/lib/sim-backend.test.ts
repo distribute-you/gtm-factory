@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { ApiCampaignDetail, ApiConnectedAccount, ApiOverview, ApiScriptStats } from "@gtm-factory/core";
+import type { ApiCampaignDetail, ApiCandidates, ApiCompany, ApiConnectedAccount, ApiObjectDynasty, ApiOverview, ApiScriptStats, ApiSeries } from "@gtm-factory/core";
 import { buildModel } from "./model";
 import { simRoute } from "./sim-backend";
 import { WORLD, applyAction, replay } from "./world";
@@ -20,6 +20,27 @@ describe("the simulator answers the factory API", () => {
     expect(c.milestones.length).toBeGreaterThan(2);
     for (const path of ["/catalogue", "/brands", `/brands/${brand}/plans`, "/campaigns", "/leads", "/objects?outcome=template_written", "/scripts", "/research", "/picks", `/tasks?brandId=${brand}`, `/accounts?brandId=${brand}`, "/ledger"]) expect(() => get(path), path).not.toThrow();
     expect(get<ApiScriptStats[]>("/scripts").find((s) => s.id === "ce_morning_v2")?.source).toContain("ctx.accounts(");
+  });
+
+  it("serves what the Today charts, the ICPs, the companies and the hidden truth read", () => {
+    const s = get<ApiSeries>("/series");
+    expect(s.days).toHaveLength(12);
+    expect(s.spendCents).toHaveLength(12);
+    expect(s.spendCents.reduce((x, y) => x + y, 0)).toBeGreaterThan(0);
+    expect(Object.values(s.outcomes).some((v) => v.some((x) => x > 0))).toBe(true);
+    expect(s.valueCents).toHaveLength(12);
+    const icps = get<ApiObjectDynasty[]>("/objects?outcome=audience_built");
+    expect(icps.length).toBeGreaterThan(0);
+    expect(icps.some((d) => (d.picks ?? 0) > 0)).toBe(true);
+    const companies = get<ApiCompany[]>("/companies");
+    expect(companies.length).toBeGreaterThan(10);
+    expect(companies.every((c) => c.leads > 0 && c.name.length > 0)).toBe(true);
+    // The hidden truth is the simulator's alone: optional fields, one hidden best per place that has one.
+    const research = get<ApiCandidates[]>("/research");
+    expect(research.some((p) => p.candidates.some((o) => o.truth))).toBe(true);
+    for (const p of research) expect(p.candidates.filter((o) => o.hiddenBest).length).toBeLessThanOrEqual(1);
+    expect(research.some((p) => (p.onBest ?? []).some((d) => d.picks > 0))).toBe(true);
+    expect(() => get("/proposals")).not.toThrow();
   });
 
   it("writes go through the logged actions: a role change shows in the next read", () => {

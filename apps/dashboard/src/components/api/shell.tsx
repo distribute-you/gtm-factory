@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   BookOpenIcon,
+  BuildingsIcon,
   FlaskIcon,
   HouseIcon,
   PlusIcon,
@@ -94,6 +95,7 @@ function Sidebar() {
   const { data, error } = useOverview();
   const { orgs, scope, setScope } = useScope();
   const at = (p: string) => pathname === p || pathname === `${p}/`;
+  const audience = data?.catalogue.outcomes.find((x) => x.contentType === "audience" && !x.retired);
   const id = search.get("id");
   const brandName = (bid: string) => data?.brands.find((b) => b.id === bid)?.name ?? "";
   return (
@@ -134,6 +136,8 @@ function Sidebar() {
         </Group>
         <Group title="Records">
           <NavItem href="/leads/" label="Leads" icon={<UsersIcon size={15} />} active={at("/leads") || pathname.startsWith("/leads/view")} />
+          <NavItem href="/companies/" label="Companies" icon={<BuildingsIcon size={15} />} active={at("/companies")} />
+          {audience && <NavItem href="/audiences/" label={audience.plural ?? `${audience.label}s`} icon={<Mark kind="object" id={audience.id} icon={audience.icon} size={16} />} active={at("/audiences")} />}
         </Group>
         {data?.pins && data.pins.length > 0 && (
           <Group title="Pinned">
